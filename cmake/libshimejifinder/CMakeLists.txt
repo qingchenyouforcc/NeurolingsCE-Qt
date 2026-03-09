@@ -79,7 +79,6 @@ else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBARCHIVE REQUIRED libarchive)
 endif()
-include_directories(${LIBSHIMEJIFINDER_SOURCE_DIR})
 
 add_library(
     shimejifinder STATIC
@@ -95,12 +94,23 @@ add_library(
     ${DEFAULT_ACTIONS_CC}
     ${DEFAULT_BEHAVIORS_CC}
 )
+target_include_directories(
+    shimejifinder PRIVATE
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}
+)
 
-if(CMAKE_BUILD_TYPE EQUAL "Release")
-    target_compile_options(shimejifinder PRIVATE -O3 -Wall -Wextra -Werror -Wpedantic)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+if(NOT MSVC)
+    if(CMAKE_BUILD_TYPE EQUAL "Release")
+        target_compile_options(shimejifinder PRIVATE -O3 -Wall -Wextra -Werror -Wpedantic)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        target_compile_options(shimejifinder PRIVATE -O0 -g -Wall -Wextra -Werror -Wpedantic)
+    endif()
 else()
-    target_compile_options(shimejifinder PRIVATE -O0 -g -Wall -Wextra -Werror -Wpedantic)
+    set(_mode_t "unsigned short")
+    target_compile_definitions(shimejifinder PRIVATE
+        mode_t=${_mode_t}
+    )
 endif()
 
 # No need for explicit dependency on default_xmls_target anymore

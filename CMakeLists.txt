@@ -108,6 +108,8 @@ add_subdirectory(libshijima)
 
 if(MSVC AND TARGET shijima)
   set_property(TARGET shijima PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
+  # Handle UTF-8 source files in libshijima (contains Unicode characters)
+  target_compile_options(shijima PRIVATE /utf-8)
 endif()
 
 # ElaWidgetTools (Fluent Design UI components)
@@ -123,6 +125,10 @@ add_subdirectory(ElaWidgetTools/ElaWidgetTools)
 if(MSVC AND TARGET ElaWidgetTools)
   set_property(TARGET ElaWidgetTools PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
 endif()
+target_compile_options(ElaWidgetTools PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-w>
+    $<$<CXX_COMPILER_ID:MSVC>:/W0>
+)
 
 # libshimejifinder's upstream CMakeLists.txt relies on a bash script (bin2cpp.sh)
 # which cannot run on Windows natively. This project instead routes through
@@ -404,15 +410,17 @@ if(WIN32)
 endif()
 
 # On Release builds, strip the binary to reduce size.
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  message(STATUS "Release build: adding post-build command to strip binary")
-  add_custom_command(
-      TARGET NeurolingsCE POST_BUILD
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:NeurolingsCE>
-      COMMENT "Stripping binary"
-  )
-else()
-  message(STATUS "Non-release build: skipping binary stripping")
+if(NOT MSVC)
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Release build: adding post-build command to strip binary")
+    add_custom_command(
+        TARGET NeurolingsCE POST_BUILD
+        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:NeurolingsCE>
+        COMMENT "Stripping binary"
+    )
+  else()
+    message(STATUS "Non-release build: skipping binary stripping")
+  endif()
 endif()
 
 # Generate metainfo.xml from template with version substitution
