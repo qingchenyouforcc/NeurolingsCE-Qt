@@ -24,9 +24,8 @@ jobs:
             qt_install_name: gcc_64
           - name: windows-latest
             host: windows
-            qt_arch: win64_mingw
-            qt_tools: tools_mingw1310
-            qt_install_name: mingw_64
+            qt_arch: win64_msvc2022_64
+            qt_install_name: msvc2022_64
 
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +38,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-cursor0 libarchive-dev libwayland-dev wayland-protocols ccache zip
 
+      - name: Patch libshijima & libshimejifinder for MSVC compatibility
+        if: matrix.platform.host == 'windows'
+        shell: bash
+        run: |
+          sed -i 's/set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")//' libshijima/CMakeLists.txt
+          sed -i 's/#include <unistd.h>//' libshimejifinder/shimejifinder/archive.cc
+
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
         with:
-          version: "6.8.2"
+          version: "6.8.3"
           host: ${{ matrix.platform.host }}
           target: "desktop"
           arch: ${{ matrix.platform.qt_arch }}
@@ -58,14 +64,17 @@ jobs:
 
       - name: Build with CMake
         shell: bash
+        env:
+          SCCACHE_GHA_ENABLED: "true"
         run: |
-          cmake -S . -B build -G Ninja \
+          cmake -S . -B build \
             -D CMAKE_BUILD_TYPE=RelWithDebInfo \
-            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/6.8.2/${{ matrix.platform.qt_install_name }}" \
-            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+            ${{ matrix.platform.host != 'windows' && '-G Ninja' || '-G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake' }} \
+            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/6.8.3/${{ matrix.platform.qt_install_name }}" \
             -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
             -D SHIJIMA_WITH_LIBSHIMEJIFINDER=ON
-          cmake --build build -j 4
+          cmake --build build --parallel
 
       - name: Archive ${{ matrix.platform.host }} x86_64 debug build
         uses: actions/upload-artifact@v4
