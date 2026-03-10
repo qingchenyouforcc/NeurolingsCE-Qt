@@ -14,6 +14,8 @@ jobs:
   build:
     name: Build on ${{ matrix.platform.host }}
     runs-on: ${{ matrix.platform.name }}
+    env:
+      QT_VERSION: "6.8.3"
     strategy:
       fail-fast: false
       matrix:
@@ -48,32 +50,28 @@ jobs:
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
         with:
-          version: "6.8.3"
+          version: ${{ env.QT_VERSION }}
           host: ${{ matrix.platform.host }}
           target: "desktop"
           arch: ${{ matrix.platform.qt_arch }}
           modules: "qtmultimedia"
-          tools: ${{ matrix.platform.qt_tools || '' }}
           cache: true
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ matrix.platform.host }}-qt6-debug
-          max-size: 800M
+          max-size: 500M
 
       - name: Build with CMake
         shell: bash
-        env:
-          SCCACHE_GHA_ENABLED: "true"
         run: |
           cmake -S . -B build \
-            -D CMAKE_BUILD_TYPE=RelWithDebInfo \
-            ${{ matrix.platform.host != 'windows' && '-G Ninja' || '-G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake' }} \
-            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/6.8.3/${{ matrix.platform.qt_install_name }}" \
+            -D CMAKE_BUILD_TYPE=Debug \
+            ${{ matrix.platform.host != 'windows' && '-G Ninja' || '-G "Visual Studio 17 2022" -A x64' }} \
+            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}" \
             -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
-            -D SHIJIMA_WITH_LIBSHIMEJIFINDER=ON
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache
           cmake --build build --parallel
 
       - name: Archive ${{ matrix.platform.host }} x86_64 debug build
