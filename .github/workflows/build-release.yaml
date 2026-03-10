@@ -21,7 +21,7 @@ jobs:
             host: linux
             qt_arch: linux_gcc_64
             qt_install_name: gcc_64
-            build_target_arg: --target appimage
+            build_args: --target appimage
             artifact_name: linux-x86_64
             artifact_path: build/NeurolingsCE.AppImage
 
@@ -29,7 +29,7 @@ jobs:
             host: linux_arm64
             qt_arch: linux_gcc_arm64
             qt_install_name: gcc_arm64
-            build_target_arg: --target appimage
+            build_args: --target appimage
             artifact_name: linux-arm64
             artifact_path: build/NeurolingsCE.AppImage
 
@@ -37,6 +37,7 @@ jobs:
             host: windows
             qt_arch: win64_msvc2022_64
             qt_install_name: msvc2022_64
+            build_args: --config Release
             artifact_name: windows-x86_64
             artifact_path: build/bin/
 
@@ -90,7 +91,7 @@ jobs:
             -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}" \
             -D CMAKE_C_COMPILER_LAUNCHER=ccache \
             -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          cmake --build build --parallel ${{ matrix.platform.build_target_arg  || '' }}
+          cmake --build build --parallel ${{ matrix.platform.build_args }}
 
       - name: Archive ${{ matrix.platform.artifact_name }} release build
         uses: actions/upload-artifact@v4
