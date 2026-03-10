@@ -75,8 +75,19 @@ if(NOT DEFINED SHIMEJIFINDER_USE_LIBUNARR)
 endif()
 
 if(SHIMEJIFINDER_USE_LIBUNARR)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries" FORCE)
     add_subdirectory(${LIBSHIMEJIFINDER_SOURCE_DIR}/unarr
                         ${LIBSHIMEJIFINDER_BIN_DIR}/unarr)
+    # unarr unconditionally adds -flto for MINGW/UNIX builds, which produces
+    # LTO-only object files in libunarr.a. When shimejifinder (non-LTO) links
+    # against it, the linker cannot resolve the LTO IR symbols, causing
+    # "undefined reference to ar_open_*" errors. Strip -flto here so that
+    # libunarr.a contains regular machine-code symbols.
+    get_target_property(_unarr_compile_opts unarr COMPILE_OPTIONS)
+    if(_unarr_compile_opts)
+        list(REMOVE_ITEM _unarr_compile_opts -flto)
+        set_target_properties(unarr PROPERTIES COMPILE_OPTIONS "${_unarr_compile_opts}")
+    endif()
 endif()
 if(SHIMEJIFINDER_USE_LIBARCHIVE)
     if(SHIMEJIFINDER_BUILD_LIBARCHIVE)
