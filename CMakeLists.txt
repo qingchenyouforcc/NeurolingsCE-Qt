@@ -137,12 +137,14 @@ target_compile_options(ElaWidgetTools PRIVATE
 # than the shared-only 'archive' target, making it fully cross-platform.
 # NOTE: When building on Windows with MinGW, use the compiler bundled with Qt
 # (e.g. D:/Qt/Tools/mingw1310_64) to avoid GCC runtime version mismatches.
-option(SHIJIMA_WITH_LIBSHIMEJIFINDER "Build with bundled libshimejifinder" OFF)
+option(SHIJIMA_WITH_LIBSHIMEJIFINDER "Build with bundled libshimejifinder" ON)
 
 if(SHIJIMA_WITH_LIBSHIMEJIFINDER)
   set(LIBSHIMEJIFINDER_SOURCE_DIR ${CMAKE_SOURCE_DIR}/libshimejifinder)
   set(LIBSHIMEJIFINDER_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/libshimejifinder)
   set(BIN2CPP_CMAKE_SCRIPT ${CMAKE_SOURCE_DIR}/cmake/bin2cpp.cmake)
+  set(SHIMEJIFINDER_USE_LIBARCHIVE OFF)
+  set(SHIMEJIFINDER_USE_LIBUNARR ON)
   add_subdirectory(${CMAKE_SOURCE_DIR}/cmake/libshimejifinder)
 endif()
 
@@ -152,14 +154,7 @@ option(SHIJIMA_WITH_LICENSES_TEXT "Embed licenses text" ON)
 set(_shijima_generated_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(_shijima_licenses_header "${_shijima_generated_dir}/licenses_generated.hpp")
 
-set(_SHIJIMA_WITH_SHIMEJIFINDER_DEFAULT ON)
-if(WIN32)
-  # Keep shimejifinder (archive import UI) off by default on Windows.
-  # To enable it, also pass -DSHIJIMA_WITH_LIBSHIMEJIFINDER=ON and ensure
-  # you are using the Qt-bundled MinGW toolchain (see note above).
-  set(_SHIJIMA_WITH_SHIMEJIFINDER_DEFAULT OFF)
-endif()
-option(SHIJIMA_WITH_SHIMEJIFINDER "Enable archive import support" ${_SHIJIMA_WITH_SHIMEJIFINDER_DEFAULT})
+option(SHIJIMA_WITH_SHIMEJIFINDER "Enable archive import support" ON)
 
 add_executable(NeurolingsCE)
 
@@ -353,15 +348,20 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/miniz/miniz.c PROPERTIES
 if(SHIJIMA_WITH_SHIMEJIFINDER)
   if(SHIJIMA_WITH_LIBSHIMEJIFINDER)
     target_link_libraries(NeurolingsCE PRIVATE shimejifinder)
-    target_compile_definitions(NeurolingsCE PRIVATE SHIMEJIFINDER_NO_LIBARCHIVE=0 SHIMEJIFINDER_NO_LIBUNARR=0)
+    # target_compile_definitions(NeurolingsCE PRIVATE
+    #   SHIMEJIFINDER_NO_LIBARCHIVE=0
+    #   # SHIMEJIFINDER_NO_LIBUNARR=0
+    # )
+    message(STATUS "Building with bundled libshimejifinder (archive import support enabled).")
   else()
     message(FATAL_ERROR "SHIJIMA_WITH_SHIMEJIFINDER=ON requires SHIJIMA_WITH_LIBSHIMEJIFINDER=ON for now.")
   endif()
 else()
-  target_compile_definitions(NeurolingsCE PRIVATE
-    SHIMEJIFINDER_NO_LIBARCHIVE=1
-    SHIMEJIFINDER_NO_LIBUNARR=1
-  )
+  # target_compile_definitions(NeurolingsCE PRIVATE
+  #   SHIMEJIFINDER_NO_LIBARCHIVE=1
+  #   # SHIMEJIFINDER_NO_LIBUNARR=1
+  # )
+  message(STATUS "Archive import support disabled (SHIJIMA_WITH_SHIMEJIFINDER=OFF).")
 endif()
 
 if(SHIJIMA_USE_QTMULTIMEDIA)

@@ -1,5 +1,5 @@
 # Modified from:
-#   https://github.com/pixelomer/libshimejifinder/blob/5b2ffb98f06939dae4aa075fabda2cf527abbaaf/CMakeLists.txt
+#   https://github.com/pixelomer/libshimejifinder/blob/226d97a4de3b3b0ed849163c841b422a6b389a5c/CMakeLists.txt
 
 if(NOT DEFINED LIBSHIMEJIFINDER_SOURCE_DIR)
   message(FATAL_ERROR "LIBSHIMEJIFINDER_SOURCE_DIR must be set to the path of libshimejifinder/")
@@ -20,7 +20,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-set(BUILD_SHARED_LIBS OFF)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries" FORCE)
+if(NOT TARGET pugixml)
+    add_subdirectory(
+        ${LIBSHIMEJIFINDER_SOURCE_DIR}/pugixml
+        ${LIBSHIMEJIFINDER_BIN_DIR}/pugixml
+    )
+endif()
 set(ENABLE_UNZIP OFF)
 set(ENABLE_TEST OFF)
 set(ENABLE_CAT OFF)
@@ -61,23 +67,26 @@ if(NOT DEFINED CMAKE_BUILD_TYPE)
 endif()
 
 if(NOT DEFINED SHIMEJIFINDER_BUILD_LIBARCHIVE)
-    set(SHIMEJIFINDER_BUILD_LIBARCHIVE YES)
+    set(SHIMEJIFINDER_BUILD_LIBARCHIVE ON)
 endif()
 
 if(NOT DEFINED SHIMEJIFINDER_USE_LIBUNARR)
-    set(SHIMEJIFINDER_USE_LIBUNARR YES)
+    set(SHIMEJIFINDER_USE_LIBUNARR ON)
 endif()
 
-if (SHIMEJIFINDER_USE_LIBUNARR)
+if(SHIMEJIFINDER_USE_LIBUNARR)
     add_subdirectory(${LIBSHIMEJIFINDER_SOURCE_DIR}/unarr
                         ${LIBSHIMEJIFINDER_BIN_DIR}/unarr)
 endif()
-if(SHIMEJIFINDER_BUILD_LIBARCHIVE)
-    add_subdirectory(${LIBSHIMEJIFINDER_SOURCE_DIR}/libarchive
-                        ${LIBSHIMEJIFINDER_BIN_DIR}/libarchive)
-else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LIBARCHIVE REQUIRED libarchive)
+if(SHIMEJIFINDER_USE_LIBARCHIVE)
+    if(SHIMEJIFINDER_BUILD_LIBARCHIVE)
+        set(BUILD_SHARED_LIBS OFF)
+        add_subdirectory(${LIBSHIMEJIFINDER_SOURCE_DIR}/libarchive
+                            ${LIBSHIMEJIFINDER_BIN_DIR}/libarchive)
+    else()
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LIBARCHIVE REQUIRED libarchive)
+    endif()
 endif()
 
 add_library(
@@ -90,6 +99,12 @@ add_library(
     ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/archive.cc
     ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/archive_entry.cc
     ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/extract_target.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/extractor.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/fs_extractor.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/memory_extractor.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/utf8_convert/jni.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/utf8_convert/icu.cc
+    ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/utf8_convert/iconv.cc
     ${LIBSHIMEJIFINDER_SOURCE_DIR}/shimejifinder/utils.cc
     ${DEFAULT_ACTIONS_CC}
     ${DEFAULT_BEHAVIORS_CC}
@@ -98,6 +113,37 @@ target_include_directories(
     shimejifinder PRIVATE
     ${LIBSHIMEJIFINDER_SOURCE_DIR}
 )
+
+if(SHIMEJIFINDER_USE_CUSTOM_UTF8_CONVERT)
+    # consumer of libshimejifinder must provide shimejifinder::is_valid_utf8
+    # and shimejifinder::shift_jis_to_utf8
+    target_compile_definitions(shimejifinder PUBLIC -DSHIMEJIFINDER_USE_CUSTOM_UTF8_CONVERT=1
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=1)
+elseif(SHIMEJIFINDER_USE_ICU)
+    find_package(ICU COMPONENTS uc REQUIRED)
+    target_link_libraries(shimejifinder ICU::uc)
+    target_compile_definitions(shimejifinder PUBLIC -DSHIMEJIFINDER_USE_ICU=1
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=1)
+elseif(SHIMEJIFINDER_USE_ICONV)
+    find_package(Iconv)
+    target_link_libraries(shimejifinder Iconv::Iconv)
+    target_compile_definitions(shimejifinder PUBLIC -DSHIMEJIFINDER_USE_ICONV=1
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=1)
+elseif(SHIMEJIFINDER_USE_JNI)
+    find_package(JNI REQUIRED)
+    target_link_libraries(shimejifinder JNI::JNI JNI::JVM)
+    target_include_directories(shimejifinder PUBLIC ${JNI_INCLUDE_DIRS})
+    target_compile_definitions(shimejifinder PUBLIC -DSHIMEJIFINDER_USE_JNI=1
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=1)
+elseif(ANDROID AND (SHIMEJIFINDER_USE_JNI OR NOT DEFINED SHIMEJIFINDER_USE_JNI))
+    target_link_libraries(shimejifinder android)
+    target_compile_definitions(shimejifinder PUBLIC -DSHIMEJIFINDER_USE_JNI=1
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=1)
+else()
+    target_compile_definitions(shimejifinder PUBLIC
+        -DSHIMEJIFINDER_HAS_UTF8_CONVERT=0)
+endif()
+
 
 if(NOT MSVC)
     if(CMAKE_BUILD_TYPE EQUAL "Release")
@@ -108,23 +154,37 @@ if(NOT MSVC)
     endif()
 else()
     set(_mode_t "unsigned short")
-    target_compile_definitions(shimejifinder PRIVATE
-        mode_t=${_mode_t}
-    )
+    target_compile_definitions(shimejifinder PRIVATE mode_t=${_mode_t})
+    target_compile_options(shimejifinder PRIVATE /utf-8)
 endif()
 
-# No need for explicit dependency on default_xmls_target anymore
-# CMake tracks the OUTPUT files from add_custom_command automatically
-if(SHIMEJIFINDER_USE_LIBUNARR)
-    target_link_libraries(shimejifinder unarr)
-    add_dependencies(shimejifinder unarr)
-else()
-    add_definitions(-DSHIMEJIFINDER_NO_LIBUNARR=1)
+add_dependencies(shimejifinder pugixml)
+target_link_libraries(shimejifinder PRIVATE pugixml)
+
+if(NOT SHIMEJIFINDER_USE_LIBARCHIVE AND NOT SHIMEJIFINDER_USE_LIBUNARR)
+    message(FATAL_ERROR "At least one of SHIMEJIFINDER_USE_LIBARCHIVE or SHIMEJIFINDER_USE_LIBUNARR must be enabled")
 endif()
-if(SHIMEJIFINDER_BUILD_LIBARCHIVE)
-    target_link_libraries(shimejifinder archive_static)
-    add_dependencies(shimejifinder archive_static)
+
+if(SHIMEJIFINDER_USE_LIBUNARR)
+    add_dependencies(shimejifinder unarr)
+    target_link_libraries(shimejifinder PRIVATE unarr)
+    target_compile_definitions(shimejifinder PUBLIC SHIMEJIFINDER_NO_LIBUNARR=0)
 else()
-    target_link_libraries(shimejifinder ${LIBARCHIVE_LIBRARIES})
-    target_include_directories(shimejifinder PUBLIC ${LIBARCHIVE_INCLUDE_DIRS})
+    target_compile_definitions(shimejifinder PUBLIC SHIMEJIFINDER_NO_LIBUNARR=1)
+endif()
+
+if(SHIMEJIFINDER_USE_LIBARCHIVE)
+    if(SHIMEJIFINDER_BUILD_LIBARCHIVE)
+        add_dependencies(shimejifinder archive_static)
+        target_link_libraries(shimejifinder PUBLIC archive_static)
+        if(WIN32)
+            target_compile_definitions(shimejifinder PUBLIC LIBARCHIVE_STATIC)
+        endif()
+    else()
+        target_link_libraries(shimejifinder PUBLIC ${LIBARCHIVE_LIBRARIES})
+        target_include_directories(shimejifinder PUBLIC ${LIBARCHIVE_INCLUDE_DIRS})
+    endif()
+    target_compile_definitions(shimejifinder PUBLIC SHIMEJIFINDER_NO_LIBARCHIVE=0)
+else()
+    target_compile_definitions(shimejifinder PUBLIC SHIMEJIFINDER_NO_LIBARCHIVE=1)
 endif()

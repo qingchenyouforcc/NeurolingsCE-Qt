@@ -63,7 +63,6 @@ NeurolingsCE/
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **32-bit MSVC**: Explicitly fatal-errored. Must use x64 toolchain.
-- **libshimejifinder on MSVC**: Off by default (`SHIJIMA_WITH_LIBSHIMEJIFINDER=OFF`). Depends on Unix tooling/bash scripts. MSVC builds require prebuilt or skip it.
 - **`SHIJIMA_WITH_DEFAULT_MASCOT=OFF`**: Not supported — `DefaultMascot.cc` is required.
 - **`SHIJIMA_WITH_LICENSES_TEXT=OFF`**: Not supported — `licenses_generated.hpp` is required.
 - **libshijima**: Does NOT accept contributions (stated in their README). Treat as read-only dependency.
