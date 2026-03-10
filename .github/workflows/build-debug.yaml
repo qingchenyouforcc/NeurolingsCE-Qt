@@ -16,6 +16,11 @@ jobs:
     runs-on: ${{ matrix.platform.name }}
     env:
       QT_VERSION: "6.8.3"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 500M
+      CMAKE_C_COMPILER_LAUNCHER: sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: sccache
     strategy:
       fail-fast: false
       matrix:
@@ -57,22 +62,21 @@ jobs:
           modules: "qtmultimedia"
           cache: true
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ matrix.platform.host }}-qt6-debug
-          max-size: 500M
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Build with CMake
+      - name: Configure with CMake
         shell: bash
         run: |
           cmake -S . -B build \
             -D CMAKE_BUILD_TYPE=Debug \
             ${{ matrix.platform.host != 'windows' && '-G Ninja' || '-G "Visual Studio 17 2022" -A x64' }} \
-            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}" \
-            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -D CMAKE_C_COMPILER_LAUNCHER=ccache
-          cmake --build build --parallel
+            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}"
+
+      - name: Build with CMake
+        shell: bash
+        run: |
+          cmake --build build --parallel --config Debug
 
       - name: Archive ${{ matrix.platform.host }} x86_64 debug build
         uses: actions/upload-artifact@v4
