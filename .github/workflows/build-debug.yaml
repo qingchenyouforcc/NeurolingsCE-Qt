@@ -16,11 +16,6 @@ jobs:
     runs-on: ${{ matrix.platform.name }}
     env:
       QT_VERSION: "6.8.3"
-      SCCACHE_GHA_ENABLED: "true"
-      SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      SCCACHE_CACHE_SIZE: 500M
-      CMAKE_C_COMPILER_LAUNCHER: sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: sccache
     strategy:
       fail-fast: false
       matrix:
@@ -31,8 +26,9 @@ jobs:
             qt_install_name: gcc_64
           - name: windows-latest
             host: windows
-            qt_arch: win64_msvc2022_64
-            qt_install_name: msvc2022_64
+            qt_tools: tools_mingw1310
+            qt_arch: win64_mingw
+            qt_install_name: mingw_64
 
     steps:
       - uses: actions/checkout@v4
@@ -45,12 +41,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-cursor0 libarchive-dev libwayland-dev wayland-protocols ccache zip
 
-      - name: Patch libshijima & libshimejifinder for MSVC compatibility
-        if: matrix.platform.host == 'windows'
-        shell: bash
-        run: |
-          sed -i 's/set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")//' libshijima/CMakeLists.txt
-          sed -i 's/#include <unistd.h>//' libshimejifinder/shimejifinder/archive.cc
+      # - name: Patch libshijima & libshimejifinder for MSVC compatibility
+      #   if: matrix.platform.host == 'windows'
+      #   shell: bash
+      #   run: |
+      #     sed -i 's/set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wpedantic")//' libshijima/CMakeLists.txt
+      #     sed -i 's/#include <unistd.h>//' libshimejifinder/shimejifinder/archive.cc
 
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
@@ -60,22 +56,23 @@ jobs:
           target: "desktop"
           arch: ${{ matrix.platform.qt_arch }}
           modules: "qtmultimedia"
+          tools: ${{ matrix.platform.qt_tools || '' }}
           cache: true
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Setup sccache on Windows
-        if: runner.os == 'Windows'
-        run: Add-Content -Path $env:GITHUB_ENV -Value "SCCACHE_GHA_ENABLED=true"
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.platform.host }}-qt6-debug
+          max-size: 500M
 
       - name: Configure with CMake
         shell: bash
         run: |
-          cmake -S . -B build \
+          cmake -S . -B build -G Ninja \
             -D CMAKE_BUILD_TYPE=Debug \
-            ${{ matrix.platform.host != 'windows' && '-G Ninja' || '-G "Visual Studio 17 2022" -A x64' }} \
-            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}"
+            -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}" \
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build with CMake
         shell: bash

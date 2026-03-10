@@ -375,37 +375,33 @@ endif()
 
 # On Windows, use windeployqt to deploy the Qt runtime in release builds.
 if(WIN32)
-  if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION_$<UPPER_CASE:$<CONFIG>>)
-    if(NOT _qt_core_location)
-      get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION_RELEASE)
-    endif()
-    if(NOT _qt_core_location)
-      get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION)
-    endif()
+  get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION_$<UPPER_CASE:$<CONFIG>>)
+  if(NOT _qt_core_location)
+    get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION_RELEASE)
+  endif()
+  if(NOT _qt_core_location)
+    get_target_property(_qt_core_location Qt6::Core IMPORTED_LOCATION)
+  endif()
 
-    if(_qt_core_location)
-      get_filename_component(_qt_bin_dir "${_qt_core_location}" DIRECTORY)
-      find_program(QT_WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
-    else()
-      find_program(QT_WINDEPLOYQT_EXECUTABLE windeployqt)
-    endif()
-
-    if(QT_WINDEPLOYQT_EXECUTABLE)
-      add_custom_command(TARGET NeurolingsCE POST_BUILD
-        COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
-                --no-translations
-                --no-system-d3d-compiler
-                "$<TARGET_FILE:NeurolingsCE>"
-        WORKING_DIRECTORY "$<TARGET_FILE_DIR:NeurolingsCE>"
-        VERBATIM
-      )
-      message(STATUS "Release build: adding post-build command windeployqt to deploy Qt runtime.")
-    else()
-      message(WARNING "windeployqt not found; NeurolingsCE.exe may fail to start outside of a Qt environment (missing Qt6Guid.dll).")
-    endif()
+  if(_qt_core_location)
+    get_filename_component(_qt_bin_dir "${_qt_core_location}" DIRECTORY)
+    find_program(QT_WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
   else()
-    message(STATUS "Non-release build: skipping windeployqt.")
+    find_program(QT_WINDEPLOYQT_EXECUTABLE windeployqt)
+  endif()
+
+  if(QT_WINDEPLOYQT_EXECUTABLE)
+    add_custom_command(TARGET NeurolingsCE POST_BUILD
+      COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
+              --no-translations
+              --no-system-d3d-compiler
+              "$<TARGET_FILE:NeurolingsCE>"
+      WORKING_DIRECTORY "$<TARGET_FILE_DIR:NeurolingsCE>"
+      VERBATIM
+    )
+    message(STATUS "windeployqt found; adding post-build command to deploy Qt runtime.")
+  else()
+    message(WARNING "windeployqt not found; NeurolingsCE.exe may fail to start outside of a Qt environment (missing Qt6Guid.dll).")
   endif()
 endif()
 
@@ -423,56 +419,22 @@ if(NOT MSVC)
   endif()
 endif()
 
+function(define_assets_target TARGET_NAME TARGET)
+  set(_input_file "${CMAKE_CURRENT_SOURCE_DIR}/src/${TARGET}.in")
+  set(_target_file "${CMAKE_CURRENT_SOURCE_DIR}/src/${TARGET}")
+  configure_file(${_input_file} ${_target_file} @ONLY)
+  add_custom_target(${TARGET_NAME} ALL DEPENDS ${_target_file})
+  add_dependencies(NeurolingsCE ${TARGET_NAME})
+endfunction()
+
 # Generate metainfo.xml from template with version substitution
-set(METAINFO_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/io.github.qingchenyouforcc.NeurolingsCE.metainfo.xml.in")
-set(METAINFO_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/io.github.qingchenyouforcc.NeurolingsCE.metainfo.xml")
-
-
-configure_file(
-  ${METAINFO_TEMPLATE}
-  ${METAINFO_OUTPUT}
-  @ONLY
-)
-
-add_custom_target(generate_metainfo ALL DEPENDS "${METAINFO_OUTPUT}")
-add_dependencies(NeurolingsCE generate_metainfo)
-
+define_assets_target(METAINFO_XML "packaging/io.github.qingchenyouforcc.NeurolingsCE.metainfo.xml")
 
 # Generate resources.rc from template (Windows)
-set(RESOURCES_RC_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/resources.rc.in")
-set(RESOURCES_RC_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/resources.rc")
-
-configure_file(
-  ${RESOURCES_RC_TEMPLATE}
-  ${RESOURCES_RC_OUTPUT}
-  @ONLY
-)
-
-add_custom_target(generate_resources_rc ALL DEPENDS "${RESOURCES_RC_OUTPUT}")
-add_dependencies(NeurolingsCE generate_resources_rc)
+define_assets_target(RESOURCES_RC "resources/resources.rc")
 
 # Generate Info.plist from template (macOS)
-set(INFO_PLIST_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/NeurolingsCE.app/Contents/Info.plist.in")
-set(INFO_PLIST_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/NeurolingsCE.app/Contents/Info.plist")
-
-configure_file(
-  ${INFO_PLIST_TEMPLATE}
-  ${INFO_PLIST_OUTPUT}
-  @ONLY
-)
-
-add_custom_target(generate_info_plist ALL DEPENDS "${INFO_PLIST_OUTPUT}")
-add_dependencies(NeurolingsCE generate_info_plist)
+define_assets_target(INFO_PLIST "packaging/NeurolingsCE.app/Contents/Info.plist")
 
 # Generate GNOME extension metadata.json from template (Linux)
-set(GNOME_METADATA_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/Platform/Linux/gnome_script/metadata.json.in")
-set(GNOME_METADATA_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/Platform/Linux/gnome_script/metadata.json")
-
-configure_file(
-  ${GNOME_METADATA_TEMPLATE}
-  ${GNOME_METADATA_OUTPUT}
-  @ONLY
-)
-
-add_custom_target(generate_gnome_metadata ALL DEPENDS "${GNOME_METADATA_OUTPUT}")
-add_dependencies(NeurolingsCE generate_gnome_metadata)
+define_assets_target(GNOME_METADATA "platform/Platform/Linux/gnome_script/metadata.json")
