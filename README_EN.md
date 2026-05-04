@@ -332,6 +332,14 @@ ICO credits:
 
 This project is open-sourced under the [GNU General Public License v3.0](LICENSE).
 
+### GPLv3 Additional Terms
+
+In addition to complying with GPLv3, any redistribution, modified version, or derivative work must also comply with the following requirements:
+
+- Preserve the original copyright notices, license notices, and related attribution information.
+- Do not impersonate the official version of this project, or represent a release in any way that could cause confusion with an official release.
+- Do not use this project's trademarks, Logo, or project name, or use them to imply official endorsement, approval, or affiliation, without explicit permission from the project rights holders.
+
 The upstream Shijima-Qt README is available at [Shijima-Qt_README.md](Shijima-Qt_README.md).
 
 ![NeurolingsCE icon](src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png)

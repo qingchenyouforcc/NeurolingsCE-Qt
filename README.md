@@ -333,6 +333,14 @@ NeurolingsCE/
 
 本项目基于 [GNU General Public License v3.0](LICENSE) 开源。
 
+### GPLv3 附加条款
+
+在遵守 GPLv3 的基础上，任何再发布、修改版本或衍生作品还必须遵守以下要求：
+
+- 保留原始版权声明、许可证声明以及相关归属信息。
+- 不得冒充本项目的官方版本，或以任何可能造成混淆的方式表示其为官方发布版本。
+- 未经项目权利人明确许可，不得使用本项目的商标、Logo、项目名称，或以这些标识暗示官方背书、认可或关联。
+
 上游项目 Shijima-Qt 的 README 见 [Shijima-Qt_README.md](Shijima-Qt_README.md)。
 
 ![NeurolingsCE icon](src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png)
