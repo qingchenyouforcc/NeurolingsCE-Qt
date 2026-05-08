@@ -1,5 +1,9 @@
 # <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE
 
+**休息一下，在5月19号前可能应该不会有release或者commit**
+
+---
+
 **[English](README_EN.md) | 中文**
 
 跨平台桌面看板娘（Shimeji）应用，基于 [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt) 深度修改而来。
