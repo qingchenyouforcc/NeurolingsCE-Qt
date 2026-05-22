@@ -1,8 +1,5 @@
 # <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE
 
-**休息一下，在5月19号前可能应该不会有release或者commit**
-
----
 
 **[English](README_EN.md) | 中文**
 
