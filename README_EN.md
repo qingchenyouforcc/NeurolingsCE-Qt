@@ -24,8 +24,6 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
 ## Download
 
-Neurolings Core is the release version of this project, while Neurolings is the one-click installation package for this project.
-
 - [Latest Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [All Releases](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
 
