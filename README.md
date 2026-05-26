@@ -25,8 +25,6 @@
 
 ## 下载
 
-Neurolings Core是该项目的发行版，Neurolings是该项目的懒人包
-
 - [最新版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [所有版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
 
