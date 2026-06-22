@@ -50,6 +50,8 @@ AppLog::Level g_minimumLevel = AppLog::Level::Info;
 #endif
 
 QString applicationNameForFileSystem() {
+    // Build filesystem-safe names so per-session log files stay portable across
+    // platforms and shells.
     QString appName = QCoreApplication::applicationName().trimmed();
     if (appName.isEmpty()) {
         appName = QStringLiteral("neurolingsce");
@@ -75,6 +77,8 @@ QString preferredLogRootDirectory(QCoreApplication *app) {
     Q_UNUSED(app);
 
 #ifdef _WIN32
+    // On Windows, prefer LOCALAPPDATA so logs stay in the conventional user
+    // profile location even when Qt's writable path resolves elsewhere.
     QString localAppData = QProcessEnvironment::systemEnvironment()
         .value(QStringLiteral("LOCALAPPDATA")).trimmed();
     if (!localAppData.isEmpty()) {
@@ -100,6 +104,8 @@ QString preferredLogRootDirectory(QCoreApplication *app) {
 bool tryOpenLogFileAtRoot(QString const& rootDirectoryPath) {
     QDir rootDir(rootDirectoryPath);
     QString datedDirectoryPath = rootDir.filePath(dateFolderName());
+    // Keep logs grouped by date so crash investigations and user support
+    // remain easy to navigate.
     if (!rootDir.mkpath(dateFolderName())) {
         return false;
     }
@@ -207,6 +213,8 @@ QString formatLine(AppLog::Level level, char const *category, QString const& mes
         location = "?";
     }
 
+    // Include timestamp, severity, category, thread id, and source location in
+    // a single line so both file logs and stderr mirrors are easy to grep.
     QString formatted = QStringLiteral("[%1] [%2] [%3] [tid:%4] %5")
         .arg(timestamp,
             QString::fromUtf8(::levelName(level)),
@@ -243,6 +251,8 @@ void appMessageHandler(QtMsgType type, QMessageLogContext const& context,
     QString const& message)
 {
     if (g_inMessageHandler) {
+        // Re-entrancy guard: if logging itself triggers Qt logging, fall back to
+        // the previous handler instead of recursing forever.
         if (g_previousHandler != nullptr) {
             g_previousHandler(type, context, message);
         }
@@ -289,6 +299,8 @@ void initialize(QCoreApplication *app) {
     }
 
     if (g_logFile == nullptr) {
+        // Try the normal per-user log directory first, then fall back to temp
+        // so startup still has somewhere to write diagnostics.
         QString preferredRoot = preferredLogRootDirectory(app);
         if (!tryOpenLogFileAtRoot(preferredRoot)) {
             QString fallbackRoot = QDir(QDir::tempPath())

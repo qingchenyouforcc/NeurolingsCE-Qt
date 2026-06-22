@@ -121,6 +121,7 @@ void applyMascotListTheme(QListWidget& listWidget) {
 }
 
 void ShijimaManager::importAction() {
+    // This is the user-facing entry point for archive import from the menu.
     auto paths = QFileDialog::getOpenFileNames(this, tr("Choose shimeji archive..."));
     if (paths.isEmpty()) {
         return;
@@ -138,6 +139,8 @@ void ShijimaManager::deleteAction() {
         return;
     }
 
+    // Filter out non-deletable templates before prompting so the confirmation
+    // dialog only lists actions that will actually happen.
     auto selected = m_ui->listWidget->selectedItems();
     for (long i = (long)selected.size() - 1; i >= 0; --i) {
         auto mascotData = m_runtime->templates.loadedMascots()[selected[i]->text()];
@@ -169,6 +172,8 @@ void ShijimaManager::deleteAction() {
         for (auto item : selected) {
             names.append(item->text());
         }
+        // Deletion is delegated to the runtime one template at a time so any
+        // validation or reload side effects stay centralized.
         for (auto const& name : names) {
             QString errorMessage;
             removeMascotTemplate(name, errorMessage);
@@ -187,6 +192,7 @@ void ShijimaManager::updateStatusBar() {
     if (m_ui->statusLabel == nullptr) {
         return;
     }
+    // Keep the status text intentionally terse because it updates on every tick.
     int mascotCount = m_runtime->sessions.size();
     int templateCount = m_runtime->templates.loadedMascots().size();
     m_ui->statusLabel->setText(tr("  Mascots: %1  |  Templates: %2")
@@ -205,6 +211,8 @@ void ShijimaManager::updateSelectedMascotDetails() {
     }
 
     if (data == nullptr) {
+        // Empty selection should read like a neutral placeholder rather than an
+        // error state.
         if (m_ui->mascotPreviewLabel != nullptr) {
             m_ui->mascotPreviewLabel->clear();
             m_ui->mascotPreviewLabel->setText(QStringLiteral("-"));
@@ -235,6 +243,8 @@ void ShijimaManager::itemDoubleClicked(QListWidgetItem *qItem) {
 }
 
 void ShijimaManager::askClose() {
+    // On desktop platforms this is used both for explicit quit and for tray
+    // close behavior when the manager is being hidden instead of destroyed.
     setManagerVisible(true);
     QMessageBox msgBox { this };
     msgBox.setWindowTitle(tr("Close NeurolingsCE"));
@@ -255,6 +265,8 @@ void ShijimaManager::askClose() {
 
 void ShijimaManager::setManagerVisible(bool visible) {
     if (visible) {
+        // Restore from minimized state before raising so the window actually
+        // comes back to the foreground.
         if (isMinimized()) {
             setWindowState(windowState() & ~Qt::WindowMinimized);
         }
@@ -269,6 +281,7 @@ void ShijimaManager::setManagerVisible(bool visible) {
     else if (m_wasVisible && !visible) {
 #if defined(__APPLE__)
         if (m_runtime->sessions.empty()) {
+            // macOS prefers to ask before hiding the final visible window.
             askClose();
             return;
         }
@@ -287,6 +300,8 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
         return;
     }
 
+    // Tear down old translators first so the new locale can retranslate from a
+    // clean slate.
     if (m_ui->translator != nullptr) {
         qApp->removeTranslator(m_ui->translator);
         delete m_ui->translator;
@@ -312,6 +327,8 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
     }
 
     if (!m_constructing) {
+        // Language changes require a restart because the UI is heavily
+        // constructed once and not all widgets retranslate live.
         QMessageBox::information(this,
             tr("Language Changed"),
             tr("The application will restart to apply the new language."));
@@ -329,6 +346,7 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
 
 void ShijimaManager::closeManagerWindow() {
 #if defined(_WIN32)
+    // Fade out on Windows to make hide/quit transitions feel deliberate.
     auto *animation = new QPropertyAnimation(this, "windowOpacity", this);
     connect(animation, &QPropertyAnimation::finished, this, &QWidget::close);
     animation->setDuration(250);

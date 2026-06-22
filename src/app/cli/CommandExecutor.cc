@@ -110,6 +110,8 @@ QStringList runtimeExecutableCandidates() {
 #ifdef _WIN32
     executableSuffix = QStringLiteral(".exe");
 #endif
+    // The CLI looks for a sibling runtime binary using the common install names
+    // used across packaging layouts, then filters out duplicates.
     QStringList names {
         QStringLiteral(APP_NAME),
         QStringLiteral("NeurolingsCE"),
@@ -134,6 +136,7 @@ QStringList runtimeExecutableCandidates() {
 bool findRuntimeExecutable(QString &path, CliError &error) {
     auto cliPath = QFileInfo { QCoreApplication::applicationFilePath() }
         .canonicalFilePath();
+    // Skip the CLI executable itself; we only want the detached GUI/runtime binary.
     for (auto const& candidate : runtimeExecutableCandidates()) {
         QFileInfo info { candidate };
         if (!info.exists() || !info.isFile() || !info.isExecutable()) {
@@ -160,6 +163,8 @@ bool waitForRuntime(CliGlobalOptions const& global, int timeoutMs) {
     QElapsedTimer timer;
     timer.start();
     APP_LOG_DEBUG("cli") << "Waiting for runtime timeout_ms=" << timeoutMs;
+    // Poll lightly instead of blocking on one long socket wait so startup can
+    // recover quickly once the runtime comes online.
     while (timer.elapsed() <= timeoutMs) {
         if (shijimaLocalApiPing(options)) {
             APP_LOG_DEBUG("cli") << "Runtime responded after_ms=" << timer.elapsed();
@@ -183,6 +188,8 @@ bool ensureRuntimeStarted(CliCommand const& command, CliError &error) {
 
     APP_LOG_INFO("cli") << "Starting NeurolingsCE runtime path=\""
         << runtimePath.toStdString() << "\"";
+    // Start detached so the CLI can keep owning the foreground process while
+    // the runtime comes up in the background.
     if (!QProcess::startDetached(runtimePath,
         QStringList { QStringLiteral("--neurolingsce-cli-runtime") },
         QFileInfo(runtimePath).absolutePath()))
@@ -220,6 +227,8 @@ bool sendRequest(CliCommand const& command, QJsonObject const& requestObject,
     bool requestOk = shijimaLocalApiRequest(requestObject, responseObject,
         transportError, localApiOptions(command.global));
     if (!requestOk) {
+        // If the socket failed and the runtime is not answering at all, try to
+        // launch it once before surfacing the transport failure.
         APP_LOG_WARN("cli") << "IPC request failed command=\""
             << commandName.toStdString() << "\" error=\""
             << transportError.toStdString() << "\"";
@@ -670,6 +679,244 @@ bool resolveMascotId(CliCommand const& command, int &mascotId,
     return false;
 }
 
+CliExecutionResult failExecution(CliExecutionResult result, CliError const& error) {
+    result.error = error;
+    return result;
+}
+
+CliExecutionResult executeDocumentStop(CliCommand const& command,
+    CliExecutionResult result)
+{
+    QJsonObject object;
+    QString transportError;
+    bool requestOk = shijimaLocalApiRequest(QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("stop_runtime") },
+    }, object, transportError, localApiOptions(command.global));
+    if (!requestOk) {
+        if (!shijimaLocalApiPing(localApiOptions(command.global))) {
+            return result;
+        }
+        return failExecution(result, makeError(QStringLiteral("transport_error"),
+            transportError.isEmpty()
+                ? QStringLiteral("NeurolingsCE runtime did not respond to the CLI request")
+                : transportError));
+    }
+    if (object.contains(QStringLiteral("error"))) {
+        return failExecution(result, makeError(
+            object.value(QStringLiteral("code")).toString(QStringLiteral("ipc_error")),
+            object.value(QStringLiteral("error")).toString(QStringLiteral("IPC request failed")),
+            1, object.value(QStringLiteral("status")).toInt()));
+    }
+    APP_LOG_INFO("cli") << "Runtime stop request sent";
+    return result;
+}
+
+CliExecutionResult executeMascotList(CliCommand const& command,
+    CliExecutionResult result)
+{
+    QJsonObject requestObject {
+        { QStringLiteral("command"), QStringLiteral("list_mascots") },
+    };
+    if (!command.selector.isEmpty()) {
+        requestObject[QStringLiteral("selector")] = command.selector;
+    }
+    QJsonObject object;
+    CliError error;
+    if (!sendRequest(command, requestObject, object, error)) {
+        return failExecution(result, error);
+    }
+    if (!parseMascotArray(object, "mascots", result.mascots, error)) {
+        return failExecution(result, error);
+    }
+    APP_LOG_INFO("cli") << "List mascots returned count=" << result.mascots.size();
+    return result;
+}
+
+CliExecutionResult executeLoadedMascotList(CliCommand const& command,
+    CliExecutionResult result)
+{
+    CliError error;
+    if (!listLoadedMascots(command, result.loadedMascots, error)) {
+        return failExecution(result, error);
+    }
+    APP_LOG_INFO("cli") << "List loaded mascots returned count="
+        << result.loadedMascots.size();
+    return result;
+}
+
+CliExecutionResult executeStandaloneMascotCommand(CliCommand const& command,
+    CliExecutionResult result)
+{
+    CliError error;
+    if (command.mascotAction == QStringLiteral("list")) {
+        if (!listStandaloneLoadedMascots(result.loadedMascots, error)) {
+            return failExecution(result, error);
+        }
+        APP_LOG_INFO("cli") << "Standalone mascot list returned count="
+            << result.loadedMascots.size();
+        return result;
+    }
+
+    if (command.mascotAction == QStringLiteral("add")) {
+        if (!importStandaloneMascotTemplate(command.mascotArchivePath,
+            result.loadedMascots, error))
+        {
+            return failExecution(result, error);
+        }
+        return result;
+    }
+
+    if (!removeStandaloneMascotTemplate(command.mascotTemplateName,
+        result.removedTemplateName, error))
+    {
+        return failExecution(result, error);
+    }
+    return result;
+}
+
+CliExecutionResult executeSpawnLikeCommand(CliCommand const& command,
+    CliExecutionResult result)
+{
+    SpawnMascotRequest request = command.spawnRequest;
+    CliError error;
+
+    if (command.kind == CliCommandKind::DocumentSummon &&
+        command.summonMode == QStringLiteral("random"))
+    {
+        QList<LoadedMascotInfo> loadedMascots;
+        if (!listLoadedMascots(command, loadedMascots, error)) {
+            return failExecution(result, error);
+        }
+        if (loadedMascots.isEmpty()) {
+            return failExecution(result, makeError(QStringLiteral("not_found"),
+                QStringLiteral("No loaded mascots are available")));
+        }
+        int index = QRandomGenerator::global()->bounded(0, loadedMascots.size());
+        request.dataId = loadedMascots[index].id;
+        request.name.reset();
+    }
+
+    auto behavior = chooseBehavior(command.behaviors);
+    if (!behavior.isEmpty()) {
+        request.patch.behavior = behavior;
+    }
+
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("spawn_mascot") },
+        { QStringLiteral("request"), spawnMascotRequestToJson(request) },
+    }, object, error))
+    {
+        return failExecution(result, error);
+    }
+    MascotInfo mascot;
+    if (!parseMascotObject(object, "mascot", mascot, error)) {
+        return failExecution(result, error);
+    }
+    if (command.kind == CliCommandKind::DocumentSummon) {
+        CliLabelInfo labelInfo;
+        if (!registerCliLabel(command, mascot.id, command.cliLabel, labelInfo, error)) {
+            return failExecution(result, error);
+        }
+        mascot.cliLabel = labelInfo.label;
+    }
+    result.mascot = mascot;
+    APP_LOG_INFO("cli") << "CLI spawn/summon succeeded mascot_id=" << mascot.id
+        << " name=\"" << mascot.name.toStdString() << "\"";
+    return result;
+}
+
+CliExecutionResult executeAlterMascot(CliCommand const& command,
+    CliExecutionResult result)
+{
+    CliError error;
+    int mascotId = -1;
+    if (!resolveMascotId(command, mascotId, error)) {
+        return failExecution(result, error);
+    }
+    MascotPatch patch = command.patch;
+    auto behavior = chooseBehavior(command.behaviors);
+    if (!behavior.isEmpty()) {
+        patch.behavior = behavior;
+    }
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("alter_mascot") },
+        { QStringLiteral("mascot_id"), mascotId },
+        { QStringLiteral("patch"), mascotPatchToJson(patch) },
+    }, object, error))
+    {
+        return failExecution(result, error);
+    }
+    MascotInfo mascot;
+    if (!parseMascotObject(object, "mascot", mascot, error)) {
+        return failExecution(result, error);
+    }
+    result.mascot = mascot;
+    APP_LOG_INFO("cli") << "CLI alter succeeded mascot_id=" << mascot.id;
+    return result;
+}
+
+CliExecutionResult executeCloseMascot(CliCommand const& command,
+    CliExecutionResult result)
+{
+    CliError error;
+    CliLabelInfo labelInfo;
+    if (!resolveCliLabel(command, command.cliLabel.value(), labelInfo, error)) {
+        return failExecution(result, error);
+    }
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
+        { QStringLiteral("mascot_id"), labelInfo.mascotId },
+    }, object, error))
+    {
+        return failExecution(result, error);
+    }
+    APP_LOG_INFO("cli") << "CLI close succeeded label="
+        << command.cliLabel.value() << " mascot_id=" << labelInfo.mascotId;
+    return result;
+}
+
+CliExecutionResult executeDismissMascot(CliCommand const& command,
+    CliExecutionResult result)
+{
+    CliError error;
+    int mascotId = -1;
+    if (!resolveMascotId(command, mascotId, error)) {
+        return failExecution(result, error);
+    }
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
+        { QStringLiteral("mascot_id"), mascotId },
+    }, object, error))
+    {
+        return failExecution(result, error);
+    }
+    APP_LOG_INFO("cli") << "CLI dismiss succeeded mascot_id=" << mascotId;
+    return result;
+}
+
+CliExecutionResult executeDismissAllMascots(CliCommand const& command,
+    CliExecutionResult result)
+{
+    QJsonObject requestObject {
+        { QStringLiteral("command"), QStringLiteral("dismiss_all_mascots") },
+    };
+    if (!command.selector.isEmpty()) {
+        requestObject[QStringLiteral("selector")] = command.selector;
+    }
+    QJsonObject object;
+    CliError error;
+    if (!sendRequest(command, requestObject, object, error)) {
+        return failExecution(result, error);
+    }
+    APP_LOG_INFO("cli") << "CLI dismiss-all succeeded selector_present="
+        << (!command.selector.isEmpty() ? "1" : "0");
+    return result;
+}
+
 }
 
 CliExecutionResult executeCliCommand(CliCommand const& command) {
@@ -685,228 +932,38 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
     }
 
     auto fail = [&](CliError const& error) {
-        result.error = error;
         APP_LOG_ERROR("cli") << error.error.toStdString();
         if (!error.details.isEmpty()) {
             APP_LOG_WARN("cli") << error.details.toStdString();
         }
-        return result;
+        return failExecution(result, error);
     };
 
-    if (command.kind == CliCommandKind::DocumentStop) {
-        QJsonObject object;
-        QString transportError;
-        bool requestOk = shijimaLocalApiRequest(QJsonObject {
-            { QStringLiteral("command"), QStringLiteral("stop_runtime") },
-        }, object, transportError, localApiOptions(command.global));
-        if (!requestOk) {
-            if (!shijimaLocalApiPing(localApiOptions(command.global))) {
-                return result;
-            }
-            return fail(makeError(QStringLiteral("transport_error"),
-                transportError.isEmpty()
-                    ? QStringLiteral("NeurolingsCE runtime did not respond to the CLI request")
-                    : transportError));
-        }
-        if (object.contains(QStringLiteral("error"))) {
-            return fail(makeError(
-                object.value(QStringLiteral("code")).toString(QStringLiteral("ipc_error")),
-                object.value(QStringLiteral("error")).toString(QStringLiteral("IPC request failed")),
-                1, object.value(QStringLiteral("status")).toInt()));
-        }
-        APP_LOG_INFO("cli") << "Runtime stop request sent";
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::DocumentList ||
-        command.kind == CliCommandKind::ListMascots)
-    {
-        QJsonObject requestObject {
-            { QStringLiteral("command"), QStringLiteral("list_mascots") },
-        };
-        if (!command.selector.isEmpty()) {
-            requestObject[QStringLiteral("selector")] = command.selector;
-        }
-        QJsonObject object;
-        CliError error;
-        if (!sendRequest(command, requestObject, object, error)) {
-            return fail(error);
-        }
-        if (!parseMascotArray(object, "mascots", result.mascots, error)) {
-            return fail(error);
-        }
-        APP_LOG_INFO("cli") << "List mascots returned count=" << result.mascots.size();
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::ListLoadedMascots) {
-        CliError error;
-        if (!listLoadedMascots(command, result.loadedMascots, error)) {
-            return fail(error);
-        }
-        APP_LOG_INFO("cli") << "List loaded mascots returned count="
-            << result.loadedMascots.size();
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::DocumentMascot) {
-        CliError error;
-        if (command.mascotAction == QStringLiteral("list")) {
-            if (!listStandaloneLoadedMascots(result.loadedMascots, error)) {
-                return fail(error);
-            }
-            APP_LOG_INFO("cli") << "Standalone mascot list returned count="
-                << result.loadedMascots.size();
+    switch (command.kind) {
+        case CliCommandKind::DocumentStop:
+            return executeDocumentStop(command, result);
+        case CliCommandKind::DocumentList:
+        case CliCommandKind::ListMascots:
+            return executeMascotList(command, result);
+        case CliCommandKind::ListLoadedMascots:
+            return executeLoadedMascotList(command, result);
+        case CliCommandKind::DocumentMascot:
+            return executeStandaloneMascotCommand(command, result);
+        case CliCommandKind::DocumentSummon:
+        case CliCommandKind::SpawnMascot:
+            return executeSpawnLikeCommand(command, result);
+        case CliCommandKind::AlterMascot:
+            return executeAlterMascot(command, result);
+        case CliCommandKind::DocumentClose:
+            return executeCloseMascot(command, result);
+        case CliCommandKind::DismissMascot:
+            return executeDismissMascot(command, result);
+        case CliCommandKind::DocumentCloseAll:
+        case CliCommandKind::DismissAllMascots:
+            return executeDismissAllMascots(command, result);
+        case CliCommandKind::Help:
+        case CliCommandKind::Version:
             return result;
-        }
-
-        if (command.mascotAction == QStringLiteral("add")) {
-            if (!importStandaloneMascotTemplate(command.mascotArchivePath,
-                result.loadedMascots, error))
-            {
-                return fail(error);
-            }
-        }
-        else {
-            if (!removeStandaloneMascotTemplate(command.mascotTemplateName,
-                result.removedTemplateName, error))
-            {
-                return fail(error);
-            }
-        }
-        return result;
     }
-
-    if (command.kind == CliCommandKind::DocumentSummon ||
-        command.kind == CliCommandKind::SpawnMascot)
-    {
-        SpawnMascotRequest request = command.spawnRequest;
-        CliError error;
-
-        if (command.kind == CliCommandKind::DocumentSummon &&
-            command.summonMode == QStringLiteral("random"))
-        {
-            QList<LoadedMascotInfo> loadedMascots;
-            if (!listLoadedMascots(command, loadedMascots, error)) {
-                return fail(error);
-            }
-            if (loadedMascots.isEmpty()) {
-                return fail(makeError(QStringLiteral("not_found"),
-                    QStringLiteral("No loaded mascots are available")));
-            }
-            int index = QRandomGenerator::global()->bounded(0, loadedMascots.size());
-            request.dataId = loadedMascots[index].id;
-            request.name.reset();
-        }
-
-        auto behavior = chooseBehavior(command.behaviors);
-        if (!behavior.isEmpty()) {
-            request.patch.behavior = behavior;
-        }
-
-        QJsonObject object;
-        if (!sendRequest(command, QJsonObject {
-            { QStringLiteral("command"), QStringLiteral("spawn_mascot") },
-            { QStringLiteral("request"), spawnMascotRequestToJson(request) },
-        }, object, error))
-        {
-            return fail(error);
-        }
-        MascotInfo mascot;
-        if (!parseMascotObject(object, "mascot", mascot, error)) {
-            return fail(error);
-        }
-        if (command.kind == CliCommandKind::DocumentSummon) {
-            CliLabelInfo labelInfo;
-            if (!registerCliLabel(command, mascot.id, command.cliLabel, labelInfo, error)) {
-                return fail(error);
-            }
-            mascot.cliLabel = labelInfo.label;
-        }
-        result.mascot = mascot;
-        APP_LOG_INFO("cli") << "CLI spawn/summon succeeded mascot_id=" << mascot.id
-            << " name=\"" << mascot.name.toStdString() << "\"";
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::AlterMascot) {
-        CliError error;
-        int mascotId = -1;
-        if (!resolveMascotId(command, mascotId, error)) {
-            return fail(error);
-        }
-        MascotPatch patch = command.patch;
-        auto behavior = chooseBehavior(command.behaviors);
-        if (!behavior.isEmpty()) {
-            patch.behavior = behavior;
-        }
-        QJsonObject object;
-        if (!sendRequest(command, QJsonObject {
-            { QStringLiteral("command"), QStringLiteral("alter_mascot") },
-            { QStringLiteral("mascot_id"), mascotId },
-            { QStringLiteral("patch"), mascotPatchToJson(patch) },
-        }, object, error))
-        {
-            return fail(error);
-        }
-        MascotInfo mascot;
-        if (!parseMascotObject(object, "mascot", mascot, error)) {
-            return fail(error);
-        }
-        result.mascot = mascot;
-        APP_LOG_INFO("cli") << "CLI alter succeeded mascot_id=" << mascot.id;
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::DocumentClose) {
-        CliError error;
-        CliLabelInfo labelInfo;
-        if (!resolveCliLabel(command, command.cliLabel.value(), labelInfo, error)) {
-            return fail(error);
-        }
-        QJsonObject object;
-        if (!sendRequest(command, QJsonObject {
-            { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
-            { QStringLiteral("mascot_id"), labelInfo.mascotId },
-        }, object, error))
-        {
-            return fail(error);
-        }
-        APP_LOG_INFO("cli") << "CLI close succeeded label="
-            << command.cliLabel.value() << " mascot_id=" << labelInfo.mascotId;
-        return result;
-    }
-
-    if (command.kind == CliCommandKind::DismissMascot) {
-        CliError error;
-        int mascotId = -1;
-        if (!resolveMascotId(command, mascotId, error)) {
-            return fail(error);
-        }
-        QJsonObject object;
-        if (!sendRequest(command, QJsonObject {
-            { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
-            { QStringLiteral("mascot_id"), mascotId },
-        }, object, error))
-        {
-            return fail(error);
-        }
-        APP_LOG_INFO("cli") << "CLI dismiss succeeded mascot_id=" << mascotId;
-        return result;
-    }
-
-    QJsonObject requestObject {
-        { QStringLiteral("command"), QStringLiteral("dismiss_all_mascots") },
-    };
-    if (!command.selector.isEmpty()) {
-        requestObject[QStringLiteral("selector")] = command.selector;
-    }
-    QJsonObject object;
-    CliError error;
-    if (!sendRequest(command, requestObject, object, error)) {
-        return fail(error);
-    }
-    APP_LOG_INFO("cli") << "CLI dismiss-all succeeded selector_present="
-        << (!command.selector.isEmpty() ? "1" : "0");
     return result;
 }

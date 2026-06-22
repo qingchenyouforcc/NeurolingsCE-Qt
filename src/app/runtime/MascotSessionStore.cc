@@ -48,6 +48,7 @@ void MascotSessionStore::add(ShijimaWidget *mascot) {
     if (mascot == nullptr) {
         return;
     }
+    // Keep the list for stable iteration order and the map for direct id lookups.
     m_mascots.push_back(mascot);
     index(mascot);
 }
@@ -61,16 +62,19 @@ void MascotSessionStore::index(ShijimaWidget *mascot) {
 
 void MascotSessionStore::removeIndex(int mascotId) {
     m_mascotsById.erase(mascotId);
+    // CLI labels are tied to runtime ids, so clearing one should also clear the other.
     clearCliLabelForMascot(mascotId);
 }
 
 void MascotSessionStore::clear() {
     m_mascots.clear();
     m_mascotsById.clear();
+    // Reset transient handles together with the backing session state.
     clearCliLabels();
 }
 
 void MascotSessionStore::markAllForDeletion() {
+    // Deletion is deferred so the runtime can finish the current tick safely.
     for (auto mascot : m_mascots) {
         mascot->markForDeletion();
     }
@@ -151,6 +155,8 @@ bool MascotSessionStore::assignCliLabel(int mascotId,
         }
     }
     else {
+        // Auto-assign the first unused label so repeated summons get stable
+        // handles without forcing the caller to manage ids.
         label = m_nextCliLabel;
         while (m_cliLabelToMascotId.contains(label)) {
             ++label;
@@ -169,6 +175,7 @@ void MascotSessionStore::clearCliLabelForMascot(int mascotId) {
     if (it == m_cliLabelByMascotId.end()) {
         return;
     }
+    // Remove both directions of the mapping together to avoid stale handles.
     int cliLabel = it.value();
     m_cliLabelByMascotId.erase(it);
     m_cliLabelToMascotId.remove(cliLabel);

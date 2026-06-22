@@ -557,6 +557,62 @@ struct RawLegacyCandidateFlags {
     bool hasImage = false;
 };
 
+QString normalizedLegacyCandidateName(QString name);
+
+enum class LegacyPathKind {
+    Unknown,
+    Actions,
+    Behaviors,
+    Image,
+};
+
+LegacyPathKind classifyLegacyPath(QString const& lowerPath) {
+    static const QStringList actionNames = {
+        QStringLiteral("actions.xml"),
+        QStringLiteral("action.xml"),
+        QStringLiteral("one.xml"),
+        QString::fromUtf8("\xe5\x8b\x95\xe4\xbd\x9c.xml"),
+    };
+    static const QStringList behaviorNames = {
+        QStringLiteral("behaviors.xml"),
+        QStringLiteral("behavior.xml"),
+        QStringLiteral("two.xml"),
+        QString::fromUtf8("\xe8\xa1\x8c\xe5\x8b\x95.xml"),
+    };
+
+    QString fileName = lowerPath.section(QLatin1Char('/'), -1);
+    if (actionNames.contains(fileName)) {
+        return LegacyPathKind::Actions;
+    }
+    if (behaviorNames.contains(fileName)) {
+        return LegacyPathKind::Behaviors;
+    }
+    if (lowerPath.endsWith(QStringLiteral(".png")) &&
+        (lowerPath.startsWith(QStringLiteral("img/")) ||
+            lowerPath.contains(QStringLiteral("/img/"))))
+    {
+        return LegacyPathKind::Image;
+    }
+    return LegacyPathKind::Unknown;
+}
+
+QString legacyRootForPath(QString const& path, QFileInfo const& archiveInfo) {
+    QString lower = path.toLower();
+    if (lower.startsWith(QStringLiteral("img/"))) {
+        return archiveInfo.completeBaseName();
+    }
+    if (!lower.contains(QLatin1Char('/'))) {
+        return archiveInfo.completeBaseName();
+    }
+
+    qsizetype imgIndex = lower.indexOf(QStringLiteral("/img/"));
+    if (imgIndex >= 0) {
+        return normalizedLegacyCandidateName(path.left(imgIndex));
+    }
+
+    return normalizedLegacyCandidateName(path.left(path.lastIndexOf(QLatin1Char('/'))));
+}
+
 bool validateZipEntryRanges(std::vector<ZipEntry> const& entries,
     QString &errorMessage)
 {
@@ -654,55 +710,20 @@ QMap<QString, RawLegacyCandidateFlags> rawLegacyCandidates(QString const& archiv
     QFileInfo archiveInfo(archivePath);
     for (size_t i = 0; i < archive.size(); ++i) {
         QString path = normalizedArchivePath(QString::fromStdString(archive.at(i)->path()));
-        QString lower = path.toLower();
-        QString root;
-        if (lower.endsWith(QStringLiteral("/actions.xml")) ||
-            lower.endsWith(QStringLiteral("/action.xml")) ||
-            lower.endsWith(QStringLiteral("/one.xml")) ||
-            lower.endsWith(QString::fromUtf8("/\xe5\x8b\x95\xe4\xbd\x9c.xml")))
-        {
-            root = path.left(path.lastIndexOf(QLatin1Char('/')));
-            root = normalizedLegacyCandidateName(root);
+        LegacyPathKind kind = classifyLegacyPath(path.toLower());
+        if (kind == LegacyPathKind::Unknown) {
+            continue;
+        }
+
+        QString root = legacyRootForPath(path, archiveInfo);
+        if (kind == LegacyPathKind::Actions) {
             candidates[root].hasActions = true;
         }
-        else if (lower == QStringLiteral("actions.xml") ||
-            lower == QStringLiteral("action.xml") ||
-            lower == QStringLiteral("one.xml") ||
-            lower == QString::fromUtf8("\xe5\x8b\x95\xe4\xbd\x9c.xml"))
-        {
-            root = archiveInfo.completeBaseName();
-            candidates[root].hasActions = true;
-        }
-        else if (lower.endsWith(QStringLiteral("/behaviors.xml")) ||
-            lower.endsWith(QStringLiteral("/behavior.xml")) ||
-            lower.endsWith(QStringLiteral("/two.xml")) ||
-            lower.endsWith(QString::fromUtf8("/\xe8\xa1\x8c\xe5\x8b\x95.xml")))
-        {
-            root = path.left(path.lastIndexOf(QLatin1Char('/')));
-            root = normalizedLegacyCandidateName(root);
+        else if (kind == LegacyPathKind::Behaviors) {
             candidates[root].hasBehaviors = true;
         }
-        else if (lower == QStringLiteral("behaviors.xml") ||
-            lower == QStringLiteral("behavior.xml") ||
-            lower == QStringLiteral("two.xml") ||
-            lower == QString::fromUtf8("\xe8\xa1\x8c\xe5\x8b\x95.xml"))
-        {
-            root = archiveInfo.completeBaseName();
-            candidates[root].hasBehaviors = true;
-        }
-        else {
-            qsizetype imgIndex = lower.indexOf(QStringLiteral("/img/"));
-            if (imgIndex >= 0 && lower.endsWith(QStringLiteral(".png"))) {
-                root = path.left(imgIndex);
-                root = normalizedLegacyCandidateName(root);
-                candidates[root].hasImage = true;
-            }
-            else if (lower.startsWith(QStringLiteral("img/")) &&
-                lower.endsWith(QStringLiteral(".png")))
-            {
-                root = archiveInfo.completeBaseName();
-                candidates[root].hasImage = true;
-            }
+        else if (kind == LegacyPathKind::Image) {
+            candidates[root].hasImage = true;
         }
     }
     return candidates;

@@ -184,6 +184,77 @@ void printDocumentMascotLine(MascotInfo const& mascot) {
         << mascot.name.toStdString() << std::endl;
 }
 
+QJsonObject buildDocumentMascotJson(CliCommand const& command,
+    CliExecutionResult const& result)
+{
+    QJsonObject object;
+    if (command.mascotAction == QStringLiteral("remove")) {
+        object["removed"] = result.removedTemplateName.isEmpty()
+            ? command.mascotTemplateName
+            : result.removedTemplateName;
+        return object;
+    }
+
+    QJsonArray array;
+    for (auto const& mascot : result.loadedMascots) {
+        array.append(loadedMascotInfoToJson(mascot));
+    }
+    object["templates"] = array;
+    return object;
+}
+
+QJsonObject buildListJson(CliExecutionResult const& result) {
+    QJsonObject object;
+    QJsonArray array;
+    for (auto const& mascot : result.mascots) {
+        array.append(mascotInfoToJson(mascot));
+    }
+    object["mascots"] = array;
+    return object;
+}
+
+QJsonObject buildLoadedListJson(CliExecutionResult const& result) {
+    QJsonObject object;
+    QJsonArray array;
+    for (auto const& mascot : result.loadedMascots) {
+        array.append(loadedMascotInfoToJson(mascot));
+    }
+    object["loaded_mascots"] = array;
+    return object;
+}
+
+QJsonObject buildCommandJson(CliCommand const& command,
+    CliExecutionResult const& result)
+{
+    if (command.kind == CliCommandKind::DocumentList ||
+        command.kind == CliCommandKind::ListMascots)
+    {
+        return buildListJson(result);
+    }
+    if (command.kind == CliCommandKind::ListLoadedMascots) {
+        return buildLoadedListJson(result);
+    }
+    if (command.kind == CliCommandKind::DocumentMascot) {
+        return buildDocumentMascotJson(command, result);
+    }
+    if (result.mascot.has_value()) {
+        QJsonObject object;
+        object["mascot"] = mascotInfoToJson(result.mascot.value());
+        if (command.kind == CliCommandKind::DocumentSummon &&
+            result.mascot->cliLabel.has_value())
+        {
+            object["label"] = result.mascot->cliLabel.value();
+        }
+        return object;
+    }
+    if (command.kind == CliCommandKind::DocumentStop) {
+        QJsonObject object;
+        object["stopped"] = true;
+        return object;
+    }
+    return QJsonObject {};
+}
+
 QJsonObject successJson(CliCommand const& command,
     CliExecutionResult const& result)
 {
@@ -197,50 +268,7 @@ QJsonObject successJson(CliCommand const& command,
         object["version"] = appVersion();
         return object;
     }
-
-    QJsonObject object;
-    if (command.kind == CliCommandKind::DocumentList ||
-        command.kind == CliCommandKind::ListMascots)
-    {
-        QJsonArray array;
-        for (auto const& mascot : result.mascots) {
-            array.append(mascotInfoToJson(mascot));
-        }
-        object["mascots"] = array;
-    }
-    else if (command.kind == CliCommandKind::ListLoadedMascots) {
-        QJsonArray array;
-        for (auto const& mascot : result.loadedMascots) {
-            array.append(loadedMascotInfoToJson(mascot));
-        }
-        object["loaded_mascots"] = array;
-    }
-    else if (command.kind == CliCommandKind::DocumentMascot) {
-        if (command.mascotAction == QStringLiteral("remove")) {
-            object["removed"] = result.removedTemplateName.isEmpty()
-                ? command.mascotTemplateName
-                : result.removedTemplateName;
-        }
-        else {
-            QJsonArray array;
-            for (auto const& mascot : result.loadedMascots) {
-                array.append(loadedMascotInfoToJson(mascot));
-            }
-            object["templates"] = array;
-        }
-    }
-    else if (result.mascot.has_value()) {
-        object["mascot"] = mascotInfoToJson(result.mascot.value());
-        if (command.kind == CliCommandKind::DocumentSummon &&
-            result.mascot->cliLabel.has_value())
-        {
-            object["label"] = result.mascot->cliLabel.value();
-        }
-    }
-    else if (command.kind == CliCommandKind::DocumentStop) {
-        object["stopped"] = true;
-    }
-    return object;
+    return buildCommandJson(command, result);
 }
 
 QJsonObject errorJson(CliError const& error) {
@@ -263,6 +291,110 @@ void writeJson(QJsonObject const& object) {
     QJsonDocument document(object);
     std::cout << document.toJson(QJsonDocument::Compact).constData()
         << std::endl;
+}
+
+void writeDocumentMascotText(CliCommand const& command,
+    CliExecutionResult const& result)
+{
+    if (command.mascotAction == QStringLiteral("remove")) {
+        std::cout << "Removed mascot template "
+            << (result.removedTemplateName.isEmpty()
+                ? command.mascotTemplateName
+                : result.removedTemplateName).toStdString()
+            << std::endl;
+        return;
+    }
+
+    if (command.mascotAction == QStringLiteral("add")) {
+        std::cout << "Imported mascot template(s):" << std::endl;
+    }
+    for (auto const& mascot : result.loadedMascots) {
+        std::cout << "[" << mascot.id << "] "
+            << mascot.name.toStdString() << std::endl;
+        if (!mascot.version.isEmpty()) {
+            std::cout << "  Version: "
+                << mascot.version.toStdString() << std::endl;
+        }
+        if (!mascot.author.isEmpty()) {
+            std::cout << "  Author: "
+                << mascot.author.toStdString() << std::endl;
+        }
+    }
+}
+
+void writeStandardTextOutput(CliCommand const& command,
+    CliExecutionResult const& result)
+{
+    if (command.kind == CliCommandKind::Help) {
+        std::cout << helpText().toStdString() << std::endl;
+        return;
+    }
+    if (command.kind == CliCommandKind::Version) {
+        std::cout << appName().toStdString() << " "
+            << appVersion().toStdString() << std::endl;
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentList) {
+        for (auto const& mascot : result.mascots) {
+            printDocumentMascotLine(mascot);
+        }
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentSummon) {
+        if (result.mascot.has_value()) {
+            printDocumentMascotLine(result.mascot.value());
+        }
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentClose) {
+        std::cout << "Closed label "
+            << command.cliLabel.value_or(-1) << std::endl;
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentCloseAll) {
+        std::cout << "Closed all mascots" << std::endl;
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentStop) {
+        std::cout << "Stopped NeurolingsCE runtime" << std::endl;
+        return;
+    }
+    if (command.kind == CliCommandKind::ListMascots) {
+        for (auto const& mascot : result.mascots) {
+            printMascot(mascot);
+        }
+        return;
+    }
+    if (command.kind == CliCommandKind::ListLoadedMascots) {
+        std::vector<LoadedMascotInfo> mascots(result.loadedMascots.begin(),
+            result.loadedMascots.end());
+        if (command.sortById) {
+            std::sort(mascots.begin(), mascots.end(),
+                [](LoadedMascotInfo const& lhs, LoadedMascotInfo const& rhs) {
+                    return lhs.id < rhs.id;
+                });
+        }
+        for (auto const& mascot : mascots) {
+            std::cout << "[" << mascot.id << "] "
+                << mascot.name.toStdString() << std::endl;
+            if (!mascot.version.isEmpty()) {
+                std::cout << "  Version: "
+                    << mascot.version.toStdString() << std::endl;
+            }
+            if (!mascot.author.isEmpty()) {
+                std::cout << "  Author: "
+                    << mascot.author.toStdString() << std::endl;
+            }
+        }
+        return;
+    }
+    if (command.kind == CliCommandKind::DocumentMascot) {
+        writeDocumentMascotText(command, result);
+        return;
+    }
+    if (result.mascot.has_value()) {
+        printMascot(result.mascot.value());
+    }
 }
 
 }
@@ -296,108 +428,6 @@ int writeCliOutput(CliCommand const& command, CliExecutionResult const& result) 
         writeJson(successJson(command, result));
         return EXIT_SUCCESS;
     }
-
-    if (command.kind == CliCommandKind::Help) {
-        std::cout << helpText().toStdString() << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::Version) {
-        std::cout << appName().toStdString() << " "
-            << appVersion().toStdString() << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentList) {
-        for (auto const& mascot : result.mascots) {
-            printDocumentMascotLine(mascot);
-        }
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentSummon) {
-        if (result.mascot.has_value()) {
-            printDocumentMascotLine(result.mascot.value());
-        }
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentClose) {
-        std::cout << "Closed label "
-            << command.cliLabel.value_or(-1) << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentCloseAll) {
-        std::cout << "Closed all mascots" << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentStop) {
-        std::cout << "Stopped NeurolingsCE runtime" << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::ListMascots) {
-        for (auto const& mascot : result.mascots) {
-            printMascot(mascot);
-        }
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::ListLoadedMascots) {
-        std::vector<LoadedMascotInfo> mascots(result.loadedMascots.begin(),
-            result.loadedMascots.end());
-        if (command.sortById) {
-            std::sort(mascots.begin(), mascots.end(),
-                [](LoadedMascotInfo const& lhs, LoadedMascotInfo const& rhs) {
-                    return lhs.id < rhs.id;
-                });
-        }
-        for (auto const& mascot : mascots) {
-            std::cout << "[" << mascot.id << "] "
-                << mascot.name.toStdString() << std::endl;
-            if (!mascot.version.isEmpty()) {
-                std::cout << "  Version: "
-                    << mascot.version.toStdString() << std::endl;
-            }
-            if (!mascot.author.isEmpty()) {
-                std::cout << "  Author: "
-                    << mascot.author.toStdString() << std::endl;
-            }
-        }
-        return EXIT_SUCCESS;
-    }
-
-    if (command.kind == CliCommandKind::DocumentMascot) {
-        if (command.mascotAction == QStringLiteral("remove")) {
-            std::cout << "Removed mascot template "
-                << (result.removedTemplateName.isEmpty()
-                    ? command.mascotTemplateName
-                    : result.removedTemplateName).toStdString()
-                << std::endl;
-            return EXIT_SUCCESS;
-        }
-        if (command.mascotAction == QStringLiteral("add")) {
-            std::cout << "Imported mascot template(s):" << std::endl;
-        }
-        for (auto const& mascot : result.loadedMascots) {
-            std::cout << "[" << mascot.id << "] "
-                << mascot.name.toStdString() << std::endl;
-            if (!mascot.version.isEmpty()) {
-                std::cout << "  Version: "
-                    << mascot.version.toStdString() << std::endl;
-            }
-            if (!mascot.author.isEmpty()) {
-                std::cout << "  Author: "
-                    << mascot.author.toStdString() << std::endl;
-            }
-        }
-        return EXIT_SUCCESS;
-    }
-
-    if (result.mascot.has_value()) {
-        printMascot(result.mascot.value());
-    }
+    writeStandardTextOutput(command, result);
     return EXIT_SUCCESS;
 }

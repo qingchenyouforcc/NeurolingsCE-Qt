@@ -33,6 +33,8 @@ MascotData *MascotTemplateStore::registerTemplate(
         throw std::runtime_error("registerTemplate() called with invalid data");
     }
 
+    // Register with the shijima factory first so the template can be spawned
+    // immediately after it enters the store.
     shijima::mascot::factory::tmpl tmpl;
     tmpl.actions_xml = data->actionsXML().toStdString();
     tmpl.behaviors_xml = data->behaviorsXML().toStdString();
@@ -56,6 +58,8 @@ std::unique_ptr<MascotData> MascotTemplateStore::takeTemplate(
     }
 
     MascotData *raw = mapIt.value();
+    // Deregister before removing ownership so the factory cannot hand out the
+    // template after its backing object has gone away.
     m_factory.deregister_template(name.toStdString());
     m_loadedMascots.erase(mapIt);
     m_loadedMascotsById.remove(raw->id());

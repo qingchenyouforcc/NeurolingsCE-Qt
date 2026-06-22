@@ -160,6 +160,8 @@ void appTerminateHandler() {
 }
 
 int main(int argc, char **argv) {
+    // The GUI binary also doubles as a CLI launcher in some workflows.
+    // Keep that path isolated so we can use QCoreApplication without UI setup.
     if (shijimaShouldRunCli(argc, argv)) {
         QCoreApplication app(argc, argv);
         app.setApplicationName(QStringLiteral(APP_NAME));
@@ -197,6 +199,8 @@ int main(int argc, char **argv) {
     syncBundledSkillsForCurrentUser(&app);
     eApp->init();
     {
+        // Prefer the icon resource that matches the OS shell expectation first,
+        // then fall back to the PNG if the ICO resource is unavailable.
         QIcon appIcon { QStringLiteral(":/neurolingsce.ico") };
         if (appIcon.isNull()) {
             appIcon = QIcon { QStringLiteral(":/neurolingsce.png") };
@@ -206,11 +210,14 @@ int main(int argc, char **argv) {
         }
     }
     try {
+        // If another instance is already alive, ask it to surface the manager
+        // instead of starting a duplicate UI process.
         if (!startedForCli && shijimaLocalApiShowManager()) {
             APP_LOG_INFO("startup") << "Existing instance activated; exiting current GUI launch request";
             AppLog::shutdown();
             return 0;
         }
+        // The IPC ping is the last gate for the single-instance check.
         if (shijimaLocalApiPing()) {
             APP_LOG_ERROR("startup") << "Single-instance guard rejected startup; local IPC endpoint already responded";
             if (startedForCli) {

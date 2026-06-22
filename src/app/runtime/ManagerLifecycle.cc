@@ -38,6 +38,8 @@ static ShijimaManager *m_defaultManager = nullptr;
 
 ShijimaManager *ShijimaManager::defaultManager() {
     if (m_defaultManager == nullptr) {
+        // The application assumes a single manager instance and uses this
+        // singleton-style entry point to make that explicit.
         APP_LOG_INFO("lifecycle") << "Creating default ShijimaManager";
         m_defaultManager = new ShijimaManager;
     }
@@ -46,6 +48,8 @@ ShijimaManager *ShijimaManager::defaultManager() {
 
 void ShijimaManager::finalize() {
     if (m_defaultManager != nullptr) {
+        // Tear down through the same global pointer so shutdown order stays
+        // predictable when CLI and GUI share the process.
         APP_LOG_INFO("lifecycle") << "Finalizing default ShijimaManager";
         delete m_defaultManager;
         m_defaultManager = nullptr;
@@ -72,10 +76,12 @@ void ShijimaManager::abortPendingCallbacks() {
 void ShijimaManager::shutdownForQuit() {
     APP_LOG_INFO("shutdown") << "Manager shutdown started mascot_count="
         << m_runtime->sessions.size();
+    // Stop new callbacks before destroying widgets or timers.
     abortPendingCallbacks();
     ShijimaManagerUiInternal::teardownTrayIcon(m_ui->trayController);
 
     if (m_runtime->mascotTimer > 0) {
+        // Timer ownership is manual because Qt timer ids are not QObject-based.
         APP_LOG_DEBUG("shutdown") << "Stopping mascot timer id="
             << m_runtime->mascotTimer;
         killTimer(m_runtime->mascotTimer);
@@ -91,6 +97,8 @@ void ShijimaManager::shutdownForQuit() {
     m_localApi->stop();
     m_httpApi->stop();
 
+    // Close mascots manually because they are top-level widgets, not child
+    // objects owned by the manager window.
     for (auto mascot : m_runtime->sessions.mascots()) {
         if (mascot == nullptr) {
             continue;
