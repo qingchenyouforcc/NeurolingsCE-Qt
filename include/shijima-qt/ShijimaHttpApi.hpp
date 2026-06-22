@@ -20,6 +20,7 @@
 
 #include "shijima-qt/MascotCommandService.hpp"
 #include <atomic>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -36,10 +37,11 @@ private:
     ShijimaManager *m_manager;
     MascotCommandService m_service;
     std::string m_host;
-    std::string m_lastError;
     int m_port;
     std::atomic<bool> m_startAttemptFinished{false};
     std::atomic<bool> m_startSucceeded{false};
+    mutable std::mutex m_lastErrorMutex;
+    std::string m_lastError;
 public:
     bool start(std::string const& host, int port);
     void stop();

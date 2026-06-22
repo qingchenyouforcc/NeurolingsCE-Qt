@@ -36,6 +36,16 @@ using namespace httplib;
 
 namespace {
 
+void setLastError(std::mutex &mutex, std::string &target, std::string value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    target = std::move(value);
+}
+
+std::string getLastError(std::mutex &mutex, std::string const& source) {
+    std::lock_guard<std::mutex> lock(mutex);
+    return source;
+}
+
 bool requestHasJsonContentType(Request const& req) {
     auto contentType = req.get_header_value("content-type");
     std::transform(contentType.begin(), contentType.end(), contentType.begin(),
@@ -386,7 +396,7 @@ bool ShijimaHttpApi::start(std::string const& host, int port) {
     stop();
     m_host = host;
     m_port = port;
-    m_lastError.clear();
+    setLastError(m_lastErrorMutex, m_lastError, {});
     m_startAttemptFinished.store(false);
     m_startSucceeded.store(false);
     APP_LOG_INFO("http") << "Starting local HTTP API on " << host << ":" << port;
@@ -396,9 +406,10 @@ bool ShijimaHttpApi::start(std::string const& host, int port) {
         m_startSucceeded.store(ok);
         m_startAttemptFinished.store(true);
         if (!ok) {
-            m_lastError = "HTTP API bind failed on " + host + ":"
+            auto error = "HTTP API bind failed on " + host + ":"
                 + std::to_string(port) + " (port may be in use)";
-            APP_LOG_ERROR("http") << m_lastError;
+            setLastError(m_lastErrorMutex, m_lastError, error);
+            APP_LOG_ERROR("http") << error;
         }
         APP_LOG_INFO("http") << "HTTP API listen loop exited";
     } };
@@ -420,11 +431,13 @@ bool ShijimaHttpApi::start(std::string const& host, int port) {
     }
     if (!m_startSucceeded.load()) {
         stop();
-        if (m_lastError.empty()) {
-            m_lastError = "HTTP API bind failed on " + host + ":"
+        auto error = getLastError(m_lastErrorMutex, m_lastError);
+        if (error.empty()) {
+            error = "HTTP API bind failed on " + host + ":"
                 + std::to_string(port);
+            setLastError(m_lastErrorMutex, m_lastError, error);
         }
-        APP_LOG_ERROR("http") << m_lastError;
+        APP_LOG_ERROR("http") << error;
         return false;
     }
     APP_LOG_INFO("http") << "Local HTTP API listening on " << host << ":" << port;
@@ -444,7 +457,7 @@ std::string const& ShijimaHttpApi::host() {
 }
 
 std::string ShijimaHttpApi::lastError() const {
-    return m_lastError;
+    return getLastError(m_lastErrorMutex, m_lastError);
 }
 
 void ShijimaHttpApi::stop() {

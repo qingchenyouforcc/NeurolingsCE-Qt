@@ -31,6 +31,7 @@ namespace {
 
 constexpr qsizetype kMaxSelectorLength = 1024;
 constexpr auto kSelectorTimeout = std::chrono::milliseconds(25);
+constexpr auto kSelectorBudget = std::chrono::milliseconds(50);
 
 MascotCommandStatus validateSelector(QString const& selector) {
     if (selector.size() > kMaxSelectorLength) {
@@ -72,9 +73,15 @@ LoadedMascotInfo buildLoadedMascotInfo(MascotData *data) {
     return info;
 }
 
-bool selectorEval(ShijimaWidget *mascot, QString const& selector) {
+bool selectorEval(ShijimaWidget *mascot, QString const& selector,
+    std::chrono::steady_clock::time_point deadline, bool &budgetExceeded)
+{
     if (selector.isEmpty()) {
         return true;
+    }
+    if (std::chrono::steady_clock::now() >= deadline) {
+        budgetExceeded = true;
+        return false;
     }
     bool eval;
     try {
@@ -85,7 +92,16 @@ bool selectorEval(ShijimaWidget *mascot, QString const& selector) {
     catch (...) {
         eval = false;
     }
+    if (std::chrono::steady_clock::now() >= deadline) {
+        budgetExceeded = true;
+    }
     return eval;
+}
+
+MascotCommandStatus selectorBudgetExceededStatus() {
+    return MascotCommandStatus::failure(503,
+        QStringLiteral("selector_budget_exceeded"),
+        QStringLiteral("Selector evaluation exceeded the total time budget"));
 }
 
 void applyPatchToWidget(MascotPatch const& patch, ShijimaWidget *widget) {
@@ -158,9 +174,16 @@ MascotCommandStatus MascotCommandService::listMascots(
     if (!selectorStatus.ok()) {
         return selectorStatus;
     }
-    m_manager->onTickSync([&out, &request](ShijimaManager *manager) {
+    auto status = MascotCommandStatus::success();
+    m_manager->onTickSync([&out, &request, &status](ShijimaManager *manager) {
+        bool budgetExceeded = false;
+        auto deadline = std::chrono::steady_clock::now() + kSelectorBudget;
         for (auto mascot : manager->mascots()) {
-            if (!selectorEval(mascot, request.selector)) {
+            if (!selectorEval(mascot, request.selector, deadline, budgetExceeded)) {
+                if (budgetExceeded) {
+                    status = selectorBudgetExceededStatus();
+                    break;
+                }
                 continue;
             }
             auto info = buildMascotInfo(mascot);
@@ -168,6 +191,11 @@ MascotCommandStatus MascotCommandService::listMascots(
             out.append(info);
         }
     });
+    if (!status.ok()) {
+        APP_LOG_WARN("command") << "List mascots selector budget exceeded";
+        out.clear();
+        return status;
+    }
     APP_LOG_DEBUG("command") << "List mascots selector_present="
         << (!request.selector.isEmpty() ? "1" : "0") << " count=" << out.size();
     return MascotCommandStatus::success();
@@ -321,19 +349,39 @@ MascotCommandStatus MascotCommandService::dismissAllMascots(
         return selectorStatus;
     }
     int dismissed = 0;
-    m_manager->onTickSync([&request, &dismissed](ShijimaManager *manager) {
+    auto status = MascotCommandStatus::success();
+    m_manager->onTickSync([&request, &dismissed, &status](ShijimaManager *manager) {
+        bool budgetExceeded = false;
+        auto deadline = std::chrono::steady_clock::now() + kSelectorBudget;
+        QList<int> matchedMascotIds;
         for (auto mascot : manager->mascots()) {
-            if (!selectorEval(mascot, request.selector)) {
+            if (!selectorEval(mascot, request.selector, deadline, budgetExceeded)) {
+                if (budgetExceeded) {
+                    status = selectorBudgetExceededStatus();
+                    break;
+                }
                 continue;
             }
-            manager->clearCliLabelForMascot(mascot->mascotId());
-            mascot->markForDeletion();
-            ++dismissed;
+            matchedMascotIds.append(mascot->mascotId());
+        }
+        if (!status.ok()) {
+            return;
+        }
+        dismissed = matchedMascotIds.size();
+        for (auto mascotId : matchedMascotIds) {
+            manager->clearCliLabelForMascot(mascotId);
+            if (manager->mascotsById().count(mascotId) == 1) {
+                manager->mascotsById().at(mascotId)->markForDeletion();
+            }
         }
         if (request.selector.isEmpty()) {
             manager->clearCliLabels();
         }
     });
+    if (!status.ok()) {
+        APP_LOG_WARN("command") << "Dismiss all mascots selector budget exceeded";
+        return status;
+    }
     APP_LOG_INFO("command") << "Dismiss all mascots request selector_present="
         << (!request.selector.isEmpty() ? "1" : "0") << " dismissed=" << dismissed;
     return MascotCommandStatus::success();
