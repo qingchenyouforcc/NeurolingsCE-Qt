@@ -93,6 +93,14 @@ void ShijimaWidget::mousePressEvent(QMouseEvent *event) {
 
 void ShijimaWidget::mouseDoubleClickEvent(QMouseEvent *event) {
     mousePressEvent(event);
+    if (event->button() != Qt::MouseButton::LeftButton ||
+        m_dragTarget == nullptr)
+    {
+        return;
+    }
+
+    ShijimaManager::defaultManager()->spawn(
+        m_dragTarget->mascotName().toStdString());
 }
 
 void ShijimaWidget::mouseMoveEvent(QMouseEvent *event) {
