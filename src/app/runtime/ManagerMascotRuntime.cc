@@ -26,6 +26,7 @@
 #include "../ui/ManagerUiState.hpp"
 #include "../ui/ManagerUiHelpers.hpp"
 #include <filesystem>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -493,14 +494,31 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
     APP_LOG_INFO("mascot") << "Spawn requested for template name=\"" << name << "\"";
 
     try {
+        auto templateName = QString::fromStdString(name);
+        auto *mascotData = m_runtime->templates.loadedMascots().value(
+            templateName, nullptr);
+        if (mascotData == nullptr) {
+            APP_LOG_ERROR("mascot") << "Spawn rejected for unknown template name=\""
+                << name << "\"";
+            return nullptr;
+        }
+
         QScreen *screen = mascotScreen();
+        if (screen == nullptr && !windowedMode()) {
+            screen = QGuiApplication::primaryScreen();
+        }
         updateEnvironment(screen);
         auto env = m_runtime->environment.environmentForScreen(screen);
+        if (env == nullptr) {
+            APP_LOG_ERROR("mascot") << "Spawn failed because no environment is available"
+                << " for template name=\"" << name << "\"";
+            return nullptr;
+        }
         auto product = m_runtime->templates.factory().spawn(name, {});
         product.manager->state->env = env;
         product.manager->reset_position();
         ShijimaWidget *shimeji = new ShijimaWidget(
-            m_runtime->templates.loadedMascots()[QString::fromStdString(name)],
+            mascotData,
             std::move(product.manager), m_runtime->idCounter++,
             windowedMode(), mascotParent());
         if (!shimeji->primeInitialFrame()) {
@@ -526,15 +544,16 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
 }
 
 void ShijimaManager::spawnClicked() {
-    auto &allTemplates = m_runtime->templates.factory().get_all_templates();
-    int target = QRandomGenerator::global()->bounded((int)allTemplates.size());
-    int i = 0;
-    for (auto &pair : allTemplates) {
-        if (i++ != target) {
-            continue;
-        }
-        APP_LOG_INFO("mascot") << "Spawning random mascot template name=\"" << pair.first << "\"";
-        spawn(pair.first);
-        break;
+    auto const& loadedMascots = m_runtime->templates.loadedMascots();
+    if (loadedMascots.isEmpty()) {
+        APP_LOG_WARN("mascot") << "Random spawn ignored because no templates are loaded";
+        return;
     }
+
+    int target = QRandomGenerator::global()->bounded(loadedMascots.size());
+    auto it = loadedMascots.cbegin();
+    std::advance(it, target);
+    std::string name = it.key().toStdString();
+    APP_LOG_INFO("mascot") << "Spawning random mascot template name=\"" << name << "\"";
+    spawn(name);
 }
