@@ -230,8 +230,19 @@ void ShijimaManager::loadAllMascots() {
         QString expectedPath = QFileInfo(MascotPackage::packagePathForName(
             m_runtime->mascotsPath, metadata.name)).absoluteFilePath();
         if (canonicalPath != expectedPath) {
-            QFile::remove(expectedPath);
-            QFile::rename(canonicalPath, expectedPath);
+            if (QFile::exists(expectedPath) && !QFile::remove(expectedPath)) {
+                APP_LOG_WARN("mascot") << "Failed to remove existing mascot package path=\""
+                    << expectedPath.toStdString() << "\"";
+                ++skippedCount;
+                continue;
+            }
+            if (!QFile::rename(canonicalPath, expectedPath)) {
+                APP_LOG_WARN("mascot") << "Failed to normalize mascot package path from=\""
+                    << canonicalPath.toStdString() << "\" to=\""
+                    << expectedPath.toStdString() << "\"";
+                ++skippedCount;
+                continue;
+            }
         }
         reloadMascot(metadata.name);
         ++loadedCount;
