@@ -94,6 +94,7 @@ public:
     bool canCheckForUpdates() const;
     bool canDownloadInstaller() const;
     bool canInstallDownloadedUpdate() const;
+    bool verifyDownloadedInstaller(QString &errorMessage) const;
     bool shouldShowIgnoreActions() const;
 
 signals:
@@ -104,6 +105,7 @@ private slots:
     void onCheckFinished();
     void onDownloadReadyRead();
     void onDownloadFinished();
+    void onChecksumFinished();
 
 private:
     enum class ProxyMode {
@@ -117,6 +119,8 @@ private:
     void resetDownloadState();
     void setState(State state, QString error = QString());
     void processLatestReleaseDocument(QByteArray const& bytes);
+    void downloadChecksumManifest();
+    bool verifyDownloadedInstallerWithManifest(QByteArray const& bytes, QString &errorMessage) const;
     QString describeReplyFailure(QNetworkReply *reply, QByteArray const& payload,
         QString const& context) const;
     QString tlsDiagnostics() const;
@@ -130,6 +134,7 @@ private:
     QString settingsLastCheckedAtKey() const;
     QString settingsDownloadedVersionKey() const;
     QString settingsDownloadedPathKey() const;
+    QString settingsDownloadedSha256Key() const;
     QString settingsRemindVersionKey() const;
     QString settingsRemindAtKey() const;
     QString settingsProxyModeKey() const;
@@ -142,19 +147,23 @@ private:
     bool reminderSuppressed() const;
     void clearOutdatedSuppression();
     void persistDownloadedInstaller(QString const& path);
+    QString sha256ForFile(QString const& path, QString &errorMessage) const;
     void emitStartupSignalIfNeeded();
 
     QSettings *m_settings = nullptr;
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_checkReply = nullptr;
     QNetworkReply *m_downloadReply = nullptr;
+    QNetworkReply *m_checksumReply = nullptr;
     QFile *m_downloadFile = nullptr;
     QString m_partialDownloadPath;
     QString m_downloadTargetPath;
     QString m_downloadedInstallerPath;
+    QString m_downloadedInstallerSha256;
     QString m_currentVersion;
     QString m_latestVersion;
     QString m_releaseUrl;
+    QUrl m_checksumManifestUrl;
     QString m_lastError;
     QDateTime m_publishedAt;
     ReleaseAsset m_selectedAsset;

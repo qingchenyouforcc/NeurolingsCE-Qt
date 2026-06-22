@@ -24,6 +24,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -80,7 +81,8 @@ bool isStableRelease(QJsonObject const& releaseObject)
         && !releaseObject.value(QStringLiteral("prerelease")).toBool();
 }
 
-GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonArray const& assets)
+GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonArray const& assets,
+    QUrl *checksumManifestUrl)
 {
     GitHubUpdateManager::ReleaseAsset best;
     int bestRank = 99;
@@ -97,6 +99,13 @@ GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonArray const& asset
         }
 
         QString lowered = name.toLower();
+        if ((lowered == QStringLiteral("sha256sums") ||
+                lowered == QStringLiteral("sha256sums.txt")) &&
+            checksumManifestUrl != nullptr)
+        {
+            *checksumManifestUrl = QUrl { url };
+            continue;
+        }
         GitHubUpdateManager::AssetKind kind = GitHubUpdateManager::AssetKind::None;
         int rank = 99;
 
@@ -140,10 +149,13 @@ GitHubUpdateManager::GitHubUpdateManager(QSettings *settings, QObject *parent):
     QString storedPath = m_settings->value(settingsDownloadedPathKey()).toString();
     if (!storedPath.isEmpty() && QFileInfo::exists(storedPath)) {
         m_downloadedInstallerPath = storedPath;
+        m_downloadedInstallerSha256 =
+            m_settings->value(settingsDownloadedSha256Key()).toString();
     }
     else {
         m_settings->remove(settingsDownloadedPathKey());
         m_settings->remove(settingsDownloadedVersionKey());
+        m_settings->remove(settingsDownloadedSha256Key());
     }
     reloadNetworkSettings();
     APP_LOG_INFO("update") << "Initialized GitHub update manager"
@@ -158,6 +170,11 @@ GitHubUpdateManager::~GitHubUpdateManager()
         m_checkReply->abort();
         m_checkReply->deleteLater();
         m_checkReply = nullptr;
+    }
+    if (m_checksumReply != nullptr) {
+        m_checksumReply->abort();
+        m_checksumReply->deleteLater();
+        m_checksumReply = nullptr;
     }
 }
 
@@ -303,8 +320,10 @@ void GitHubUpdateManager::remindLater()
 void GitHubUpdateManager::clearDownloadedInstaller()
 {
     m_downloadedInstallerPath.clear();
+    m_downloadedInstallerSha256.clear();
     m_settings->remove(settingsDownloadedPathKey());
     m_settings->remove(settingsDownloadedVersionKey());
+    m_settings->remove(settingsDownloadedSha256Key());
 }
 
 void GitHubUpdateManager::reloadNetworkSettings()
@@ -479,7 +498,29 @@ bool GitHubUpdateManager::canInstallDownloadedUpdate() const
     return m_state == State::ReadyToInstall
         && isInstallerKind(m_selectedAsset.kind)
         && !m_downloadedInstallerPath.isEmpty()
+        && !m_downloadedInstallerSha256.isEmpty()
         && QFileInfo::exists(m_downloadedInstallerPath);
+}
+
+bool GitHubUpdateManager::verifyDownloadedInstaller(QString &errorMessage) const
+{
+    if (!canInstallDownloadedUpdate()) {
+        errorMessage = tr("No verified installer is ready to install.");
+        return false;
+    }
+    if (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()) {
+        errorMessage = tr("The release did not publish SHA256SUMS.txt. Open the release page and install manually.");
+        return false;
+    }
+    QString actualHash = sha256ForFile(m_downloadedInstallerPath, errorMessage);
+    if (actualHash.isEmpty()) {
+        return false;
+    }
+    if (actualHash != m_downloadedInstallerSha256) {
+        errorMessage = tr("The downloaded installer changed after verification. Open the release page and install manually.");
+        return false;
+    }
+    return true;
 }
 
 bool GitHubUpdateManager::shouldShowIgnoreActions() const
@@ -604,8 +645,85 @@ void GitHubUpdateManager::onDownloadFinished()
         return;
     }
 
+    APP_LOG_INFO("update") << "Installer download complete; verifying checksum path="
+        << m_downloadTargetPath.toStdString();
+    downloadChecksumManifest();
+    reply->deleteLater();
+}
+
+void GitHubUpdateManager::downloadChecksumManifest()
+{
+    if (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()) {
+        QFile::remove(m_downloadTargetPath);
+        setState(State::Error,
+            tr("The release does not include SHA256SUMS.txt, so the installer was not started automatically. Open the release page and install manually."));
+        return;
+    }
+
+    if (m_checksumReply != nullptr) {
+        m_checksumReply->abort();
+        m_checksumReply->deleteLater();
+        m_checksumReply = nullptr;
+    }
+
+    QNetworkRequest request { m_checksumManifestUrl };
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+        QStringLiteral("NeurolingsCE/%1").arg(m_currentVersion));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+        QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkProxy proxy = proxyForUrl(request.url());
+    m_network->setProxy(proxy);
+    APP_LOG_INFO("update") << "Downloading checksum manifest url="
+        << m_checksumManifestUrl.toString().toStdString();
+    m_checksumReply = m_network->get(request);
+    connect(m_checksumReply, &QNetworkReply::finished,
+        this, &GitHubUpdateManager::onChecksumFinished);
+    connect(m_checksumReply, &QNetworkReply::sslErrors, this,
+        [this](QList<QSslError> const& errors) {
+            QStringList descriptions;
+            for (auto const& error : errors) {
+                descriptions.append(error.errorString());
+            }
+            APP_LOG_WARN("update") << "SSL errors during checksum download: "
+                << descriptions.join(QStringLiteral(" | ")).toStdString()
+                << " tls=" << tlsDiagnostics().toStdString();
+        });
+}
+
+void GitHubUpdateManager::onChecksumFinished()
+{
+    if (m_checksumReply == nullptr) {
+        return;
+    }
+
+    QNetworkReply *reply = m_checksumReply;
+    m_checksumReply = nullptr;
+    QByteArray payload = reply->readAll();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        QString error = describeReplyFailure(reply, payload,
+            tr("Could not download SHA256SUMS.txt."));
+        APP_LOG_ERROR("update") << "Checksum manifest download failed"
+            << " networkError=" << static_cast<int>(reply->error())
+            << " errorString=" << reply->errorString().toStdString();
+        QFile::remove(m_downloadTargetPath);
+        setState(State::Error, error);
+        reply->deleteLater();
+        return;
+    }
+
+    QString errorMessage;
+    if (!verifyDownloadedInstallerWithManifest(payload, errorMessage)) {
+        QFile::remove(m_downloadTargetPath);
+        APP_LOG_ERROR("update") << "Installer checksum verification failed: "
+            << errorMessage.toStdString();
+        setState(State::Error, errorMessage);
+        reply->deleteLater();
+        return;
+    }
+
     persistDownloadedInstaller(m_downloadTargetPath);
-    APP_LOG_INFO("update") << "Installer download complete path="
+    APP_LOG_INFO("update") << "Installer checksum verified path="
         << m_downloadTargetPath.toStdString();
     setState(State::ReadyToInstall);
     reply->deleteLater();
@@ -615,6 +733,7 @@ void GitHubUpdateManager::resetLatestRelease()
 {
     m_latestVersion.clear();
     m_releaseUrl.clear();
+    m_checksumManifestUrl = QUrl();
     m_lastError.clear();
     m_publishedAt = QDateTime();
     m_selectedAsset = ReleaseAsset {};
@@ -689,7 +808,8 @@ void GitHubUpdateManager::processLatestReleaseDocument(QByteArray const& bytes)
     m_publishedAt = QDateTime::fromString(
         releaseObject.value(QStringLiteral("published_at")).toString(), Qt::ISODate);
     m_selectedAsset = selectBestWindowsAsset(
-        releaseObject.value(QStringLiteral("assets")).toArray());
+        releaseObject.value(QStringLiteral("assets")).toArray(),
+        &m_checksumManifestUrl);
     clearOutdatedSuppression();
 
     if (versionNumberFor(m_latestVersion) <= versionNumberFor(m_currentVersion)) {
@@ -705,6 +825,56 @@ void GitHubUpdateManager::processLatestReleaseDocument(QByteArray const& bytes)
     }
 
     emitStartupSignalIfNeeded();
+}
+
+bool GitHubUpdateManager::verifyDownloadedInstallerWithManifest(
+    QByteArray const& bytes, QString &errorMessage) const
+{
+    if (m_downloadTargetPath.isEmpty() || m_selectedAsset.name.isEmpty()) {
+        errorMessage = tr("No downloaded installer is available for checksum verification.");
+        return false;
+    }
+
+    QString expectedHash;
+    QString manifest = QString::fromUtf8(bytes);
+    QStringList lines = manifest.split(QLatin1Char('\n'));
+    for (QString line : lines) {
+        line = line.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
+            continue;
+        }
+        QStringList parts = line.split(QRegularExpression(QStringLiteral("\\s+")),
+            Qt::SkipEmptyParts);
+        if (parts.size() < 2) {
+            continue;
+        }
+        QString hash = parts.first().trimmed().toLower();
+        QString filename = parts.last().trimmed();
+        if (filename.startsWith(QLatin1Char('*'))) {
+            filename.remove(0, 1);
+        }
+        if (hash.size() == 64 && filename == m_selectedAsset.name) {
+            expectedHash = hash;
+            break;
+        }
+    }
+
+    if (expectedHash.isEmpty()) {
+        errorMessage = tr("SHA256SUMS.txt does not contain a hash for %1. The installer was not started automatically.")
+            .arg(m_selectedAsset.name);
+        return false;
+    }
+
+    QString actualHash = sha256ForFile(m_downloadTargetPath, errorMessage);
+    if (actualHash.isEmpty()) {
+        return false;
+    }
+    if (actualHash != expectedHash) {
+        errorMessage = tr("The downloaded installer failed SHA-256 verification. Open the release page and install manually.");
+        return false;
+    }
+
+    return true;
 }
 
 QString GitHubUpdateManager::describeReplyFailure(QNetworkReply *reply, QByteArray const& payload,
@@ -911,6 +1081,11 @@ QString GitHubUpdateManager::settingsDownloadedPathKey() const
     return QStringLiteral("update/downloadedInstallerPath");
 }
 
+QString GitHubUpdateManager::settingsDownloadedSha256Key() const
+{
+    return QStringLiteral("update/downloadedInstallerSha256");
+}
+
 QString GitHubUpdateManager::settingsRemindVersionKey() const
 {
     return QStringLiteral("update/remindVersion");
@@ -950,7 +1125,8 @@ bool GitHubUpdateManager::hasPersistedInstallerForLatest() const
 {
     QString storedVersion = m_settings->value(settingsDownloadedVersionKey()).toString();
     QString storedPath = m_settings->value(settingsDownloadedPathKey()).toString();
-    if (storedVersion != m_latestVersion || storedPath.isEmpty()) {
+    QString storedSha256 = m_settings->value(settingsDownloadedSha256Key()).toString();
+    if (storedVersion != m_latestVersion || storedPath.isEmpty() || storedSha256.isEmpty()) {
         return false;
     }
     if (!QFileInfo::exists(storedPath)) {
@@ -991,14 +1167,40 @@ void GitHubUpdateManager::clearOutdatedSuppression()
     }
     else {
         m_downloadedInstallerPath = m_settings->value(settingsDownloadedPathKey()).toString();
+        m_downloadedInstallerSha256 =
+            m_settings->value(settingsDownloadedSha256Key()).toString();
     }
 }
 
 void GitHubUpdateManager::persistDownloadedInstaller(QString const& path)
 {
     m_downloadedInstallerPath = path;
+    QString error;
+    m_downloadedInstallerSha256 = sha256ForFile(path, error);
     m_settings->setValue(settingsDownloadedVersionKey(), m_latestVersion);
     m_settings->setValue(settingsDownloadedPathKey(), path);
+    m_settings->setValue(settingsDownloadedSha256Key(), m_downloadedInstallerSha256);
+}
+
+QString GitHubUpdateManager::sha256ForFile(QString const& path, QString &errorMessage) const
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        errorMessage = tr("Could not read the downloaded installer for checksum verification.");
+        return {};
+    }
+
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    while (!file.atEnd()) {
+        QByteArray chunk = file.read(1024 * 1024);
+        if (chunk.isEmpty() && file.error() != QFileDevice::NoError) {
+            errorMessage = tr("Could not read the downloaded installer for checksum verification.");
+            return {};
+        }
+        hash.addData(chunk);
+    }
+
+    return QString::fromLatin1(hash.result().toHex()).toLower();
 }
 
 void GitHubUpdateManager::emitStartupSignalIfNeeded()

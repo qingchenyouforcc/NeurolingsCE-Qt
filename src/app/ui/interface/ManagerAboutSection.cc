@@ -350,6 +350,17 @@ void ShijimaManager::showAboutDialog()
         }
 
         if (m_updateManager->canInstallDownloadedUpdate()) {
+            QString verificationError;
+            if (!m_updateManager->verifyDownloadedInstaller(verificationError)) {
+                QMessageBox::warning(
+                    aboutDialog,
+                    tr("Install Update"),
+                    verificationError);
+                if (!m_updateManager->releaseUrl().isEmpty()) {
+                    QDesktopServices::openUrl(QUrl { m_updateManager->releaseUrl() });
+                }
+                return;
+            }
             QString versionText = QStringLiteral("v%1").arg(m_updateManager->latestVersion());
             int result = QMessageBox::question(
                 aboutDialog,
