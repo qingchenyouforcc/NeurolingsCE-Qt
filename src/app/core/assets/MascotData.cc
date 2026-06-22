@@ -19,13 +19,16 @@
 #include "shijima-qt/MascotData.hpp"
 #include "shijima-qt/AssetLoader.hpp"
 #include "shijima-qt/MascotPackage.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 #include <QDirIterator>
 #include <QFile>
+#include <QImageReader>
 #include <QPainter>
 #include <QTextStream>
 #include <QDir>
 #include "shijima-qt/DefaultMascot.hpp"
 #include <stdexcept>
+#include <cstdint>
 #include <shijima/parser.hpp>
 
 static QString readFile(QString const& file) {
@@ -34,6 +37,27 @@ static QString readFile(QString const& file) {
         throw std::runtime_error("failed to open file: " + file.toStdString());
     QTextStream in(&f);
     return in.readAll(); 
+}
+
+static QImage loadPreviewImage(QString const& filePath) {
+    QImageReader reader(filePath);
+    QSize size = reader.size();
+    if (!size.isValid()) {
+        throw std::runtime_error("invalid preview image");
+    }
+    std::uint64_t width = static_cast<std::uint64_t>(size.width());
+    std::uint64_t height = static_cast<std::uint64_t>(size.height());
+    std::uint64_t pixels = width * height;
+    if (width == 0 || height == 0 ||
+        pixels > SecurityLimits::kMascotImageMaxPixels)
+    {
+        throw std::runtime_error("preview image is too large");
+    }
+    QImage frame;
+    if (!reader.read(&frame) || frame.isNull()) {
+        throw std::runtime_error("failed to load preview image");
+    }
+    return frame;
 }
 
 MascotData::MascotData(): m_valid(false) {}
@@ -96,9 +120,8 @@ MascotData::MascotData(QString const& packagePath, QString const& cachePath, int
     if (images.isEmpty()) {
         throw std::runtime_error("mascot package does not contain preview images");
     }
-    QImage frame;
-    frame.load(dir.absoluteFilePath(images[0]));
-    QImage preview = renderPreview(frame);
+    QImage preview = renderPreview(loadPreviewImage(
+        dir.absoluteFilePath(images[0])));
     m_preview = QPixmap::fromImage(preview);
 }
 

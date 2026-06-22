@@ -161,7 +161,29 @@ QByteArray minimalBehaviorsXml() {
 }
 
 QByteArray minimalPngBytes() {
-    return QByteArrayLiteral("png");
+    static constexpr unsigned char bytes[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+        0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99,
+        0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+    };
+    return QByteArray(reinterpret_cast<char const *>(bytes),
+        static_cast<qsizetype>(sizeof(bytes)));
+}
+
+QByteArray oversizedHeaderOnlyPngBytes() {
+    static constexpr unsigned char bytes[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x20, 0x00
+    };
+    return QByteArray(reinterpret_cast<char const *>(bytes),
+        static_cast<qsizetype>(sizeof(bytes)));
 }
 
 struct FakeMascotService {
@@ -431,6 +453,31 @@ void testLegacyArchiveAnalysisAndConversion() {
     }
 }
 
+void testPackageInspectionRejectsOversizedPngHeader() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QString packagePath = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("oversized.mascot"));
+
+    MascotMetadata metadata;
+    metadata.name = QStringLiteral("Oversized");
+    std::vector<TestZipEntry> entries {
+        { QStringLiteral("info.json"), MascotPackage::metadataToJson(metadata) },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), oversizedHeaderOnlyPngBytes() },
+    };
+    testWriteZip(packagePath, entries);
+
+    QString error;
+    MascotMetadata parsed;
+    expect(!MascotPackage::inspectPackage(packagePath, parsed, error),
+        "package inspection should reject oversized PNG headers");
+    expect(error.contains(QStringLiteral("maximum pixel count")) ||
+        error.contains(QStringLiteral("invalid dimensions")),
+        "oversized PNG rejection should mention dimensions");
+}
+
 void testCommandDispatcher() {
     FakeMascotService service;
 
@@ -509,6 +556,7 @@ int main() {
     testStatusJson();
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
+    testPackageInspectionRejectsOversizedPngHeader();
     testCommandDispatcher();
     testSafeChildPath();
     testScriptExecutionTimeout();

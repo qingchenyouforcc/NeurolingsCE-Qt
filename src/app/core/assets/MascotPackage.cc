@@ -223,6 +223,9 @@ std::uint64_t maxSizeForPackagePath(QString const& path)
     return SecurityLimits::kMascotSingleFileMaxBytes;
 }
 
+QByteArray readPackageFile(QString const& packagePath, QString const& wantedPath,
+    QString &errorMessage);
+
 bool validateImageFile(QString const& filePath, QString &errorMessage)
 {
     QFile file(filePath);
@@ -262,6 +265,135 @@ bool validateImageFile(QString const& filePath, QString &errorMessage)
         return false;
     }
     return true;
+}
+
+bool validatePngDimensions(QString const& label, QByteArray const& header,
+    QString &errorMessage)
+{
+    static constexpr unsigned char kPngSignature[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+    };
+    if (header.size() < 24 ||
+        std::memcmp(header.constData(), kPngSignature, sizeof(kPngSignature)) != 0 ||
+        header.mid(12, 4) != QByteArrayLiteral("IHDR"))
+    {
+        return true;
+    }
+    auto readBigEndian32 = [](char const *data) -> std::uint32_t {
+        auto bytes = reinterpret_cast<unsigned char const *>(data);
+        return (static_cast<std::uint32_t>(bytes[0]) << 24) |
+            (static_cast<std::uint32_t>(bytes[1]) << 16) |
+            (static_cast<std::uint32_t>(bytes[2]) << 8) |
+            static_cast<std::uint32_t>(bytes[3]);
+    };
+    std::uint64_t width = readBigEndian32(header.constData() + 16);
+    std::uint64_t height = readBigEndian32(header.constData() + 20);
+    std::uint64_t pixels = width * height;
+    if (width == 0 || height == 0) {
+        errorMessage = QStringLiteral("Image %1 has invalid dimensions").arg(label);
+        return false;
+    }
+    if (pixels > SecurityLimits::kMascotImageMaxPixels) {
+        errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
+            .arg(label)
+            .arg(SecurityLimits::kMascotImageMaxPixels);
+        return false;
+    }
+    return true;
+}
+
+bool validatePackageImageEntry(QString const& packagePath, QString const& entryPath,
+    QString &errorMessage)
+{
+    QByteArray bytes = readPackageFile(packagePath, entryPath, errorMessage);
+    if (bytes.isEmpty()) {
+        return false;
+    }
+    QByteArray header = bytes.left(24);
+    return validatePngDimensions(entryPath, header, errorMessage);
+}
+
+bool validateExtractedDirectory(QString const& rootPath, QString &errorMessage)
+{
+    QDir root(rootPath);
+    if (!root.exists()) {
+        errorMessage = QStringLiteral("Extracted archive directory is missing");
+        return false;
+    }
+
+    std::uint64_t totalBytes = 0;
+    std::size_t fileCount = 0;
+    QDirIterator iter(rootPath, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
+        QDirIterator::Subdirectories);
+    while (iter.hasNext()) {
+        QFileInfo info = iter.nextFileInfo();
+        QString relative = root.relativeFilePath(info.absoluteFilePath()).replace(
+            QLatin1Char('\\'), QLatin1Char('/'));
+        auto safePath = SafePath::safeChildPath(rootPath, relative);
+        if (!safePath.has_value() ||
+            QDir::cleanPath(safePath.value()) != QDir::cleanPath(info.absoluteFilePath()))
+        {
+            errorMessage = QStringLiteral("Archive extracted an unsafe path");
+            return false;
+        }
+        if (info.isSymLink()) {
+            errorMessage = QStringLiteral("Archive contains symbolic links");
+            return false;
+        }
+        if (!info.isFile()) {
+            continue;
+        }
+
+        ++fileCount;
+        if (fileCount > SecurityLimits::kMascotZipEntryMaxCount) {
+            errorMessage = QStringLiteral("Archive contains too many extracted files");
+            return false;
+        }
+
+        std::uint64_t maxBytes = maxSizeForPackagePath(relative);
+        if (info.size() < 0 ||
+            static_cast<std::uint64_t>(info.size()) > maxBytes)
+        {
+            errorMessage = QStringLiteral("Extracted file %1 exceeds size limits")
+                .arg(relative);
+            return false;
+        }
+
+        totalBytes += static_cast<std::uint64_t>(info.size());
+        if (totalBytes > SecurityLimits::kMascotExtractedMaxBytes) {
+            errorMessage = QStringLiteral("Archive extracted data is too large");
+            return false;
+        }
+
+        if (relative.toLower().contains(QStringLiteral("/img/")) &&
+            relative.toLower().endsWith(QStringLiteral(".png")) &&
+            !validateImageFile(info.absoluteFilePath(), errorMessage))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool extractArchiveSafely(shimejifinder::archive &archive, QString const& outputPath,
+    QString &errorMessage)
+{
+    QDir outputDir(outputPath);
+    if (outputDir.exists()) {
+        outputDir.removeRecursively();
+    }
+    outputDir.mkpath(QStringLiteral("."));
+
+    ExactPathExtractor extractor(outputPath);
+    try {
+        archive.extract(&extractor);
+    }
+    catch (std::exception const& ex) {
+        errorMessage = QString::fromUtf8(ex.what());
+        return false;
+    }
+
+    return validateExtractedDirectory(outputPath, errorMessage);
 }
 
 bool openPackage(QString const& packagePath, shimejifinder::libunarr::archive &archive,
@@ -348,17 +480,27 @@ bool inspectEntries(QString const& packagePath, MascotMetadata &metadata,
     bool hasActions = false;
     bool hasBehaviors = false;
     bool hasImage = false;
+    QStringList imagePaths;
     for (size_t i = 0; i < archive.size(); ++i) {
         QString path = normalizedArchivePath(QString::fromStdString(archive.at(i)->path()));
         QString lower = path.toLower();
         hasActions = hasActions || lower == QStringLiteral("actions.xml");
         hasBehaviors = hasBehaviors || lower == QStringLiteral("behaviors.xml");
-        hasImage = hasImage || (lower.startsWith(QStringLiteral("img/")) &&
-            lower.endsWith(QStringLiteral(".png")));
+        bool isImage = lower.startsWith(QStringLiteral("img/")) &&
+            lower.endsWith(QStringLiteral(".png"));
+        hasImage = hasImage || isImage;
+        if (isImage) {
+            imagePaths.append(path);
+        }
     }
     if (!hasActions || !hasBehaviors || !hasImage) {
         errorMessage = QStringLiteral("Package must contain actions.xml, behaviors.xml, and img/*.png");
         return false;
+    }
+    for (auto const& imagePath : imagePaths) {
+        if (!validatePackageImageEntry(packagePath, imagePath, errorMessage)) {
+            return false;
+        }
     }
     return true;
 }
@@ -1079,7 +1221,9 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
             return analysis;
         }
         auto rawCandidates = rawLegacyCandidates(archiveInfo.absoluteFilePath());
-        archive->extract(tempDir.path().toStdString());
+        if (!extractArchiveSafely(*archive, tempDir.path(), analysis.errorMessage)) {
+            return analysis;
+        }
 
         QSet<QString> seenNames;
         for (auto const& name : archive->shimejis()) {
@@ -1190,7 +1334,13 @@ QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
             results.append(result);
             return results;
         }
-        archive->extract(tempDir.path().toStdString());
+        QString errorMessage;
+        if (!extractArchiveSafely(*archive, tempDir.path(), errorMessage)) {
+            LegacyMascotConversionResult result;
+            result.errorMessage = errorMessage;
+            results.append(result);
+            return results;
+        }
 
         QSet<QString> reservedOutputPaths;
         for (auto const& name : archive->shimejis()) {
@@ -1291,7 +1441,17 @@ std::set<std::string> importArchive(QString const& archivePath,
             return imported;
         }
         auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
-        archive->extract(tempDir.path().toStdString());
+        if (!archive) {
+            APP_LOG_WARN("import") << "Could not analyze archive path=\""
+                << archiveInfo.absoluteFilePath().toStdString() << "\"";
+            return imported;
+        }
+        if (!extractArchiveSafely(*archive, tempDir.path(), error)) {
+            APP_LOG_WARN("import") << "Legacy archive extraction failed path=\""
+                << archiveInfo.absoluteFilePath().toStdString() << "\": "
+                << error.toStdString();
+            return imported;
+        }
         for (auto const& name : archive->shimejis()) {
             QString qName = QString::fromStdString(name);
             QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
