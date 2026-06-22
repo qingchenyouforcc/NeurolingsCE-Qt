@@ -18,6 +18,7 @@
 
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/SafePath.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -52,11 +53,18 @@ public:
 
     void begin_write(shimejifinder::extract_target const& target) override {
         QString relative = QString::fromStdString(target.extract_name());
-        QString filePath = QDir(m_root).absoluteFilePath(relative);
+        auto safePath = SafePath::safeChildPath(m_root, relative);
+        if (!safePath.has_value()) {
+            throw std::runtime_error("Unsafe package extraction path");
+        }
+        QString filePath = safePath.value();
         std::filesystem::path path = filePath.toStdString();
         std::filesystem::create_directories(path.parent_path());
         std::ofstream out;
         out.open(path, std::ios::out | std::ios::binary);
+        if (!out.is_open()) {
+            throw std::runtime_error("Could not open package extraction target");
+        }
         m_activeWrites.emplace_back(std::move(out));
     }
 

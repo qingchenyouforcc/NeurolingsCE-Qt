@@ -8193,7 +8193,7 @@ DUK_INTERNAL_DECL void duk_hbufobj_promote_plain(duk_hthread *thr, duk_idx_t idx
  * impact on execution performance low.
  */
 #if defined(DUK_USE_INTERRUPT_COUNTER)
-#define DUK_HTHREAD_INTCTR_DEFAULT (256L * 1024L)
+#define DUK_HTHREAD_INTCTR_DEFAULT (1024L)
 #endif
 
 /*

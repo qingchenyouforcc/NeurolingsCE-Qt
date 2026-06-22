@@ -25,8 +25,21 @@
 #include <QBuffer>
 #include <QByteArray>
 #include <QMetaObject>
+#include <chrono>
 
 namespace {
+
+constexpr qsizetype kMaxSelectorLength = 1024;
+constexpr auto kSelectorTimeout = std::chrono::milliseconds(25);
+
+MascotCommandStatus validateSelector(QString const& selector) {
+    if (selector.size() > kMaxSelectorLength) {
+        return MascotCommandStatus::failure(400,
+            QStringLiteral("selector_too_long"),
+            QStringLiteral("Selector must not exceed 1024 characters"));
+    }
+    return MascotCommandStatus::success();
+}
 
 MascotInfo buildMascotInfo(ShijimaWidget *widget) {
     MascotInfo info;
@@ -66,7 +79,8 @@ bool selectorEval(ShijimaWidget *mascot, QString const& selector) {
     bool eval;
     try {
         mascot->mascot().script_ctx->state = mascot->mascot().state;
-        eval = mascot->mascot().script_ctx->eval_bool(selector.toStdString());
+        eval = mascot->mascot().script_ctx->eval_bool_with_timeout(
+            selector.toStdString(), kSelectorTimeout);
     }
     catch (...) {
         eval = false;
@@ -140,6 +154,10 @@ MascotCommandStatus MascotCommandService::listMascots(
     ListMascotsRequest const& request, QList<MascotInfo> &out) const
 {
     out.clear();
+    auto selectorStatus = validateSelector(request.selector);
+    if (!selectorStatus.ok()) {
+        return selectorStatus;
+    }
     m_manager->onTickSync([&out, &request](ShijimaManager *manager) {
         for (auto mascot : manager->mascots()) {
             if (!selectorEval(mascot, request.selector)) {
@@ -298,6 +316,10 @@ MascotCommandStatus MascotCommandService::dismissMascot(int mascotId) const {
 MascotCommandStatus MascotCommandService::dismissAllMascots(
     DismissAllMascotsRequest const& request) const
 {
+    auto selectorStatus = validateSelector(request.selector);
+    if (!selectorStatus.ok()) {
+        return selectorStatus;
+    }
     int dismissed = 0;
     m_manager->onTickSync([&request, &dismissed](ShijimaManager *manager) {
         for (auto mascot : manager->mascots()) {

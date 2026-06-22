@@ -8,6 +8,7 @@ SOURCES = src/app/main.cc \
 	src/app/core/assets/Asset.cc \
 	src/app/core/assets/MascotData.cc \
 	src/app/core/assets/MascotPackage.cc \
+	src/app/core/assets/SafePath.cc \
 	src/app/core/assets/AssetLoader.cc \
 	src/app/core/commands/MascotApi.cc \
 	src/app/core/commands/MascotCommandService.cc \
@@ -61,6 +62,7 @@ CLI_SOURCES = src/app/cli_main.cc \
 	src/app/cli/OutputFormatter.cc \
 	src/app/core/AppLog.cc \
 	src/app/core/assets/MascotPackage.cc \
+	src/app/core/assets/SafePath.cc \
 	src/app/core/commands/MascotApi.cc \
 	src/app/core/localipc/ShijimaLocalApiClient.cc
 CLI_OBJECTS = $(patsubst %.cc,%.o,$(CLI_SOURCES))

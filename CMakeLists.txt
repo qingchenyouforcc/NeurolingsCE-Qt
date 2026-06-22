@@ -182,6 +182,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/assets/Asset.cc
   src/app/core/assets/MascotData.cc
   src/app/core/assets/MascotPackage.cc
+  src/app/core/assets/SafePath.cc
   src/app/core/assets/AssetLoader.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/MascotCommandService.cc
@@ -244,6 +245,7 @@ target_sources(NeurolingsCECli PRIVATE
   src/app/cli/OutputFormatter.cc
   src/app/core/AppLog.cc
   src/app/core/assets/MascotPackage.cc
+  src/app/core/assets/SafePath.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
 )
@@ -437,6 +439,7 @@ add_executable(NeurolingsCETests
   src/app/tests/AppCoreTests.cc
   src/app/core/AppLog.cc
   src/app/core/assets/MascotPackage.cc
+  src/app/core/assets/SafePath.cc
   src/app/core/commands/MascotApi.cc
 )
 target_include_directories(NeurolingsCETests PRIVATE
@@ -453,6 +456,7 @@ target_compile_definitions(NeurolingsCETests PRIVATE
 target_link_libraries(NeurolingsCETests PRIVATE
   Qt6::Core
   Qt6::Gui
+  NeurolingsShijimaEngine
   shimejifinder
 )
 if(MSVC)

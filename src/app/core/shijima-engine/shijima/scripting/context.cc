@@ -22,6 +22,12 @@
 #include <stdexcept>
 #include <shijima/behavior/base.hpp>
 
+extern "C" int shijima_duk_exec_timeout_check(void *udata) {
+    auto *deadline = static_cast<shijima::scripting::context::execution_deadline *>(udata);
+    return deadline != nullptr && deadline->active &&
+        std::chrono::steady_clock::now() >= deadline->expires;
+}
+
 namespace shijima {
 namespace scripting {
 
@@ -734,6 +740,23 @@ bool context::eval_bool(std::string const& js, bool log) {
     return ret;
 }
 
+bool context::eval_bool_with_timeout(std::string const& js,
+    std::chrono::milliseconds timeout, bool log)
+{
+    deadline.expires = std::chrono::steady_clock::now() + timeout;
+    deadline.active = true;
+    bool result = false;
+    if (duk_peval_string(duk, js.c_str()) == DUK_EXEC_SUCCESS) {
+        result = duk_to_boolean(duk, -1);
+        if (log) {
+            log_javascript(js, result ? "true" : "false");
+        }
+    }
+    deadline.active = false;
+    duk_pop(duk);
+    return result;
+}
+
 double context::eval_number(std::string js, bool log) {
     duk_eval_string(duk, js.c_str());
     double ret = duk_to_number(duk, -1);
@@ -790,7 +813,7 @@ void context::eval(std::string js) {
 
 context::context() {
     invalidated_flag = std::make_shared<bool>(false);
-    duk = duk_create_heap_default();
+    duk = duk_create_heap(nullptr, nullptr, nullptr, &deadline, nullptr);
     build_mascot();
     duk_put_global_string(duk, "mascot");
     build_console();

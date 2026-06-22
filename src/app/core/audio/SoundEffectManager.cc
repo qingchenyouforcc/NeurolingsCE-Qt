@@ -18,6 +18,7 @@
 
 #include "shijima-qt/SoundEffectManager.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/SafePath.hpp"
 
 #if SHIJIMA_USE_QTMULTIMEDIA
 
@@ -31,9 +32,9 @@ void SoundEffectManager::play(QString const& name) {
             << name.toStdString() << "\"";
         QUrl url;
         for (QString &searchPath : searchPaths) {
-            QString file = QDir::cleanPath(searchPath + QDir::separator() + name);
-            if (QFile::exists(file)) {
-                url = QUrl::fromLocalFile(file);
+            auto file = SafePath::safeChildPath(searchPath, name);
+            if (file.has_value() && QFile::exists(file.value())) {
+                url = QUrl::fromLocalFile(file.value());
                 break;
             }
         }

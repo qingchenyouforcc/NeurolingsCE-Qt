@@ -17,6 +17,7 @@
 // 
 
 #if !defined(DUK_CONFIG_H_INCLUDED)
+extern "C" int shijima_duk_exec_timeout_check(void *udata);
 #include "_duk_config.h"
 
 #ifdef SHIJIMA_DUK_STATIC_BUILD

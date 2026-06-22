@@ -31,6 +31,7 @@
 #include "Platform/Platform.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/AssetLoader.hpp"
+#include "shijima-qt/SafePath.hpp"
 
 namespace {
 
@@ -64,9 +65,17 @@ Asset const& ShijimaWidget::getActiveAsset() {
     std::string lowerName = name;
     std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
                    [](unsigned char c) { return (char)std::tolower(c); });
-    auto imagePath = QDir::cleanPath(m_data->imgRoot()
-        + QDir::separator() + QString::fromStdString(lowerName));
-    return AssetLoader::defaultLoader()->loadAsset(imagePath);
+    auto imagePath = SafePath::safeChildPath(m_data->imgRoot(),
+        QString::fromStdString(lowerName));
+    if (!imagePath.has_value() || !imagePath->endsWith(
+        QStringLiteral(".png"), Qt::CaseInsensitive))
+    {
+        APP_LOG_WARN("mascot") << "Rejected unsafe active frame name for mascotId="
+            << m_mascotId;
+        return AssetLoader::defaultLoader()->loadAsset(
+            QStringLiteral("@/img/__missing__.png"));
+    }
+    return AssetLoader::defaultLoader()->loadAsset(imagePath.value());
 }
 
 bool ShijimaWidget::isMirroredRender() const {

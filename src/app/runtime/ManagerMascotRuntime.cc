@@ -20,6 +20,7 @@
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/MascotData.hpp"
 #include "shijima-qt/MascotPackage.hpp"
+#include "shijima-qt/SafePath.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include "ManagerRuntimeState.hpp"
 #include "../ui/ManagerUiState.hpp"
@@ -313,7 +314,15 @@ bool ShijimaManager::removeMascotTemplate(QString const& name,
         return false;
     }
 
-    std::filesystem::path path = mascotData->packagePath().toStdString();
+    auto safePath = SafePath::safeChildPath(m_runtime->mascotsPath,
+        QFileInfo(mascotData->packagePath()).fileName());
+    if (!safePath.has_value() || QFileInfo(safePath.value()).absoluteFilePath() !=
+        QFileInfo(mascotData->packagePath()).absoluteFilePath())
+    {
+        errorMessage = QStringLiteral("Mascot package path is outside storage");
+        return false;
+    }
+    std::filesystem::path path = safePath->toStdString();
     APP_LOG_INFO("mascot") << "Deleting mascot template name=\""
         << name.toStdString() << "\" path=\"" << path.string() << "\"";
     try {

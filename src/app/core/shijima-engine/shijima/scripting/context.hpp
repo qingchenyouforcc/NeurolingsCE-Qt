@@ -26,6 +26,7 @@
 #include <vector>
 #include <iostream>
 #include <memory>
+#include <chrono>
 
 // forward declarations from duktape.h
 extern "C" {
@@ -100,6 +101,10 @@ private:
 
     std::shared_ptr<bool> invalidated_flag;
 public:
+    struct execution_deadline {
+        bool active = false;
+        std::chrono::steady_clock::time_point expires;
+    };
     // Holds a bare pointer to the context. The context should therefore
     // outlive any global. In case it doesn't, the invalidated flag
     // will prevent bad memory access.
@@ -153,6 +158,8 @@ public:
 #define log_javascript_default false
 #endif
     bool eval_bool(std::string const& js, bool log = log_javascript_default);
+    bool eval_bool_with_timeout(std::string const& js,
+        std::chrono::milliseconds timeout, bool log = false);
     double eval_number(std::string js, bool log = log_javascript_default);
     std::string eval_string(std::string js, bool log = log_javascript_default);
 #undef log_javascript
@@ -165,6 +172,8 @@ public:
     context &operator=(context&&) = delete;
     context(context const&) = delete;
     context(context&&) = delete;
+private:
+    execution_deadline deadline;
 };
 
 }

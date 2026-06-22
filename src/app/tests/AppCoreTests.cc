@@ -19,6 +19,8 @@
 #include "../core/commands/MascotCommandDispatcher.hpp"
 #include "shijima-qt/MascotApi.hpp"
 #include "shijima-qt/MascotPackage.hpp"
+#include "shijima-qt/SafePath.hpp"
+#include "core/shijima-engine/shijima/scripting/context.hpp"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -29,6 +31,7 @@
 #include <QString>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -472,6 +475,32 @@ void testCommandDispatcher() {
         "dispatcher should parse spawn request");
 }
 
+void testSafeChildPath() {
+    QTemporaryDir root;
+    expect(root.isValid(), "safe path test root should be valid");
+    expect(SafePath::safeChildPath(root.path(), QStringLiteral("img/frame.png")).has_value(),
+        "safe child path should allow nested relative names");
+    expect(!SafePath::safeChildPath(root.path(), QStringLiteral("../outside.png")).has_value(),
+        "safe child path should reject parent traversal");
+    expect(!SafePath::safeChildPath(root.path(), QStringLiteral("img/../../outside.png")).has_value(),
+        "safe child path should reject embedded parent traversal");
+    expect(!SafePath::safeChildPath(root.path(), QStringLiteral("C:\\outside.png")).has_value(),
+        "safe child path should reject drive paths");
+    expect(!SafePath::safeChildPath(root.path(), QStringLiteral("/etc/passwd")).has_value(),
+        "safe child path should reject absolute paths");
+}
+
+void testScriptExecutionTimeout() {
+    shijima::scripting::context context;
+    auto started = std::chrono::steady_clock::now();
+    bool result = context.eval_bool_with_timeout(
+        "while (true) {}", std::chrono::milliseconds(25));
+    auto elapsed = std::chrono::steady_clock::now() - started;
+    expect(!result, "timed out script should evaluate to false");
+    expect(elapsed < std::chrono::seconds(2),
+        "script execution timeout should interrupt an infinite loop");
+}
+
 }
 
 int main() {
@@ -481,6 +510,8 @@ int main() {
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
     testCommandDispatcher();
+    testSafeChildPath();
+    testScriptExecutionTimeout();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

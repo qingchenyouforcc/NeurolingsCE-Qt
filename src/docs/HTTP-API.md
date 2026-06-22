@@ -1,5 +1,9 @@
 # Shijima-Qt API Documentation
 
+The HTTP API is disabled by default. It starts only when the Qt setting
+`http/enabled` is explicitly set to `true`; local IPC remains the preferred
+control interface. The server still binds only to `127.0.0.1`.
+
 Base URL: http://127.0.0.1:32456/shijima/api/v1
 
 ## GET /ping

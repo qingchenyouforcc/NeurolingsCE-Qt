@@ -177,8 +177,12 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         ShijimaManagerUiInternal::setupTrayIcon(this, m_ui->trayController);
     }
     m_localApi->start();
-    if (!m_runtime->cliRuntimeMode) {
+    if (!m_runtime->cliRuntimeMode &&
+        m_settings->value("http/enabled", false).toBool())
+    {
         m_httpApi->start("127.0.0.1", 32456);
+    }
+    if (!m_runtime->cliRuntimeMode) {
         startStartupUpdateCheck();
     }
     APP_LOG_INFO("startup") << "Manager window initialized";
