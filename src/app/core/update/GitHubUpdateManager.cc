@@ -240,7 +240,17 @@ void GitHubUpdateManager::downloadAndPrepareUpdate()
         return;
     }
 
-    m_downloadTargetPath = QDir(versionDir).filePath(m_selectedAsset.name);
+    QString safeAssetName = QFileInfo(m_selectedAsset.name).fileName();
+    if (safeAssetName.isEmpty() || safeAssetName != m_selectedAsset.name ||
+        safeAssetName.contains(QLatin1Char('/')) ||
+        safeAssetName.contains(QLatin1Char('\\')) ||
+        safeAssetName.contains(QLatin1Char(':')))
+    {
+        setState(State::Error, tr("Unsafe update asset name."));
+        return;
+    }
+
+    m_downloadTargetPath = QDir(versionDir).filePath(safeAssetName);
     m_partialDownloadPath = m_downloadTargetPath + QStringLiteral(".part");
 
     QFile::remove(m_partialDownloadPath);
