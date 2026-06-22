@@ -310,6 +310,17 @@ generate new mascot sprites/XML/ZIP resources.
 - Use Qt APIs for JSON, paths, files, threads, and event dispatch where the
   surrounding code already does.
 
+## Local IPC Trust Boundary
+
+NeurolingsCE uses a local IPC endpoint for communication between the official CLI
+and the running desktop runtime. This channel is intended for same-user local
+automation only. It is not a security sandbox boundary and does not attempt to
+defend against malicious processes already running under the same user account.
+
+Security-sensitive validation focuses on untrusted mascot packages, imported
+archives, script selectors, image and audio assets, HTTP input when enabled, and
+update package integrity.
+
 ## Design Constraints And Anti-Patterns
 
 - Do not support 32-bit MSVC. CMake intentionally fatal-errors for x86 MSVC.
@@ -373,4 +384,3 @@ When touching UI/runtime behavior, manually smoke-test:
 | Change active window behavior | `src/platform/Platform/*/ActiveWindowObserver*`. |
 | Change Windows packaging | `src/tools/package-windows-bin.ps1`, `installer/wix/`. |
 | Change version/app metadata | `VERSION.txt`, then regenerate/build affected templates. |
-
