@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ShijimaHttpApi.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 #include <httplib.h>
 #include "shijima-qt/ShijimaManager.hpp"
 #include <sstream>
@@ -29,6 +30,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 
 using namespace httplib;
 
@@ -54,6 +56,12 @@ bool requestHasJsonContentType(Request const& req) {
 
 std::optional<QJsonObject> jsonForRequest(Request const& req) {
     if (!requestHasJsonContentType(req)) {
+        return {};
+    }
+    if (req.body.size() > SecurityLimits::kHttpJsonBodyMaxBytes) {
+        APP_LOG_WARN("http") << "Rejected oversized JSON body for " << req.method
+            << " " << req.path << " bytes=" << req.body.size()
+            << " limit=" << SecurityLimits::kHttpJsonBodyMaxBytes;
         return {};
     }
     QByteArray bytes { req.body.c_str(), (qsizetype)req.body.size() };
@@ -367,22 +375,60 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
     m_server->Post(".*", badRequest);
     m_server->Delete(".*", badRequest);
     m_server->Patch(".*", badRequest);
+    m_server->set_payload_max_length(SecurityLimits::kHttpJsonBodyMaxBytes);
     m_server->set_logger([](const Request &req, const Response &res) {
         APP_LOG_INFO("http") << req.method << " " << requestTarget(req)
             << " -> status=" << res.status;
     });
 }
 
-void ShijimaHttpApi::start(std::string const& host, int port) {
+bool ShijimaHttpApi::start(std::string const& host, int port) {
     stop();
     m_host = host;
     m_port = port;
+    m_lastError.clear();
+    m_startAttemptFinished.store(false);
+    m_startSucceeded.store(false);
     APP_LOG_INFO("http") << "Starting local HTTP API on " << host << ":" << port;
     m_thread = new std::thread { [this, host, port](){
         APP_LOG_INFO("http") << "HTTP API listen loop entered on " << host << ":" << port;
-        m_server->listen(host, port);
+        bool ok = m_server->listen(host, port);
+        m_startSucceeded.store(ok);
+        m_startAttemptFinished.store(true);
+        if (!ok) {
+            m_lastError = "HTTP API bind failed on " + host + ":"
+                + std::to_string(port) + " (port may be in use)";
+            APP_LOG_ERROR("http") << m_lastError;
+        }
         APP_LOG_INFO("http") << "HTTP API listen loop exited";
     } };
+    using namespace std::chrono_literals;
+    auto deadline = std::chrono::steady_clock::now() + 1500ms;
+    while (!m_startAttemptFinished.load() &&
+        std::chrono::steady_clock::now() < deadline)
+    {
+        if (m_server->is_running()) {
+            m_startSucceeded.store(true);
+            m_startAttemptFinished.store(true);
+            break;
+        }
+        std::this_thread::sleep_for(10ms);
+    }
+    if (!m_startAttemptFinished.load() && m_server->is_running()) {
+        m_startSucceeded.store(true);
+        m_startAttemptFinished.store(true);
+    }
+    if (!m_startSucceeded.load()) {
+        stop();
+        if (m_lastError.empty()) {
+            m_lastError = "HTTP API bind failed on " + host + ":"
+                + std::to_string(port);
+        }
+        APP_LOG_ERROR("http") << m_lastError;
+        return false;
+    }
+    APP_LOG_INFO("http") << "Local HTTP API listening on " << host << ":" << port;
+    return true;
 }
 
 bool ShijimaHttpApi::running() {
@@ -395,6 +441,10 @@ int ShijimaHttpApi::port() {
 
 std::string const& ShijimaHttpApi::host() {
     return m_host;
+}
+
+std::string ShijimaHttpApi::lastError() const {
+    return m_lastError;
 }
 
 void ShijimaHttpApi::stop() {

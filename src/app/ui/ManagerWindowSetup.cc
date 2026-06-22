@@ -38,6 +38,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QScreen>
 #include <QSettings>
 #include <QStandardPaths>
@@ -180,7 +181,19 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     if (!m_runtime->cliRuntimeMode &&
         m_settings->value("http/enabled", false).toBool())
     {
-        m_httpApi->start("127.0.0.1", 32456);
+        if (!m_httpApi->start("127.0.0.1", 32456)) {
+            QString error = QString::fromStdString(m_httpApi->lastError());
+            if (error.isEmpty()) {
+                error = tr("HTTP API bind failed. The port may already be in use.");
+            }
+            APP_LOG_ERROR("http") << error.toStdString();
+            QTimer::singleShot(0, this, [this, error]() {
+                QMessageBox::warning(
+                    this,
+                    tr("HTTP API Failed"),
+                    error);
+            });
+        }
     }
     if (!m_runtime->cliRuntimeMode) {
         startStartupUpdateCheck();

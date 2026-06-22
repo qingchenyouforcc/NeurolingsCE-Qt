@@ -19,6 +19,7 @@
 // 
 
 #include "shijima-qt/MascotCommandService.hpp"
+#include <atomic>
 #include <string>
 #include <thread>
 
@@ -35,13 +36,17 @@ private:
     ShijimaManager *m_manager;
     MascotCommandService m_service;
     std::string m_host;
+    std::string m_lastError;
     int m_port;
+    std::atomic<bool> m_startAttemptFinished{false};
+    std::atomic<bool> m_startSucceeded{false};
 public:
-    void start(std::string const& host, int port);
+    bool start(std::string const& host, int port);
     void stop();
     bool running();
     int port();
     std::string const& host();
+    std::string lastError() const;
     ShijimaHttpApi(ShijimaManager *manager);
     ~ShijimaHttpApi();
 };
