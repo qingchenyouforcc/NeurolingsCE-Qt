@@ -19,6 +19,7 @@
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/SafePath.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -35,8 +36,11 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <limits>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <stdexcept>
 #include <vector>
 
@@ -52,6 +56,7 @@ public:
     explicit ExactPathExtractor(QString root): m_root(QDir::cleanPath(root)) {}
 
     void begin_write(shimejifinder::extract_target const& target) override {
+        m_currentFileBytes = 0;
         QString relative = QString::fromStdString(target.extract_name());
         auto safePath = SafePath::safeChildPath(m_root, relative);
         if (!safePath.has_value()) {
@@ -69,6 +74,14 @@ public:
     }
 
     void write_next(size_t offset, const void *buf, size_t size) override {
+        if (m_totalBytes + size > SecurityLimits::kMascotExtractedMaxBytes) {
+            throw std::runtime_error("Mascot package extracted data is too large");
+        }
+        if (m_currentFileBytes + size > SecurityLimits::kMascotSingleFileMaxBytes) {
+            throw std::runtime_error("Mascot package entry is too large");
+        }
+        m_totalBytes += size;
+        m_currentFileBytes += size;
         for (auto &stream : m_activeWrites) {
             stream.seekp(offset);
             stream.write(static_cast<const char *>(buf), size);
@@ -88,7 +101,54 @@ public:
 
 private:
     QString m_root;
+    std::uint64_t m_totalBytes = 0;
+    std::uint64_t m_currentFileBytes = 0;
     std::vector<std::ofstream> m_activeWrites;
+};
+
+class LimitedMemoryExtractor : public shimejifinder::extractor {
+public:
+    explicit LimitedMemoryExtractor(std::uint64_t maxBytes): m_maxBytes(maxBytes) {}
+
+    void begin_write(shimejifinder::extract_target const& target) override {
+        m_activeTargets.emplace_back(target.extract_name());
+        m_buffer.clear();
+    }
+
+    void write_next(size_t offset, const void *buf, size_t size) override {
+        if (offset > m_maxBytes || offset + size > m_maxBytes) {
+            throw std::runtime_error("Mascot package entry is too large");
+        }
+        if (offset + size > static_cast<size_t>(m_buffer.size())) {
+            m_buffer.resize(static_cast<qsizetype>(offset + size));
+        }
+        std::memcpy(m_buffer.data() + offset, buf, size);
+    }
+
+    void end_write() override {
+        for (auto const& target : m_activeTargets) {
+            m_output[target] = m_buffer;
+        }
+        m_activeTargets.clear();
+        m_buffer.clear();
+    }
+
+    bool contains(std::string const& name) const {
+        return m_output.count(name) == 1;
+    }
+
+    QByteArray data(std::string const& name) const {
+        if (m_output.count(name) == 1) {
+            return m_output.at(name);
+        }
+        return {};
+    }
+
+private:
+    std::uint64_t m_maxBytes;
+    QByteArray m_buffer;
+    std::vector<std::string> m_activeTargets;
+    std::map<std::string, QByteArray> m_output;
 };
 
 QString normalizedArchivePath(QString path) {
@@ -117,11 +177,104 @@ bool isSupportedPackagePath(QString const& path) {
         lower.startsWith(QStringLiteral("sound/"));
 }
 
+bool ensureFileSizeAtMost(QFileInfo const& fileInfo, std::uint64_t maxBytes,
+    QString const& label, QString &errorMessage)
+{
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        errorMessage = QStringLiteral("%1 does not exist").arg(label);
+        return false;
+    }
+    if (fileInfo.size() < 0 ||
+        static_cast<std::uint64_t>(fileInfo.size()) > maxBytes)
+    {
+        errorMessage = QStringLiteral("%1 exceeds the maximum size of %2 bytes")
+            .arg(label)
+            .arg(maxBytes);
+        return false;
+    }
+    return true;
+}
+
+bool ensurePackageFileAcceptable(QString const& packagePath, QString &errorMessage)
+{
+    QFileInfo info(packagePath);
+    return ensureFileSizeAtMost(info, SecurityLimits::kMascotPackageMaxBytes,
+        QStringLiteral("Mascot package"), errorMessage);
+}
+
+bool ensureArchiveEntryCountAcceptable(shimejifinder::archive const& archive,
+    QString &errorMessage)
+{
+    if (archive.size() > SecurityLimits::kMascotZipEntryMaxCount) {
+        errorMessage = QStringLiteral("Archive contains too many entries (%1, maximum %2)")
+            .arg(archive.size())
+            .arg(SecurityLimits::kMascotZipEntryMaxCount);
+        return false;
+    }
+    return true;
+}
+
+std::uint64_t maxSizeForPackagePath(QString const& path)
+{
+    QString lower = path.toLower();
+    if (lower.startsWith(QStringLiteral("sound/"))) {
+        return SecurityLimits::kMascotAudioFileMaxBytes;
+    }
+    return SecurityLimits::kMascotSingleFileMaxBytes;
+}
+
+bool validateImageFile(QString const& filePath, QString &errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly)) {
+        errorMessage = QStringLiteral("Could not inspect image dimensions for %1")
+            .arg(filePath);
+        return false;
+    }
+    QByteArray header = file.read(24);
+    static constexpr unsigned char kPngSignature[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+    };
+    if (header.size() < 24 ||
+        std::memcmp(header.constData(), kPngSignature, sizeof(kPngSignature)) != 0 ||
+        header.mid(12, 4) != QByteArrayLiteral("IHDR"))
+    {
+        return true;
+    }
+    auto readBigEndian32 = [](char const *data) -> std::uint32_t {
+        auto bytes = reinterpret_cast<unsigned char const *>(data);
+        return (static_cast<std::uint32_t>(bytes[0]) << 24) |
+            (static_cast<std::uint32_t>(bytes[1]) << 16) |
+            (static_cast<std::uint32_t>(bytes[2]) << 8) |
+            static_cast<std::uint32_t>(bytes[3]);
+    };
+    std::uint64_t width = readBigEndian32(header.constData() + 16);
+    std::uint64_t height = readBigEndian32(header.constData() + 20);
+    std::uint64_t pixels = width * height;
+    if (width == 0 || height == 0) {
+        errorMessage = QStringLiteral("Image %1 has invalid dimensions").arg(filePath);
+        return false;
+    }
+    if (pixels > SecurityLimits::kMascotImageMaxPixels) {
+        errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
+            .arg(filePath)
+            .arg(SecurityLimits::kMascotImageMaxPixels);
+        return false;
+    }
+    return true;
+}
+
 bool openPackage(QString const& packagePath, shimejifinder::libunarr::archive &archive,
     QString &errorMessage)
 {
+    if (!ensurePackageFileAcceptable(packagePath, errorMessage)) {
+        return false;
+    }
     try {
         archive.open(packagePath.toStdString());
+        if (!ensureArchiveEntryCountAcceptable(archive, errorMessage)) {
+            return false;
+        }
         return true;
     }
     catch (std::exception const& ex) {
@@ -155,7 +308,7 @@ QByteArray readPackageFile(QString const& packagePath, QString const& wantedPath
         return {};
     }
 
-    shimejifinder::memory_extractor extractor;
+    LimitedMemoryExtractor extractor(maxSizeForPackagePath(normalizedWanted));
     try {
         static_cast<shimejifinder::archive&>(archive).extract(&extractor);
     }
@@ -169,8 +322,7 @@ QByteArray readPackageFile(QString const& packagePath, QString const& wantedPath
         errorMessage = QStringLiteral("Could not read %1").arg(wantedPath);
         return {};
     }
-    auto const& data = extractor.data(key);
-    return QByteArray(data.data(), (qsizetype)data.size());
+    return extractor.data(key);
 }
 
 bool inspectEntries(QString const& packagePath, MascotMetadata &metadata,
@@ -263,6 +415,39 @@ struct RawLegacyCandidateFlags {
     bool hasImage = false;
 };
 
+bool validateZipEntryRanges(std::vector<ZipEntry> const& entries,
+    QString &errorMessage)
+{
+    if (entries.size() > SecurityLimits::kMascotZipEntryMaxCount ||
+        entries.size() > std::numeric_limits<quint16>::max())
+    {
+        errorMessage = QStringLiteral("Mascot package contains too many entries");
+        return false;
+    }
+    std::uint64_t totalSize = 0;
+    for (auto const& entry : entries) {
+        QByteArray name = entry.name.toUtf8();
+        if (name.size() > std::numeric_limits<quint16>::max()) {
+            errorMessage = QStringLiteral("Mascot package entry path is too long");
+            return false;
+        }
+        if (entry.data.size() < 0 ||
+            static_cast<std::uint64_t>(entry.data.size()) >
+                std::numeric_limits<quint32>::max())
+        {
+            errorMessage = QStringLiteral("Mascot package entry is too large for ZIP32");
+            return false;
+        }
+        totalSize += static_cast<std::uint64_t>(entry.data.size());
+        if (totalSize > SecurityLimits::kMascotPackageMaxBytes) {
+            errorMessage = QStringLiteral("Mascot package exceeds the maximum size of %1 bytes")
+                .arg(SecurityLimits::kMascotPackageMaxBytes);
+            return false;
+        }
+    }
+    return true;
+}
+
 QString normalizedLegacyCandidateName(QString name)
 {
     if (name.endsWith(QStringLiteral(".mascot"), Qt::CaseInsensitive)) {
@@ -281,6 +466,22 @@ bool addFileEntry(QString const& root, QString const& filePath,
         return true;
     }
 
+    if (entries.size() >= SecurityLimits::kMascotZipEntryMaxCount) {
+        errorMessage = QStringLiteral("Mascot package contains too many entries");
+        return false;
+    }
+    QFileInfo fileInfo(filePath);
+    if (!ensureFileSizeAtMost(fileInfo, maxSizeForPackagePath(relative),
+        QStringLiteral("Mascot package file"), errorMessage))
+    {
+        return false;
+    }
+    if (relative.toLower().startsWith(QStringLiteral("img/")) &&
+        !validateImageFile(filePath, errorMessage))
+    {
+        return false;
+    }
+
     QFile file(filePath);
     if (!file.open(QFile::ReadOnly)) {
         errorMessage = QStringLiteral("Could not read %1").arg(filePath);
@@ -290,6 +491,10 @@ bool addFileEntry(QString const& root, QString const& filePath,
     ZipEntry entry;
     entry.name = relative;
     entry.data = file.readAll();
+    if (entry.data.size() != fileInfo.size()) {
+        errorMessage = QStringLiteral("Could not read all of %1").arg(filePath);
+        return false;
+    }
     entry.crc = crc32(entry.data);
     entries.push_back(entry);
     return true;
@@ -361,8 +566,14 @@ QMap<QString, RawLegacyCandidateFlags> rawLegacyCandidates(QString const& archiv
     return candidates;
 }
 
-void writeLocalEntry(QFile &file, ZipEntry &entry) {
+bool writeLocalEntry(QFile &file, ZipEntry &entry, QString &errorMessage) {
     QByteArray name = entry.name.toUtf8();
+    if (file.pos() < 0 ||
+        static_cast<std::uint64_t>(file.pos()) > std::numeric_limits<quint32>::max())
+    {
+        errorMessage = QStringLiteral("Mascot package is too large for ZIP32 offsets");
+        return false;
+    }
     entry.offset = static_cast<quint32>(file.pos());
     write32(file, 0x04034b50);
     write16(file, 20);
@@ -377,6 +588,7 @@ void writeLocalEntry(QFile &file, ZipEntry &entry) {
     write16(file, 0);
     file.write(name);
     file.write(entry.data);
+    return file.error() == QFileDevice::NoError;
 }
 
 void writeCentralEntry(QFile &file, ZipEntry const& entry) {
@@ -698,6 +910,9 @@ bool writePackageFromDirectory(QString const& sourcePath,
         ZipEntry const& rhs) {
         return lhs.name < rhs.name;
     });
+    if (!validateZipEntryRanges(entries, errorMessage)) {
+        return false;
+    }
 
     bool hasInfo = false;
     bool hasActions = false;
@@ -726,11 +941,31 @@ bool writePackageFromDirectory(QString const& sourcePath,
     }
 
     for (auto &entry : entries) {
-        writeLocalEntry(file, entry);
+        if (!writeLocalEntry(file, entry, errorMessage)) {
+            if (errorMessage.isEmpty()) {
+                errorMessage = QStringLiteral("Could not write package entry");
+            }
+            QFile::remove(packagePath);
+            return false;
+        }
+    }
+    if (file.pos() < 0 ||
+        static_cast<std::uint64_t>(file.pos()) > std::numeric_limits<quint32>::max())
+    {
+        errorMessage = QStringLiteral("Mascot package is too large for ZIP32 central directory");
+        QFile::remove(packagePath);
+        return false;
     }
     quint32 centralOffset = static_cast<quint32>(file.pos());
     for (auto const& entry : entries) {
         writeCentralEntry(file, entry);
+    }
+    if (file.pos() < 0 ||
+        static_cast<std::uint64_t>(file.pos()) > std::numeric_limits<quint32>::max())
+    {
+        errorMessage = QStringLiteral("Mascot package central directory is too large");
+        QFile::remove(packagePath);
+        return false;
     }
     quint32 centralSize = static_cast<quint32>(file.pos()) - centralOffset;
     write32(file, 0x06054b50);
@@ -752,6 +987,9 @@ bool installPackage(QString const& packagePath, QString const& storagePath,
     APP_LOG_INFO("package") << "Installing mascot package path=\""
         << packagePath.toStdString() << "\" storage=\""
         << storagePath.toStdString() << "\"";
+    if (!ensurePackageFileAcceptable(packagePath, errorMessage)) {
+        return false;
+    }
     MascotMetadata metadata;
     if (!inspectPackage(packagePath, metadata, errorMessage)) {
         return false;
@@ -817,6 +1055,14 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
     QFileInfo archiveInfo(archivePath);
     if (!archiveInfo.exists() || !archiveInfo.isFile()) {
         analysis.errorMessage = QStringLiteral("Archive does not exist");
+        return analysis;
+    }
+    if (archiveInfo.size() < 0 ||
+        static_cast<std::uint64_t>(archiveInfo.size()) >
+            SecurityLimits::kMascotPackageMaxBytes)
+    {
+        analysis.errorMessage = QStringLiteral("Archive exceeds the maximum size of %1 bytes")
+            .arg(SecurityLimits::kMascotPackageMaxBytes);
         return analysis;
     }
 
@@ -902,6 +1148,16 @@ QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
     if (!archiveInfo.exists() || !archiveInfo.isFile()) {
         LegacyMascotConversionResult result;
         result.errorMessage = QStringLiteral("Archive does not exist");
+        results.append(result);
+        return results;
+    }
+    if (archiveInfo.size() < 0 ||
+        static_cast<std::uint64_t>(archiveInfo.size()) >
+            SecurityLimits::kMascotPackageMaxBytes)
+    {
+        LegacyMascotConversionResult result;
+        result.errorMessage = QStringLiteral("Archive exceeds the maximum size of %1 bytes")
+            .arg(SecurityLimits::kMascotPackageMaxBytes);
         results.append(result);
         return results;
     }
@@ -1000,6 +1256,15 @@ std::set<std::string> importArchive(QString const& archivePath,
     std::set<std::string> imported;
     QFileInfo archiveInfo(archivePath);
     QString error;
+    if (!archiveInfo.exists() || !archiveInfo.isFile() ||
+        archiveInfo.size() < 0 ||
+        static_cast<std::uint64_t>(archiveInfo.size()) >
+            SecurityLimits::kMascotPackageMaxBytes)
+    {
+        APP_LOG_WARN("import") << "Archive rejected by size limit path=\""
+            << archivePath.toStdString() << "\"";
+        return imported;
+    }
 
     if (archiveInfo.suffix().compare(QStringLiteral("mascot"),
         Qt::CaseInsensitive) == 0)

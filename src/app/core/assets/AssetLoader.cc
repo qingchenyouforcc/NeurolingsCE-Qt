@@ -20,8 +20,10 @@
 #include "shijima-qt/Asset.hpp"
 #include "shijima-qt/DefaultMascot.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 #include <QDir>
-#include <QDir>
+#include <QFileInfo>
+#include <QImageReader>
 
 AssetLoader::AssetLoader() {}
 
@@ -57,7 +59,31 @@ Asset const& AssetLoader::loadAsset(QString path) {
             }
         }
         else {
-            loaded = image.load(path);
+            QFileInfo info(path);
+            if (info.exists() && info.size() >= 0 &&
+                static_cast<std::uint64_t>(info.size()) <=
+                    SecurityLimits::kMascotSingleFileMaxBytes)
+            {
+                QImageReader reader(path);
+                QSize imageSize = reader.size();
+                std::uint64_t pixels = imageSize.isValid()
+                    ? static_cast<std::uint64_t>(imageSize.width())
+                        * static_cast<std::uint64_t>(imageSize.height())
+                    : 0;
+                if (imageSize.isValid() &&
+                    pixels <= SecurityLimits::kMascotImageMaxPixels)
+                {
+                    loaded = reader.read(&image);
+                }
+                else {
+                    APP_LOG_ERROR("asset") << "Rejected oversized image asset path=\""
+                        << path.toStdString() << "\"";
+                }
+            }
+            else {
+                APP_LOG_ERROR("asset") << "Rejected oversized image file path=\""
+                    << path.toStdString() << "\"";
+            }
         }
         if (!loaded || image.isNull()) {
             APP_LOG_ERROR("asset") << "Failed to load image asset path=\""

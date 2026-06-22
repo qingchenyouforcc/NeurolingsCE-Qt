@@ -19,10 +19,12 @@
 #include "shijima-qt/SoundEffectManager.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/SafePath.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 
 #if SHIJIMA_USE_QTMULTIMEDIA
 
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QSoundEffect>
 
@@ -34,6 +36,16 @@ void SoundEffectManager::play(QString const& name) {
         for (QString &searchPath : searchPaths) {
             auto file = SafePath::safeChildPath(searchPath, name);
             if (file.has_value() && QFile::exists(file.value())) {
+                QFileInfo info(file.value());
+                if (info.size() < 0 ||
+                    static_cast<std::uint64_t>(info.size()) >
+                        SecurityLimits::kMascotAudioFileMaxBytes)
+                {
+                    APP_LOG_WARN("audio") << "Rejected oversized sound effect name=\""
+                        << name.toStdString() << "\" source=\""
+                        << file.value().toStdString() << "\"";
+                    return;
+                }
                 url = QUrl::fromLocalFile(file.value());
                 break;
             }

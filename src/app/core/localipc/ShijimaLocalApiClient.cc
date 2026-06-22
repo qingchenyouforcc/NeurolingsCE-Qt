@@ -17,6 +17,7 @@
 //
 
 #include "shijima-qt/ShijimaLocalApi.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -66,6 +67,11 @@ bool readMessage(QLocalSocket &socket, int timeoutMs, QByteArray &message,
             return false;
         }
         message.append(socket.readAll());
+        if (message.size() > static_cast<qsizetype>(SecurityLimits::kIpcMessageMaxBytes)) {
+            error = QStringLiteral("IPC message exceeds the maximum size of %1 bytes")
+                .arg(SecurityLimits::kIpcMessageMaxBytes);
+            return false;
+        }
     }
 }
 
@@ -73,6 +79,11 @@ bool writeMessage(QLocalSocket &socket, QJsonObject const& object,
     int timeoutMs, QString &error)
 {
     auto bytes = jsonMessage(object);
+    if (bytes.size() > static_cast<qsizetype>(SecurityLimits::kIpcMessageMaxBytes)) {
+        error = QStringLiteral("IPC request exceeds the maximum size of %1 bytes")
+            .arg(SecurityLimits::kIpcMessageMaxBytes);
+        return false;
+    }
     if (socket.write(bytes) != bytes.size()) {
         error = QStringLiteral("Failed to write IPC request");
         return false;
