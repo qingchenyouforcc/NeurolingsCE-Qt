@@ -101,6 +101,7 @@ private:
     explicit ShijimaManager(QWidget *parent = nullptr);
     void abortPendingCallbacks();
     void shutdownForQuit();
+    void closeManagerWindow();
     void loadDefaultMascot();
     void loadData(MascotData *data);
     void spawnClicked();

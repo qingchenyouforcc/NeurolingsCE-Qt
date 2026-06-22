@@ -386,7 +386,7 @@ void ShijimaManager::showAboutDialog()
             m_httpApi->stop();
             m_allowClose = true;
             aboutDialog->accept();
-            closeWindow();
+            closeManagerWindow();
             return;
         }
 

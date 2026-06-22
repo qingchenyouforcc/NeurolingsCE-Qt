@@ -35,6 +35,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QProcess>
+#include <QPropertyAnimation>
 #include <QSettings>
 #include <QStringList>
 #include <QTimer>
@@ -129,7 +130,7 @@ void ShijimaManager::importAction() {
 
 void ShijimaManager::quitAction() {
     m_allowClose = true;
-    closeWindow();
+    closeManagerWindow();
 }
 
 void ShijimaManager::deleteAction() {
@@ -247,7 +248,7 @@ void ShijimaManager::askClose() {
         QCoreApplication::quit();
 #else
         m_allowClose = true;
-        closeWindow();
+        closeManagerWindow();
 #endif
     }
 }
@@ -322,8 +323,22 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
         const QStringList args = QCoreApplication::arguments().mid(1);
         QProcess::startDetached(program, args);
         m_allowClose = true;
-        closeWindow();
+        closeManagerWindow();
     }
+}
+
+void ShijimaManager::closeManagerWindow() {
+#if defined(_WIN32)
+    auto *animation = new QPropertyAnimation(this, "windowOpacity", this);
+    connect(animation, &QPropertyAnimation::finished, this, &QWidget::close);
+    animation->setDuration(250);
+    animation->setStartValue(windowOpacity());
+    animation->setEndValue(0.0);
+    animation->setEasingCurve(QEasingCurve::InOutSine);
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+#else
+    ElaWindow::closeWindow();
+#endif
 }
 
 void ShijimaManager::retranslateUi() {
