@@ -58,6 +58,18 @@ jobs:
         run: |
           brew install ninja
 
+      - name: Setup Python for aqt
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Remove WindowsApps Python shim from PATH
+        if: matrix.platform.host == 'windows'
+        shell: pwsh
+        run: |
+          $paths = $env:PATH -split ';' | Where-Object { $_ -and ($_ -notlike '*\Microsoft\WindowsApps*') }
+          "PATH=$($paths -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
         with:
@@ -67,7 +79,7 @@ jobs:
           arch: ${{ matrix.platform.qt_arch }}
           modules: ${{ matrix.platform.qt_modules || 'qtmultimedia' }}
           tools: ${{ matrix.platform.qt_tools || '' }}
-          cache: true
+          cache: false
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
