@@ -65,8 +65,13 @@ Asset const& ShijimaWidget::getActiveAsset() {
     std::string lowerName = name;
     std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
                    [](unsigned char c) { return (char)std::tolower(c); });
+    auto relativeName = QString::fromStdString(lowerName);
+    relativeName.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    while (relativeName.startsWith(QLatin1Char('/'))) {
+        relativeName.remove(0, 1);
+    }
     auto imagePath = SafePath::safeChildPath(m_data->imgRoot(),
-        QString::fromStdString(lowerName));
+        relativeName);
     if (!imagePath.has_value() || !imagePath->endsWith(
         QStringLiteral(".png"), Qt::CaseInsensitive))
     {
