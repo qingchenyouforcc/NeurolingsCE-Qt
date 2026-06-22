@@ -478,6 +478,30 @@ void testPackageInspectionRejectsOversizedPngHeader() {
         "oversized PNG rejection should mention dimensions");
 }
 
+void testPackageInspectionRejectsMalformedPng() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QString packagePath = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("malformed.mascot"));
+
+    MascotMetadata metadata;
+    metadata.name = QStringLiteral("Malformed");
+    std::vector<TestZipEntry> entries {
+        { QStringLiteral("info.json"), MascotPackage::metadataToJson(metadata) },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), QByteArrayLiteral("not a png") },
+    };
+    testWriteZip(packagePath, entries);
+
+    QString error;
+    MascotMetadata parsed;
+    expect(!MascotPackage::inspectPackage(packagePath, parsed, error),
+        "package inspection should reject malformed PNG files");
+    expect(error.contains(QStringLiteral("not a valid PNG")),
+        "malformed PNG rejection should explain the invalid format");
+}
+
 void testCommandDispatcher() {
     FakeMascotService service;
 
@@ -557,6 +581,7 @@ int main() {
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
     testPackageInspectionRejectsOversizedPngHeader();
+    testPackageInspectionRejectsMalformedPng();
     testCommandDispatcher();
     testSafeChildPath();
     testScriptExecutionTimeout();

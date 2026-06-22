@@ -57,7 +57,24 @@ public:
 
     void begin_write(shimejifinder::extract_target const& target) override {
         m_currentFileBytes = 0;
-        QString relative = QString::fromStdString(target.extract_name());
+        QString relative;
+        if (target.type() == shimejifinder::extract_target::extract_type::UNSPECIFIED) {
+            relative = QString::fromStdString(target.extract_name());
+        }
+        else {
+            relative = QString::fromStdString(target.shimeji_name()) +
+                QStringLiteral(".mascot/");
+            if (target.type() == shimejifinder::extract_target::extract_type::IMAGE) {
+                relative += QStringLiteral("img/");
+            }
+            else if (target.type() == shimejifinder::extract_target::extract_type::SOUND) {
+                relative += QStringLiteral("sound/");
+            }
+            else if (target.type() != shimejifinder::extract_target::extract_type::XML) {
+                throw std::runtime_error("Unsupported package extraction target type");
+            }
+            relative += QString::fromStdString(target.extract_name());
+        }
         auto safePath = SafePath::safeChildPath(m_root, relative);
         if (!safePath.has_value()) {
             throw std::runtime_error("Unsafe package extraction path");
@@ -74,14 +91,19 @@ public:
     }
 
     void write_next(size_t offset, const void *buf, size_t size) override {
-        if (m_totalBytes + size > SecurityLimits::kMascotExtractedMaxBytes) {
+        std::uint64_t chunkSize = static_cast<std::uint64_t>(size);
+        if (m_totalBytes > SecurityLimits::kMascotExtractedMaxBytes ||
+            chunkSize > SecurityLimits::kMascotExtractedMaxBytes - m_totalBytes)
+        {
             throw std::runtime_error("Mascot package extracted data is too large");
         }
-        if (m_currentFileBytes + size > SecurityLimits::kMascotSingleFileMaxBytes) {
+        if (m_currentFileBytes > SecurityLimits::kMascotSingleFileMaxBytes ||
+            chunkSize > SecurityLimits::kMascotSingleFileMaxBytes - m_currentFileBytes)
+        {
             throw std::runtime_error("Mascot package entry is too large");
         }
-        m_totalBytes += size;
-        m_currentFileBytes += size;
+        m_totalBytes += chunkSize;
+        m_currentFileBytes += chunkSize;
         for (auto &stream : m_activeWrites) {
             stream.seekp(offset);
             stream.write(static_cast<const char *>(buf), size);
@@ -116,11 +138,17 @@ public:
     }
 
     void write_next(size_t offset, const void *buf, size_t size) override {
-        if (offset > m_maxBytes || offset + size > m_maxBytes) {
+        std::uint64_t uOffset = static_cast<std::uint64_t>(offset);
+        std::uint64_t chunkSize = static_cast<std::uint64_t>(size);
+        if (uOffset > m_maxBytes || chunkSize > m_maxBytes - uOffset) {
             throw std::runtime_error("Mascot package entry is too large");
         }
-        if (offset + size > static_cast<size_t>(m_buffer.size())) {
-            m_buffer.resize(static_cast<qsizetype>(offset + size));
+        std::uint64_t end = uOffset + chunkSize;
+        if (end > static_cast<std::uint64_t>(std::numeric_limits<qsizetype>::max())) {
+            throw std::runtime_error("Mascot package entry is too large");
+        }
+        if (static_cast<qsizetype>(end) > m_buffer.size()) {
+            m_buffer.resize(static_cast<qsizetype>(end));
         }
         std::memcpy(m_buffer.data() + offset, buf, size);
     }
@@ -242,7 +270,8 @@ bool validateImageFile(QString const& filePath, QString &errorMessage)
         std::memcmp(header.constData(), kPngSignature, sizeof(kPngSignature)) != 0 ||
         header.mid(12, 4) != QByteArrayLiteral("IHDR"))
     {
-        return true;
+        errorMessage = QStringLiteral("Image %1 is not a valid PNG").arg(filePath);
+        return false;
     }
     auto readBigEndian32 = [](char const *data) -> std::uint32_t {
         auto bytes = reinterpret_cast<unsigned char const *>(data);
@@ -253,11 +282,17 @@ bool validateImageFile(QString const& filePath, QString &errorMessage)
     };
     std::uint64_t width = readBigEndian32(header.constData() + 16);
     std::uint64_t height = readBigEndian32(header.constData() + 20);
-    std::uint64_t pixels = width * height;
     if (width == 0 || height == 0) {
         errorMessage = QStringLiteral("Image %1 has invalid dimensions").arg(filePath);
         return false;
     }
+    if (width > SecurityLimits::kMascotImageMaxPixels / height) {
+        errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
+            .arg(filePath)
+            .arg(SecurityLimits::kMascotImageMaxPixels);
+        return false;
+    }
+    std::uint64_t pixels = width * height;
     if (pixels > SecurityLimits::kMascotImageMaxPixels) {
         errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
             .arg(filePath)
@@ -277,7 +312,8 @@ bool validatePngDimensions(QString const& label, QByteArray const& header,
         std::memcmp(header.constData(), kPngSignature, sizeof(kPngSignature)) != 0 ||
         header.mid(12, 4) != QByteArrayLiteral("IHDR"))
     {
-        return true;
+        errorMessage = QStringLiteral("Image %1 is not a valid PNG").arg(label);
+        return false;
     }
     auto readBigEndian32 = [](char const *data) -> std::uint32_t {
         auto bytes = reinterpret_cast<unsigned char const *>(data);
@@ -288,11 +324,17 @@ bool validatePngDimensions(QString const& label, QByteArray const& header,
     };
     std::uint64_t width = readBigEndian32(header.constData() + 16);
     std::uint64_t height = readBigEndian32(header.constData() + 20);
-    std::uint64_t pixels = width * height;
     if (width == 0 || height == 0) {
         errorMessage = QStringLiteral("Image %1 has invalid dimensions").arg(label);
         return false;
     }
+    if (width > SecurityLimits::kMascotImageMaxPixels / height) {
+        errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
+            .arg(label)
+            .arg(SecurityLimits::kMascotImageMaxPixels);
+        return false;
+    }
+    std::uint64_t pixels = width * height;
     if (pixels > SecurityLimits::kMascotImageMaxPixels) {
         errorMessage = QStringLiteral("Image %1 exceeds the maximum pixel count of %2")
             .arg(label)
@@ -896,6 +938,22 @@ LegacyMascotCandidate inspectLegacyDirectory(QString const& sourcePath,
     return candidate;
 }
 
+QString extractedLegacyMascotPath(QString const& extractionRoot, QString const& name)
+{
+    QStringList candidates {
+        name + QStringLiteral(".mascot"),
+        name,
+    };
+    for (auto const& relative : candidates) {
+        auto path = SafePath::safeChildPath(extractionRoot, relative);
+        if (path.has_value() && QFileInfo(path.value()).isDir()) {
+            return path.value();
+        }
+    }
+    auto fallback = SafePath::safeChildPath(extractionRoot, candidates.first());
+    return fallback.value_or(QString());
+}
+
 QString uniquePackagePath(QString const& outputPath, QString const& name,
     QSet<QString> &reserved)
 {
@@ -1250,8 +1308,7 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
         for (auto const& name : archive->shimejis()) {
             QString qName = QString::fromStdString(name);
             seenNames.insert(qName);
-            QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
-                qName + QStringLiteral(".mascot"));
+            QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
             analysis.candidates.append(inspectLegacyDirectory(sourcePath, qName));
         }
@@ -1373,8 +1430,7 @@ QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
 
             LegacyMascotConversionResult result;
             result.name = qName;
-            QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
-                qName + QStringLiteral(".mascot"));
+            QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
 
             auto candidate = inspectLegacyDirectory(sourcePath, qName);
@@ -1475,8 +1531,7 @@ std::set<std::string> importArchive(QString const& archivePath,
         }
         for (auto const& name : archive->shimejis()) {
             QString qName = QString::fromStdString(name);
-            QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
-                qName + QStringLiteral(".mascot"));
+            QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
             QString installedName;
             if (packageLegacyDirectory(sourcePath, storagePath, qName,
