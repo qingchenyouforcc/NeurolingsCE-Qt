@@ -15,9 +15,13 @@
 - 🎭 兼容 Shimeji-ee 格式的看板娘资源包
 - 📦 拖放导入看板娘压缩包
 - 🛠️ 制作页 — 检查 Shimeji zip 并转换为 `.mascot`
+- 🧩 桌宠组合 — 保存当前桌宠组，并在需要时恢复
+- 🚀 开机自启与静默恢复 — Windows 可开机启动并恢复上次或指定组合
 - 🪟 窗口模式 — 在独立沙盒窗口中运行看板娘
 - 🖱️ 鼠标交互 — 拖拽、右键菜单
+- 🧰 独立 CLI — 用 `NeurolingsCE-cli` 管理模板和控制运行时
 - 📡 HTTP REST API（`localhost:32456`）
+- 🔐 安全更新检查 — 使用静态更新清单并校验下载产物
 - 🌐 多语言支持（English / 中文简体）
 - 🔊 可选的音效支持（Qt Multimedia）
 - 🖥️ 多显示器支持
@@ -32,9 +36,40 @@
 
 📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
 
+## 0.3.3 以来的主要更新
+
+当前 `main` 相比 `0.3.3` 已同步到 `0.4.0` 版本线，并继续补充了更新检查与启动体验：
+
+- 新增桌宠组合页，可保存当前运行中的多只桌宠，并恢复上次关闭前的组合。
+- 模板列表支持双击生成匹配桌宠，减少选择和召唤步骤。
+- 新增“制作”页，可检查旧 Shimeji `.zip` 并转换为 NeurolingsCE `.mascot` 包。
+- 增强 `.mascot`/旧版 ZIP 包验证、图片检查、解包与重命名失败处理。
+- 更新检查改为请求 GitHub Pages 上的静态 `latest.json`，避免客户端直连 GitHub API 触发限流。
+- 更新下载支持 SHA-256 校验；发布 asset 名称会先清理再写入本地缓存。
+- Windows 支持开机自启、静默启动，以及启动时恢复上次或指定桌宠组合。
+- CI 增加 macOS Intel/Apple Silicon 构建，debug 构建会运行核心测试。
+
 ## 制作
 
 主界面的“制作”页可以把旧 Shimeji `.zip` 资源包转换为 NeurolingsCE 使用的 `.mascot` 包。选择 zip 后先执行内容检查；如果压缩包中包含多只桌宠，可以勾选要转换的条目。转换结果会写入你选择的输出目录，不会自动导入模板库。
+
+## 桌宠组合与启动恢复
+
+“组合”页用于保存当前屏幕上的桌宠组。你可以把多个已经召唤的桌宠保存为一个组合，之后一键恢复；程序关闭前也会记录最后一次组合状态。
+
+Windows 用户可以在“设置 → 启动”中开启开机自启。开启静默启动后，系统登录时程序会留在托盘中，并按设置恢复“上次关闭前组合”或某个已保存组合。
+
+## 更新机制
+
+客户端更新检查现在读取静态清单：
+
+```text
+https://blog.qingchenyou.asia/NeurolingsCE/update/latest.json
+```
+
+这个清单由 GitHub Actions 在发布 Release 后生成并部署到 GitHub Pages。客户端不再请求 `api.github.com/repos/.../releases/latest`，因此不会再因为共享出口 IP 触发 GitHub REST API 未认证限流。下载到本地的安装包会通过清单中的 `sha256` 或 `SHA256SUMS.txt` 校验后才允许安装。
+
+维护者发布新版本时，请确认仓库 Pages 来源为 GitHub Actions，并运行 `Publish update manifest` workflow；如果 Release assets 是发布后才补传的，也需要手动重跑该 workflow。
 
 ## 日志与调试
 

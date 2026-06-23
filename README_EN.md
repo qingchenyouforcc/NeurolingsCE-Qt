@@ -14,9 +14,13 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 - 🎭 Compatible with Shimeji-ee format mascot packs
 - 📦 Drag-and-drop mascot pack import
 - 🛠️ Create page — check Shimeji zips and convert them to `.mascot`
+- 🧩 Mascot combinations — save and restore currently running mascot groups
+- 🚀 Start at login and silent restore — restore the last or a selected group on Windows login
 - 🪟 Window mode — run mascots in standalone sandbox windows
 - 🖱️ Mouse interaction — drag, right-click menu
+- 🧰 Dedicated CLI — manage templates and control the runtime with `NeurolingsCE-cli`
 - 📡 HTTP REST API (`localhost:32456`)
+- 🔐 Safer update checks — use a static update manifest and verify downloaded artifacts
 - 🌐 Multi-language support (English / Simplified Chinese)
 - 🔊 Optional sound effects (Qt Multimedia)
 - 🖥️ Multi-monitor support
@@ -31,9 +35,40 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
 📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
 
+## Highlights Since 0.3.3
+
+Current `main` has moved past the `0.4.0` release line and includes additional updater and startup improvements:
+
+- Added a mascot combinations page for saving the currently running mascot group and restoring the group from the previous close.
+- Double-clicking a template can now spawn the matching mascot directly.
+- Added the Create page for checking legacy Shimeji `.zip` packs and converting them into NeurolingsCE `.mascot` packages.
+- Hardened `.mascot` and legacy ZIP validation, image checks, extraction, and rename-failure handling.
+- Update checks now read a static `latest.json` from GitHub Pages instead of calling the GitHub REST releases API from every client.
+- Downloaded update artifacts are verified with SHA-256, and release asset names are sanitized before writing to the local cache.
+- Windows now supports start-at-login, silent startup, and restoring the previous or selected mascot combination at login.
+- CI now includes macOS Intel/Apple Silicon builds, and debug builds run core tests.
+
 ## Create
 
 The manager's Create page can convert legacy Shimeji `.zip` packs into NeurolingsCE `.mascot` packages. Choose a zip, run the content check, then select which mascots to convert when the archive contains more than one. Generated packages are written to the output folder you choose and are not imported into the template library automatically.
+
+## Mascot Combinations And Startup Restore
+
+The Combinations page saves groups of mascots that are currently running on screen. You can save multiple spawned mascots as one group and restore it later; NeurolingsCE also records the last group before shutdown.
+
+On Windows, Settings -> Startup can enable start-at-login. With silent startup enabled, NeurolingsCE stays in the tray after login and restores either the last group before close or a selected saved combination.
+
+## Update Manifest
+
+Client update checks now read this static manifest:
+
+```text
+https://blog.qingchenyou.asia/NeurolingsCE/update/latest.json
+```
+
+GitHub Actions generates and deploys the manifest to GitHub Pages after a Release is published. Clients no longer call `api.github.com/repos/.../releases/latest`, so shared-IP GitHub REST API rate limits no longer break update checks. Downloaded installers are verified with the manifest `sha256` value or `SHA256SUMS.txt` before installation is allowed.
+
+For maintainers, keep GitHub Pages set to the GitHub Actions source and run the `Publish update manifest` workflow after publishing a release. If release assets are uploaded after the release event, rerun the workflow manually.
 
 ## Logging And Debugging
 
