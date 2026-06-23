@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-06-23
+
+### 🚀 Major Changes / 重大变更
+
+#### Mascot Combinations & Spawn Experience / 桌宠组合与生成体验升级
+- **Mascot Combinations Page** - Added a combinations page for saving and managing current desktop pet groups
+  - 桌宠组合页 - 新增组合管理页面，用于保存和管理当前桌面宠物组
+- **Session Restoration** - Added support for restoring the mascot group from the previous close
+  - 组合恢复 - 支持恢复上次关闭前的桌宠组合状态
+- **Matching Mascot Spawn** - Double-clicking a mascot template can now spawn the matching mascot
+  - 匹配桌宠生成 - 双击桌宠模板现在可以生成对应桌宠
+
+#### Mascot Creation & Package Handling / 桌宠制作与包处理增强
+- **Legacy Shimeji Package Creator** - Added a creation page for building legacy Shimeji archive packages
+  - 旧版 Shimeji 压缩包制作页 - 新增旧版 Shimeji 压缩包制作入口
+- **Package Validation Hardening** - Strengthened mascot package validation, image checks, and legacy extraction handling
+  - 包校验增强 - 加强桌宠包验证、图片检查与旧版解包流程
+- **Creation Documentation** - Added documentation and Chinese translation notes for the mascot creation page
+  - 制作文档补充 - 补充桌宠制作页说明与中文翻译
+
+#### Security & Update Hardening / 安全与更新机制强化
+- **Installer Verification** - Update downloads now verify installer artifacts before use
+  - 安装器校验 - 更新下载现在会验证安装器产物
+- **Bounded Local Control Inputs** - Added limits and validation around local IPC and mascot package inputs
+  - 本地控制输入限制 - 为本地 IPC 与桌宠包输入增加限制和校验
+- **Release Asset Sanitization** - Sanitized release asset names used by the update flow
+  - 发布资源名清理 - 对更新流程使用的 release asset 名称进行清理
+
+#### Cross-platform Build Improvements / 跨平台构建改进
+- **macOS Release Builds** - Added macOS release and debug CI builds for Apple Silicon and Intel targets
+  - macOS 发布构建 - 新增 Apple Silicon 与 Intel 目标的 macOS release/debug CI 构建
+- **macOS Packaging Support** - Fixed macOS build behavior and added Homebrew-oriented dependency support
+  - macOS 打包支持 - 修复 macOS 构建流程并补充 Homebrew 依赖支持
+- **CI Test Coverage** - Debug CI builds now run core tests
+  - CI 测试覆盖 - debug 构建现在会运行核心测试
+
+### ✨ Added / 新增功能
+
+- **Mascot combinations page** - Added UI for saving and restoring desktop pet groups / 新增桌宠组合页面，用于保存和恢复桌面宠物组
+- **Previous group restore** - The app can restore the mascot group from the previous close / 新增上次组合恢复能力，可恢复关闭前的桌宠组合状态
+- **Double-click matching spawn** - Double-clicking a mascot template can spawn the matching mascot / 新增双击匹配生成，双击桌宠模板可生成对应桌宠
+- **Legacy Shimeji package creator** - Added a page for creating legacy Shimeji archive packages / 新增旧版 Shimeji 压缩包制作页
+- **macOS CI artifacts** - Added macOS x86_64 and arm64 release build artifacts / 新增 macOS x86_64 与 arm64 release 构建产物
+- **Installer verification** - Update downloads now verify installer artifacts / 新增更新安装器校验
+- **Security limits** - Added shared limits for local IPC and mascot package inputs / 新增本地 IPC 与桌宠包输入限制
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed rooted frame image path resolution / 修复 rooted frame 图片路径解析问题
+- Fixed edge cases in mascot spawn selection / 修复桌宠生成选择逻辑中的边界问题
+- Fixed mascot package rename failure handling / 修复桌宠包重命名失败时处理不完整的问题
+- Fixed incomplete validation and extraction handling for legacy mascot packages / 修复旧版桌宠包解包与验证中的边界问题
+- Fixed insufficient mascot image validation / 修复桌宠图片校验不充分的问题
+- Fixed unclear HTTP API bind failure reporting / 修复 HTTP API 绑定失败时错误报告不清晰的问题
+- Fixed startup-state API guard gaps / 修复启动状态 API 防护不足的问题
+- Fixed selector budget handling by adding explicit caps / 修复选择器预算未限制导致的潜在异常问题
+- Fixed update release asset name handling by sanitizing asset names / 修复 release asset 名称未清理导致的更新风险
+- Fixed manager close behavior on Windows / 修复 Windows 管理器关闭时体验不顺畅的问题
+- Fixed Windows Qt install workflow failures in CI / 修复 Windows Qt 安装导致的 CI 构建失败问题
+
+### 🔧 Changed / 改进与优化
+
+- **Mascot Groups** - Added save and restore flows for managing multiple running mascots / 桌宠组合优化 - 新增多个桌宠同时运行时的保存与恢复流程
+- **Spawn Experience** - Refined double-click spawn and template matching behavior / 生成体验优化 - 优化双击生成和模板匹配行为
+- **Security Boundaries** - Hardened local IPC, HTTP API, resource paths, update downloads, and mascot package handling / 安全边界优化 - 加强本地 IPC、HTTP API、资源路径、更新下载和桌宠包处理保护
+- **Package Handling** - Improved package validation, legacy extraction, image checks, and rename failure handling / 包处理优化 - 改进包验证、旧版解包、图片检查和重命名失败处理
+- **Runtime Maintainability** - Refactored CLI and runtime code paths for cleaner maintenance / 运行时可维护性优化 - 重构部分 CLI 与运行时代码路径
+- **Build System** - Added macOS app packaging configuration, Homebrew dependency detection, and cross-platform release artifacts / 构建系统优化 - 补充 macOS app 打包配置、Homebrew 依赖探测与跨平台发布产物
+- **Documentation** - Updated README, README_EN, GPLv3 additional terms, and local IPC trust-boundary notes / 文档更新 - 更新 README、README_EN、GPLv3 附加条款与本地 IPC 信任边界说明
+- **Release Metadata** - Refreshed 0.4.0 version metadata / 发布元数据整理 - 更新 0.4.0 版本元数据
+
+---
+
 ## [0.3.3] - 2026-04-27
 
 ### 🚀 Major Changes / 重大变更
@@ -216,6 +289,11 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.4.0]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, mascot combinations, package creation, security hardening, runtime fixes / 主要开发，完成桌宠组合、包制作、安全加固与运行时修复
+- [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
+- [@XiaoYuan151](https://github.com/XiaoYuan151) - macOS build support / macOS 构建支持
+
 ### [0.3.3]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, stability fixes, logging, runtime interaction fixes / 主要开发，完成稳定性修复、日志增强与运行时交互修复
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
@@ -237,6 +315,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.4.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.0...0.3.1
