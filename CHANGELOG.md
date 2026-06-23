@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2026-06-23
+
+### 🔧 Changed / 改进与优化
+
+- **Release Metadata** - Refreshed 0.4.1 version metadata / 发布元数据整理 - 更新 0.4.1 版本元数据
+
+---
+
 ## [0.4.0] - 2026-06-23
 
 ### 🚀 Major Changes / 重大变更
@@ -289,6 +297,9 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.4.1]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Release metadata refresh / 发布元数据整理
+
 ### [0.4.0]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, mascot combinations, package creation, security hardening, runtime fixes / 主要开发，完成桌宠组合、包制作、安全加固与运行时修复
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
@@ -315,6 +326,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.4.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.1...0.3.2

@@ -2,24 +2,24 @@
   "schema": 1,
   "app": "NeurolingsCE",
   "channel": "stable",
-  "version": "0.4.0",
-  "tag": "v0.4.0",
+  "version": "0.4.1",
+  "tag": "v0.4.1",
   "published_at": "2026-06-23T12:00:00Z",
   "mandatory": false,
   "min_supported_version": "0.2.0",
-  "release_page": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/v0.4.0",
+  "release_page": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/v0.4.1",
   "notes": "Short release notes shown in the update UI.",
   "assets": {
     "windows-x86_64": {
-      "name": "NeurolingsCE-windows-x86_64-v0.4.0.msi",
-      "url": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/v0.4.0/NeurolingsCE-windows-x86_64-v0.4.0.msi",
+      "name": "NeurolingsCE-windows-x86_64-v0.4.1.msi",
+      "url": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/v0.4.1/NeurolingsCE-windows-x86_64-v0.4.1.msi",
       "sha256": "",
       "size": 12345678,
       "content_type": "application/octet-stream"
     },
     "sha256sums": {
       "name": "SHA256SUMS.txt",
-      "url": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/v0.4.0/SHA256SUMS.txt",
+      "url": "https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/v0.4.1/SHA256SUMS.txt",
       "sha256": "",
       "size": 4096,
       "content_type": "text/plain"
