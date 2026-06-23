@@ -40,6 +40,20 @@ def detect_platform(asset_name: str) -> str | None:
     return None
 
 
+def asset_rank(asset_name: str) -> int:
+    name = asset_name.lower()
+
+    if name.endswith(".msi"):
+        return 0
+    if name.endswith(".exe") and "setup" in name:
+        return 1
+    if name.endswith(".zip"):
+        return 2
+    if name.endswith(".appimage"):
+        return 3
+    return 9
+
+
 def clean_release_notes(body: str | None, max_len: int = 1200) -> str:
     if not body:
         return ""
@@ -66,13 +80,16 @@ def build_manifest(release: dict, min_supported_version: str) -> dict:
         if platform is None or not asset_name or not download_url:
             continue
 
-        assets[platform] = {
+        manifest_asset = {
             "name": asset_name,
             "url": download_url,
             "sha256": asset_sha256(asset),
             "size": asset.get("size", 0),
             "content_type": asset.get("content_type", ""),
         }
+        current = assets.get(platform)
+        if current is None or asset_rank(asset_name) < asset_rank(current["name"]):
+            assets[platform] = manifest_asset
 
     return {
         "schema": 1,
