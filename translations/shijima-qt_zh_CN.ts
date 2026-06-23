@@ -415,6 +415,70 @@
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
+    <message>
+        <source>Startup</source>
+        <translation>启动</translation>
+    </message>
+    <message>
+        <source>Control how NeurolingsCE starts with your system and what it restores.</source>
+        <translation>控制 NeurolingsCE 如何随系统启动以及启动时恢复的内容。</translation>
+    </message>
+    <message>
+        <source>Start at Login</source>
+        <translation>开机自启</translation>
+    </message>
+    <message>
+        <source>Enabled</source>
+        <translation>已启用</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>已禁用</translation>
+    </message>
+    <message>
+        <source>Could not update the system startup setting.</source>
+        <translation>无法更新系统开机启动设置。</translation>
+    </message>
+    <message>
+        <source>Startup launch is currently supported on Windows only.</source>
+        <translation>开机自启当前仅支持 Windows。</translation>
+    </message>
+    <message>
+        <source>Silent Startup</source>
+        <translation>静默启动</translation>
+    </message>
+    <message>
+        <source>When launched at login, keep the manager in the tray and restore the configured combination.</source>
+        <translation>开机启动时将管理器保持在托盘，并恢复配置的组合。</translation>
+    </message>
+    <message>
+        <source>Startup Combination</source>
+        <translation>启动组合</translation>
+    </message>
+    <message>
+        <source>Do not restore a combination.</source>
+        <translation>不恢复组合。</translation>
+    </message>
+    <message>
+        <source>Restore saved combination: %1</source>
+        <translation>恢复已保存组合：%1</translation>
+    </message>
+    <message>
+        <source>Restore a saved combination, but the selection is missing.</source>
+        <translation>将恢复已保存组合，但当前选择已丢失。</translation>
+    </message>
+    <message>
+        <source>Restore the last combination before close.</source>
+        <translation>恢复上次关闭前的组合。</translation>
+    </message>
+    <message>
+        <source>Do not restore</source>
+        <translation>不恢复</translation>
+    </message>
+    <message>
+        <source>Choose which combination to restore during silent startup.</source>
+        <translation>选择静默启动时要恢复的组合。</translation>
+    </message>
     <!-- About page -->
     <message>
         <source>About</source>
@@ -665,20 +729,20 @@
         <translation>无法创建带版本号的更新缓存目录。</translation>
     </message>
     <message>
-        <source>Could not reach GitHub.</source>
-        <translation>无法连接到 GitHub。</translation>
+        <source>Could not reach the update service.</source>
+        <translation>无法连接到更新服务。</translation>
     </message>
     <message>
         <source>Could not open the update file for writing.</source>
         <translation>无法打开更新文件进行写入。</translation>
     </message>
     <message>
-        <source>Check GitHub for the latest NeurolingsCE release.</source>
-        <translation>从 GitHub 检查最新的 NeurolingsCE 发布版本。</translation>
+        <source>Check for the latest NeurolingsCE release.</source>
+        <translation>检查最新的 NeurolingsCE 发布版本。</translation>
     </message>
     <message>
-        <source>Checking GitHub releases...</source>
-        <translation>正在检查 GitHub 发布版本...</translation>
+        <source>Checking for updates...</source>
+        <translation>正在检查更新...</translation>
     </message>
     <message>
         <source>You're up to date.</source>
@@ -761,8 +825,8 @@
         <translation>查看发布说明</translation>
     </message>
     <message>
-        <source>GitHub returned HTTP status %1.</source>
-        <translation>GitHub 返回了 HTTP 状态码 %1。</translation>
+        <source>The update service returned HTTP status %1.</source>
+        <translation>更新服务返回了 HTTP 状态码 %1。</translation>
     </message>
     <message>
         <source>HTTP %1: %2</source>
@@ -785,16 +849,12 @@
         <translation>无法完成下载文件的最终保存。</translation>
     </message>
     <message>
-        <source>GitHub returned an invalid response.</source>
-        <translation>GitHub 返回了无效响应。</translation>
+        <source>The update service returned an invalid response.</source>
+        <translation>更新服务返回了无效响应。</translation>
     </message>
     <message>
-        <source>GitHub did not return a stable release.</source>
-        <translation>GitHub 未返回稳定版本发布。</translation>
-    </message>
-    <message>
-        <source>The latest release tag could not be parsed.</source>
-        <translation>无法解析最新发布的标签版本。</translation>
+        <source>The latest release version could not be parsed.</source>
+        <translation>无法解析最新发布版本号。</translation>
     </message>
     <message>
         <source>TLS backend: %1</source>

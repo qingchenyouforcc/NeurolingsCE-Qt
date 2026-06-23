@@ -28,11 +28,15 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QFrame>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QRadioButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -200,6 +204,131 @@ QString backgroundSummaryForSettings(QColor const& color)
 {
     return settingsTr("Current color: %1")
         .arg(ShijimaManagerUiInternal::colorToString(color));
+}
+
+QString quoteProcessArgument(QString const& argument)
+{
+    QString escaped = argument;
+    escaped.replace(QStringLiteral("\""), QStringLiteral("\\\""));
+    return QStringLiteral("\"%1\"").arg(escaped);
+}
+
+QString startupRunCommand()
+{
+    return quoteProcessArgument(QCoreApplication::applicationFilePath()) +
+        QStringLiteral(" --neurolingsce-startup");
+}
+
+bool startupLaunchAtLoginEnabled()
+{
+#ifdef _WIN32
+    QSettings runKey(QStringLiteral(
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+        QSettings::NativeFormat);
+    return !runKey.value(QStringLiteral("NeurolingsCE")).toString().trimmed().isEmpty();
+#else
+    return false;
+#endif
+}
+
+bool setStartupLaunchAtLoginEnabled(bool enabled, QString &errorMessage)
+{
+#ifdef _WIN32
+    QSettings runKey(QStringLiteral(
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+        QSettings::NativeFormat);
+    if (enabled) {
+        runKey.setValue(QStringLiteral("NeurolingsCE"), startupRunCommand());
+    }
+    else {
+        runKey.remove(QStringLiteral("NeurolingsCE"));
+    }
+    runKey.sync();
+    if (runKey.status() != QSettings::NoError) {
+        errorMessage = settingsTr("Could not update the system startup setting.");
+        return false;
+    }
+    return true;
+#else
+    Q_UNUSED(enabled);
+    errorMessage = settingsTr("Startup launch is currently supported on Windows only.");
+    return false;
+#endif
+}
+
+QString startupLaunchSummary()
+{
+    return startupLaunchAtLoginEnabled()
+        ? settingsTr("Enabled")
+        : settingsTr("Disabled");
+}
+
+QJsonArray savedCombinationArrayForSettings(QSettings const& settings)
+{
+    QJsonParseError error;
+    QJsonDocument document = QJsonDocument::fromJson(
+        settings.value(QStringLiteral("combinations/saved")).toString().toUtf8(),
+        &error);
+    if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        return {};
+    }
+    return document.array();
+}
+
+QString savedCombinationName(QSettings const& settings, QString const& id)
+{
+    for (auto const& value : savedCombinationArrayForSettings(settings)) {
+        QJsonObject entry = value.toObject();
+        if (entry.value(QStringLiteral("id")).toString() == id) {
+            QString name = entry.value(QStringLiteral("name")).toString().trimmed();
+            return name.isEmpty() ? settingsTr("Untitled Combination") : name;
+        }
+    }
+    return {};
+}
+
+QString startupCombinationSummary(QSettings const& settings)
+{
+    QString mode = settings.value(QStringLiteral("startup/restoreCombinationMode"),
+        QStringLiteral("last")).toString();
+    if (mode == QStringLiteral("none")) {
+        return settingsTr("Do not restore a combination.");
+    }
+    if (mode == QStringLiteral("saved")) {
+        QString name = savedCombinationName(settings,
+            settings.value(QStringLiteral("startup/restoreCombinationId")).toString());
+        if (!name.isEmpty()) {
+            return settingsTr("Restore saved combination: %1").arg(name);
+        }
+        return settingsTr("Restore a saved combination, but the selection is missing.");
+    }
+    return settingsTr("Restore the last combination before close.");
+}
+
+void populateStartupCombinationCombo(QComboBox *combo, QSettings const& settings)
+{
+    combo->clear();
+    combo->addItem(settingsTr("Do not restore"), QStringLiteral("none:"));
+    combo->addItem(settingsTr("Last Combination Before Close"), QStringLiteral("last:"));
+    for (auto const& value : savedCombinationArrayForSettings(settings)) {
+        QJsonObject entry = value.toObject();
+        QString id = entry.value(QStringLiteral("id")).toString();
+        if (id.isEmpty()) {
+            continue;
+        }
+        QString name = entry.value(QStringLiteral("name")).toString().trimmed();
+        combo->addItem(name.isEmpty() ? settingsTr("Untitled Combination") : name,
+            QStringLiteral("saved:%1").arg(id));
+    }
+
+    QString mode = settings.value(QStringLiteral("startup/restoreCombinationMode"),
+        QStringLiteral("last")).toString();
+    QString id = settings.value(QStringLiteral("startup/restoreCombinationId")).toString();
+    QString target = mode == QStringLiteral("saved")
+        ? QStringLiteral("saved:%1").arg(id)
+        : QStringLiteral("%1:").arg(mode);
+    int index = combo->findData(target);
+    combo->setCurrentIndex(index >= 0 ? index : 1);
 }
 
 }
@@ -511,6 +640,91 @@ void ShijimaManager::setupSettingsPage() {
             }
         });
 
+        settingsLayout->addWidget(row);
+    }
+
+    addSettingsSection(settingsLayout, settingsContent,
+        tr("Startup"),
+        tr("Control how NeurolingsCE starts with your system and what it restores."));
+
+    {
+        QLabel *summaryLabel = nullptr;
+        auto *toggle = new ElaToggleSwitch(settingsContent);
+        toggle->setIsToggled(startupLaunchAtLoginEnabled());
+        auto *row = createSettingsRow(settingsContent,
+            tr("Start at Login"),
+            startupLaunchSummary(),
+            toggle,
+            &summaryLabel);
+        connect(toggle, &ElaToggleSwitch::toggled, this,
+            [this, toggle, summaryLabel](bool checked) {
+                QString errorMessage;
+                if (!setStartupLaunchAtLoginEnabled(checked, errorMessage)) {
+                    toggle->blockSignals(true);
+                    toggle->setIsToggled(!checked);
+                    toggle->blockSignals(false);
+                    QMessageBox::warning(this, tr("Startup"), errorMessage);
+                }
+                if (summaryLabel != nullptr) {
+                    summaryLabel->setText(startupLaunchSummary());
+                }
+            });
+        settingsLayout->addWidget(row);
+    }
+
+    {
+        bool initial = m_settings->value("startup/silent", false).toBool();
+        auto *toggle = new ElaToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
+            m_settings->setValue("startup/silent", checked);
+        });
+
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Silent Startup"),
+            tr("When launched at login, keep the manager in the tray and restore the configured combination."),
+            toggle));
+    }
+
+    {
+        QLabel *summaryLabel = nullptr;
+        auto *btn = new ElaPushButton(tr("Configure..."), settingsContent);
+        auto *row = createSettingsRow(settingsContent,
+            tr("Startup Combination"),
+            startupCombinationSummary(*m_settings),
+            btn,
+            &summaryLabel);
+        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+            QDialog dialog(this);
+            dialog.setWindowTitle(tr("Startup Combination"));
+            dialog.setMinimumWidth(420);
+
+            auto *layout = new QVBoxLayout(&dialog);
+            layout->addWidget(new QLabel(
+                tr("Choose which combination to restore during silent startup."),
+                &dialog));
+
+            auto *combo = new QComboBox(&dialog);
+            populateStartupCombinationCombo(combo, *m_settings);
+            layout->addWidget(combo);
+
+            auto *buttons = new QDialogButtonBox(
+                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+            layout->addWidget(buttons);
+
+            if (dialog.exec() == QDialog::Accepted) {
+                QString data = combo->currentData().toString();
+                QString mode = data.section(QLatin1Char(':'), 0, 0);
+                QString id = data.section(QLatin1Char(':'), 1);
+                m_settings->setValue("startup/restoreCombinationMode", mode);
+                m_settings->setValue("startup/restoreCombinationId", id);
+                if (summaryLabel != nullptr) {
+                    summaryLabel->setText(startupCombinationSummary(*m_settings));
+                }
+            }
+        });
         settingsLayout->addWidget(row);
     }
 

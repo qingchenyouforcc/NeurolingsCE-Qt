@@ -356,7 +356,9 @@ bool ShijimaManager::prepareMascotTick() {
     if (m_ui->sandboxWidget != nullptr && !m_ui->sandboxWidget->isVisible()) {
         setWindowedMode(false);
 #if !defined(__APPLE__)
-        if (m_runtime->sessions.empty() && !m_runtime->cliRuntimeMode) {
+        if (m_runtime->sessions.empty() && !m_runtime->cliRuntimeMode &&
+            !m_runtime->silentStartupMode)
+        {
             setManagerVisible(true);
         }
 #endif
@@ -364,7 +366,9 @@ bool ShijimaManager::prepareMascotTick() {
 
     if (m_runtime->sessions.empty()) {
 #if !defined(__APPLE__)
-        if (!windowedMode() && !m_wasVisible && !m_runtime->cliRuntimeMode) {
+        if (!windowedMode() && !m_wasVisible && !m_runtime->cliRuntimeMode &&
+            !m_runtime->silentStartupMode)
+        {
             setManagerVisible(true);
         }
 #endif
@@ -461,7 +465,7 @@ void ShijimaManager::finishMascotTick() {
     m_runtime->environment.resetScales();
 
     if (m_runtime->sessions.empty() && !windowedMode() &&
-        !m_runtime->cliRuntimeMode)
+        !m_runtime->cliRuntimeMode && !m_runtime->silentStartupMode)
     {
         setManagerVisible(true);
     }

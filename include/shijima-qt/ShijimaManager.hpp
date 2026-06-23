@@ -42,6 +42,7 @@ class QListWidgetItem;
 class QObject;
 class QPoint;
 class QPushButton;
+class QJsonObject;
 class QScreen;
 class QShowEvent;
 class QSettings;
@@ -137,6 +138,8 @@ private:
     void saveCurrentCombination();
     void restoreSelectedCombination();
     void deleteSelectedCombination();
+    int restoreCombination(QJsonObject const& combination, bool showMessages);
+    void restoreStartupCombination();
     void saveLastCombinationBeforeShutdown();
     void retranslateUi();
     void switchLanguage(const QString &langCode);

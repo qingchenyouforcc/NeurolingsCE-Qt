@@ -43,5 +43,6 @@ struct ShijimaManagerRuntimeState {
     QString mascotsPath;
     QString mascotCachePath;
     bool cliRuntimeMode = false;
+    bool silentStartupMode = false;
     std::atomic<bool> shuttingDown{false};
 };

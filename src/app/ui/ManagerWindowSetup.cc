@@ -59,6 +59,10 @@ ShijimaManager::ShijimaManager(QWidget *parent):
 {
     m_runtime->cliRuntimeMode =
         qApp->property("neurolingsce.cliRuntime").toBool();
+    m_runtime->silentStartupMode =
+        !m_runtime->cliRuntimeMode &&
+        qApp->property("neurolingsce.startupLaunch").toBool() &&
+        m_settings->value("startup/silent", false).toBool();
     m_ui->listWidget = new QListWidget(this);
 
     for (auto screen : QGuiApplication::screens()) {
@@ -169,13 +173,18 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     if (!m_runtime->cliRuntimeMode) {
         setupNavigation();
     }
-    if (!m_runtime->cliRuntimeMode) {
+    if (!m_runtime->cliRuntimeMode && !m_runtime->silentStartupMode) {
         setManagerVisible(true);
     }
     m_constructing = false;
 
     if (!m_runtime->cliRuntimeMode) {
         ShijimaManagerUiInternal::setupTrayIcon(this, m_ui->trayController);
+    }
+    if (m_runtime->silentStartupMode) {
+        QTimer::singleShot(0, this, [this]() {
+            restoreStartupCombination();
+        });
     }
     m_localApi->start();
     if (!m_runtime->cliRuntimeMode &&

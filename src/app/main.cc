@@ -43,10 +43,20 @@
 namespace {
 
 QString const kCliRuntimeArgument = QStringLiteral("--neurolingsce-cli-runtime");
+QString const kStartupLaunchArgument = QStringLiteral("--neurolingsce-startup");
 
 bool cliRuntimeMode(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         if (QString::fromUtf8(argv[i]) == kCliRuntimeArgument) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool startupLaunchMode(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (QString::fromUtf8(argv[i]) == kStartupLaunchArgument) {
             return true;
         }
     }
@@ -179,11 +189,13 @@ int main(int argc, char **argv) {
         return ret;
     }
     bool const startedForCli = cliRuntimeMode(argc, argv);
+    bool const startedFromSystemStartup = startupLaunchMode(argc, argv);
     Platform::initialize(argc, argv);
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral(APP_NAME));
     app.setApplicationDisplayName(QStringLiteral(APP_DISPLAY_NAME));
     app.setProperty("neurolingsce.cliRuntime", startedForCli);
+    app.setProperty("neurolingsce.startupLaunch", startedFromSystemStartup);
     if (startedForCli) {
         app.setQuitOnLastWindowClosed(false);
     }
@@ -191,6 +203,7 @@ int main(int argc, char **argv) {
     installShijimaEngineLogger();
     APP_LOG_INFO("startup") << "GUI startup initialized argc=" << argc
         << " cli_runtime=" << (startedForCli ? "1" : "0")
+        << " startup_launch=" << (startedFromSystemStartup ? "1" : "0")
         << " version=\"" << NEUROLINGSCE_VERSION << "\"";
     std::set_terminate(appTerminateHandler);
 #ifdef _WIN32
@@ -212,7 +225,12 @@ int main(int argc, char **argv) {
     try {
         // If another instance is already alive, ask it to surface the manager
         // instead of starting a duplicate UI process.
-        if (!startedForCli && shijimaLocalApiShowManager()) {
+        if (!startedForCli && startedFromSystemStartup && shijimaLocalApiPing()) {
+            APP_LOG_INFO("startup") << "Existing instance detected during system startup; exiting silently";
+            AppLog::shutdown();
+            return 0;
+        }
+        if (!startedForCli && !startedFromSystemStartup && shijimaLocalApiShowManager()) {
             APP_LOG_INFO("startup") << "Existing instance activated; exiting current GUI launch request";
             AppLog::shutdown();
             return 0;
@@ -228,7 +246,7 @@ int main(int argc, char **argv) {
         }
         APP_LOG_INFO("startup") << "Application startup checks passed";
         auto *manager = ShijimaManager::defaultManager();
-        if (!startedForCli) {
+        if (!startedForCli && !startedFromSystemStartup) {
             manager->show();
         }
     }

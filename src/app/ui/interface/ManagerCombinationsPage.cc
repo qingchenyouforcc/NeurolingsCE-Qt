@@ -124,6 +124,20 @@ QJsonArray savedCombinationArray(QSettings const& settings)
     return document.array();
 }
 
+QJsonObject savedCombinationById(QSettings const& settings, QString const& id)
+{
+    if (id.isEmpty()) {
+        return {};
+    }
+    for (auto const& value : savedCombinationArray(settings)) {
+        QJsonObject entry = value.toObject();
+        if (entry.value(QStringLiteral("id")).toString() == id) {
+            return entry.value(QStringLiteral("combination")).toObject();
+        }
+    }
+    return {};
+}
+
 void writeSavedCombinationArray(QSettings& settings, QJsonArray const& array)
 {
     settings.setValue(kSavedCombinationsKey,
@@ -448,6 +462,15 @@ void ShijimaManager::restoreSelectedCombination()
         return;
     }
 
+    restoreCombination(combination, true);
+}
+
+int ShijimaManager::restoreCombination(QJsonObject const& combination, bool showMessages)
+{
+    if (totalMascotCount(combination) == 0) {
+        return 0;
+    }
+
     killAll();
     QStringList missing;
     int restored = 0;
@@ -470,7 +493,7 @@ void ShijimaManager::restoreSelectedCombination()
     }
 
     updateStatusBar();
-    if (!missing.isEmpty()) {
+    if (showMessages && !missing.isEmpty()) {
         missing.removeDuplicates();
         QMessageBox::warning(this,
             tr("Combinations"),
@@ -478,6 +501,30 @@ void ShijimaManager::restoreSelectedCombination()
                 .arg(restored)
                 .arg(missing.join(QStringLiteral(", "))));
     }
+    return restored;
+}
+
+void ShijimaManager::restoreStartupCombination()
+{
+    if (m_settings == nullptr) {
+        return;
+    }
+
+    QString mode = m_settings->value(QStringLiteral("startup/restoreCombinationMode"),
+        QStringLiteral("last")).toString();
+    QJsonObject combination;
+    if (mode == QStringLiteral("last")) {
+        combination = parseCombination(m_settings->value(kLastCombinationKey).toString());
+    }
+    else if (mode == QStringLiteral("saved")) {
+        combination = savedCombinationById(*m_settings,
+            m_settings->value(QStringLiteral("startup/restoreCombinationId")).toString());
+    }
+    else {
+        return;
+    }
+
+    restoreCombination(combination, false);
 }
 
 void ShijimaManager::deleteSelectedCombination()
