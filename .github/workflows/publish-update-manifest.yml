@@ -1,0 +1,77 @@
+name: Publish update manifest
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.4.0"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: release-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag || '' }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || '' }}
+        shell: bash
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          elif [ -n "$RELEASE_TAG" ]; then
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          else
+            latest_tag="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
+            echo "tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        shell: bash
+        run: |
+          mkdir -p build
+          gh api "repos/$REPO/releases/tags/$TAG" > build/release.json
+
+      - name: Generate latest.json
+        shell: bash
+        run: |
+          mkdir -p public/update
+          python3 tools/generate_update_manifest.py \
+            --release-json build/release.json \
+            --output public/update/latest.json
+
+      - name: Add Pages metadata
+        shell: bash
+        run: |
+          touch public/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

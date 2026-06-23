@@ -48,7 +48,10 @@
 namespace {
 
 QString const kLatestReleaseUrl =
-    QStringLiteral("https://api.github.com/repos/qingchenyouforcc/NeurolingsCE/releases/latest");
+    QStringLiteral("https://blog.qingchenyou.asia/NeurolingsCE/update/latest.json");
+
+QString const kGitHubReleaseLatestUrl =
+    QStringLiteral("https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest");
 
 QString formatVersion(QString const& version)
 {
@@ -73,12 +76,6 @@ bool isInstallerKind(GitHubUpdateManager::AssetKind kind)
 {
     return kind == GitHubUpdateManager::AssetKind::Msi
         || kind == GitHubUpdateManager::AssetKind::Exe;
-}
-
-bool isStableRelease(QJsonObject const& releaseObject)
-{
-    return !releaseObject.value(QStringLiteral("draft")).toBool()
-        && !releaseObject.value(QStringLiteral("prerelease")).toBool();
 }
 
 GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonArray const& assets,
@@ -131,11 +128,47 @@ GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonArray const& asset
             best.kind = kind;
             best.name = name;
             best.url = QUrl { url };
+            best.sha256 = assetObject.value(QStringLiteral("sha256")).toString().trimmed().toLower();
             bestRank = rank;
         }
     }
 
     return best;
+}
+
+GitHubUpdateManager::ReleaseAsset selectBestWindowsAsset(QJsonObject const& assets,
+    QUrl *checksumManifestUrl)
+{
+    QJsonArray releaseAssets;
+
+    for (auto it = assets.constBegin(); it != assets.constEnd(); ++it) {
+        if (!it.value().isObject()) {
+            continue;
+        }
+        QJsonObject assetObject = it.value().toObject();
+        QString name = assetObject.value(QStringLiteral("name")).toString();
+        QString url = assetObject.value(QStringLiteral("url")).toString();
+        if (name.isEmpty() || url.isEmpty()) {
+            continue;
+        }
+
+        QJsonObject releaseAsset;
+        releaseAsset.insert(QStringLiteral("name"), name);
+        releaseAsset.insert(QStringLiteral("browser_download_url"), url);
+        releaseAsset.insert(QStringLiteral("sha256"),
+            assetObject.value(QStringLiteral("sha256")).toString());
+        releaseAssets.append(releaseAsset);
+    }
+
+    if (checksumManifestUrl != nullptr) {
+        QString checksumUrl = assets.value(QStringLiteral("sha256sums")).toObject()
+            .value(QStringLiteral("url")).toString();
+        if (!checksumUrl.isEmpty()) {
+            *checksumManifestUrl = QUrl { checksumUrl };
+        }
+    }
+
+    return selectBestWindowsAsset(releaseAssets, checksumManifestUrl);
 }
 
 }
@@ -194,7 +227,7 @@ void GitHubUpdateManager::checkForUpdates(CheckMode mode)
     QNetworkRequest request { QUrl { kLatestReleaseUrl } };
     request.setHeader(QNetworkRequest::UserAgentHeader,
         QStringLiteral("NeurolingsCE/%1").arg(m_currentVersion));
-    request.setRawHeader("Accept", "application/vnd.github+json");
+    request.setRawHeader("Accept", "application/json");
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
         QNetworkRequest::NoLessSafeRedirectPolicy);
 
@@ -202,7 +235,7 @@ void GitHubUpdateManager::checkForUpdates(CheckMode mode)
     m_network->setProxy(proxy);
     APP_LOG_INFO("update") << "Checking for updates mode="
         << (mode == CheckMode::Startup ? "startup" : "manual")
-        << " url=" << kLatestReleaseUrl.toStdString()
+        << " manifestUrl=" << kLatestReleaseUrl.toStdString()
         << " proxy=" << proxyDescription(proxy).toStdString();
 
     m_checkReply = m_network->get(request);
@@ -383,9 +416,9 @@ QString GitHubUpdateManager::statusText() const
 {
     switch (m_state) {
     case State::Idle:
-        return tr("Check GitHub for the latest NeurolingsCE release.");
+        return tr("Check for the latest NeurolingsCE release.");
     case State::Checking:
-        return tr("Checking GitHub releases...");
+        return tr("Checking for updates...");
     case State::UpToDate:
         return tr("You're up to date.");
     case State::UpdateAvailable:
@@ -518,7 +551,9 @@ bool GitHubUpdateManager::verifyDownloadedInstaller(QString &errorMessage) const
         errorMessage = tr("No verified installer is ready to install.");
         return false;
     }
-    if (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()) {
+    if (m_selectedAsset.sha256.isEmpty()
+        && (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()))
+    {
         errorMessage = tr("The release did not publish SHA256SUMS.txt. Open the release page and install manually.");
         return false;
     }
@@ -555,7 +590,7 @@ void GitHubUpdateManager::onCheckFinished()
     QString apiMessage = payloadMessage(payload);
 
     if (reply->error() != QNetworkReply::NoError) {
-        QString error = describeReplyFailure(reply, payload, tr("Could not reach GitHub."));
+        QString error = describeReplyFailure(reply, payload, tr("Could not reach the update service."));
         APP_LOG_ERROR("update") << "Update check failed"
             << " networkError=" << static_cast<int>(reply->error())
             << " httpStatus=" << httpStatus
@@ -570,7 +605,7 @@ void GitHubUpdateManager::onCheckFinished()
 
     if (httpStatus >= 400) {
         QString error = describeReplyFailure(reply, payload,
-            tr("GitHub returned HTTP status %1.").arg(httpStatus));
+            tr("The update service returned HTTP status %1.").arg(httpStatus));
         APP_LOG_ERROR("update") << "Update check returned HTTP error"
             << " httpStatus=" << httpStatus
             << " reason=" << reason.toStdString()
@@ -663,6 +698,28 @@ void GitHubUpdateManager::onDownloadFinished()
 
 void GitHubUpdateManager::downloadChecksumManifest()
 {
+    if (!m_selectedAsset.sha256.isEmpty()) {
+        QString errorMessage;
+        QString actualHash = sha256ForFile(m_downloadTargetPath, errorMessage);
+        if (actualHash.isEmpty()) {
+            QFile::remove(m_downloadTargetPath);
+            setState(State::Error, errorMessage);
+            return;
+        }
+        if (actualHash != m_selectedAsset.sha256) {
+            QFile::remove(m_downloadTargetPath);
+            setState(State::Error,
+                tr("The downloaded installer failed SHA-256 verification. Open the release page and install manually."));
+            return;
+        }
+
+        persistDownloadedInstaller(m_downloadTargetPath);
+        APP_LOG_INFO("update") << "Installer checksum verified from update manifest path="
+            << m_downloadTargetPath.toStdString();
+        setState(State::ReadyToInstall);
+        return;
+    }
+
     if (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()) {
         QFile::remove(m_downloadTargetPath);
         setState(State::Error,
@@ -791,34 +848,40 @@ void GitHubUpdateManager::processLatestReleaseDocument(QByteArray const& bytes)
     QJsonParseError parseError;
     QJsonDocument document = QJsonDocument::fromJson(bytes, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        APP_LOG_ERROR("update") << "Invalid JSON from GitHub parseError="
+        APP_LOG_ERROR("update") << "Invalid update manifest parseError="
             << parseError.errorString().toStdString();
-        setState(State::Error, tr("GitHub returned an invalid response."));
+        setState(State::Error, tr("The update service returned an invalid response."));
         return;
     }
 
-    QJsonObject releaseObject = document.object();
-    if (!isStableRelease(releaseObject)) {
-        setState(State::Error, tr("GitHub did not return a stable release."));
-        return;
-    }
-
+    QJsonObject manifestObject = document.object();
     QString version = normalizedVersionTag(
-        releaseObject.value(QStringLiteral("tag_name")).toString());
+        manifestObject.value(QStringLiteral("version")).toString());
     if (version.isEmpty()) {
-        APP_LOG_ERROR("update") << "Could not parse release tag"
-            << " tag=" << releaseObject.value(QStringLiteral("tag_name")).toString().toStdString();
-        setState(State::Error, tr("The latest release tag could not be parsed."));
+        version = normalizedVersionTag(
+            manifestObject.value(QStringLiteral("tag")).toString());
+    }
+    if (version.isEmpty()) {
+        APP_LOG_ERROR("update") << "Could not parse update manifest version"
+            << " version=" << manifestObject.value(QStringLiteral("version")).toString().toStdString()
+            << " tag=" << manifestObject.value(QStringLiteral("tag")).toString().toStdString();
+        setState(State::Error, tr("The latest release version could not be parsed."));
         return;
     }
 
     resetLatestRelease();
     m_latestVersion = version;
-    m_releaseUrl = releaseObject.value(QStringLiteral("html_url")).toString();
+    m_releaseUrl = manifestObject.value(QStringLiteral("release_page")).toString();
+    if (m_releaseUrl.isEmpty()) {
+        QString tag = manifestObject.value(QStringLiteral("tag")).toString().trimmed();
+        m_releaseUrl = tag.isEmpty()
+            ? kGitHubReleaseLatestUrl
+            : QStringLiteral("https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/%1").arg(tag);
+    }
     m_publishedAt = QDateTime::fromString(
-        releaseObject.value(QStringLiteral("published_at")).toString(), Qt::ISODate);
+        manifestObject.value(QStringLiteral("published_at")).toString(), Qt::ISODate);
     m_selectedAsset = selectBestWindowsAsset(
-        releaseObject.value(QStringLiteral("assets")).toArray(),
+        manifestObject.value(QStringLiteral("assets")).toObject(),
         &m_checksumManifestUrl);
     clearOutdatedSuppression();
 

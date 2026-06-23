@@ -63,6 +63,7 @@ public:
         AssetKind kind = AssetKind::None;
         QString name;
         QUrl url;
+        QString sha256;
     };
 
     explicit GitHubUpdateManager(QSettings *settings, QObject *parent = nullptr);
