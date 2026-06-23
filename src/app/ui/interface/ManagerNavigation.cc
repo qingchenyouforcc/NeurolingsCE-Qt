@@ -21,6 +21,7 @@
 void ShijimaManager::setupNavigation() {
     setupHomePage();
     setupCreatePage();
+    setupCombinationsPage();
     setupSettingsPage();
     setupAboutPage();
 }

@@ -76,6 +76,7 @@ void ShijimaManager::abortPendingCallbacks() {
 void ShijimaManager::shutdownForQuit() {
     APP_LOG_INFO("shutdown") << "Manager shutdown started mascot_count="
         << m_runtime->sessions.size();
+    saveLastCombinationBeforeShutdown();
     // Stop new callbacks before destroying widgets or timers.
     abortPendingCallbacks();
     ShijimaManagerUiInternal::teardownTrayIcon(m_ui->trayController);

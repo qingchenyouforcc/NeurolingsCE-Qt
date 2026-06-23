@@ -41,6 +41,7 @@ class QLabel;
 class QListWidgetItem;
 class QObject;
 class QPoint;
+class QPushButton;
 class QScreen;
 class QShowEvent;
 class QSettings;
@@ -115,6 +116,7 @@ private:
     void setupNavigation();
     void setupHomePage();
     void setupCreatePage();
+    void setupCombinationsPage();
     void setupSettingsPage();
     void setupAboutPage();
     void showAboutDialog();
@@ -131,6 +133,11 @@ private:
     bool prepareMascotTick();
     void tickMascotWidgets();
     void finishMascotTick();
+    void refreshCombinationPage();
+    void saveCurrentCombination();
+    void restoreSelectedCombination();
+    void deleteSelectedCombination();
+    void saveLastCombinationBeforeShutdown();
     void retranslateUi();
     void switchLanguage(const QString &langCode);
     void updateStatusBar();

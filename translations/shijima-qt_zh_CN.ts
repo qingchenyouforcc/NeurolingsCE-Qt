@@ -205,6 +205,103 @@
         <source>Missing info.json; fallback metadata will be generated</source>
         <translation>缺少 info.json；将生成备用元数据</translation>
     </message>
+    <!-- Combinations page -->
+    <message>
+        <source>Combinations</source>
+        <translation>组合</translation>
+    </message>
+    <message>
+        <source>Save the mascots currently on your desktop and restore the same mix later.</source>
+        <translation>保存当前桌面上的桌宠组合，之后可以恢复同样的搭配。</translation>
+    </message>
+    <message>
+        <source>Save Current Combination</source>
+        <translation>保存当前组合</translation>
+    </message>
+    <message>
+        <source>Saved Combinations</source>
+        <translation>已保存的组合</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <source>Select a combination.</source>
+        <translation>请选择一个组合。</translation>
+    </message>
+    <message>
+        <source>Restore Combination</source>
+        <translation>恢复组合</translation>
+    </message>
+    <message>
+        <source>Delete Saved Combination</source>
+        <translation>删除已保存组合</translation>
+    </message>
+    <message>
+        <source>Last Combination Before Close</source>
+        <translation>上次关闭前的组合</translation>
+    </message>
+    <message>
+        <source>Untitled Combination</source>
+        <translation>未命名组合</translation>
+    </message>
+    <message>
+        <source>No mascots in this combination.</source>
+        <translation>这个组合中没有桌宠。</translation>
+    </message>
+    <message>
+        <source>Not saved yet</source>
+        <translation>尚未保存</translation>
+    </message>
+    <message>
+        <source>Saved at: %1</source>
+        <translation>保存时间：%1</translation>
+    </message>
+    <message>
+        <source>Total mascots: %1</source>
+        <translation>桌宠总数：%1</translation>
+    </message>
+    <message>
+        <source>%1 x%2</source>
+        <translation>%1 x%2</translation>
+    </message>
+    <message>
+        <source>and %1 more</source>
+        <translation>以及另外 %1 种</translation>
+    </message>
+    <message>
+        <source>There are no active mascots to save.</source>
+        <translation>当前没有可保存的桌宠。</translation>
+    </message>
+    <message>
+        <source>Combination %1</source>
+        <translation>组合 %1</translation>
+    </message>
+    <message>
+        <source>Save Combination</source>
+        <translation>保存组合</translation>
+    </message>
+    <message>
+        <source>Combination name:</source>
+        <translation>组合名称：</translation>
+    </message>
+    <message>
+        <source>This combination does not contain any mascots.</source>
+        <translation>这个组合不包含任何桌宠。</translation>
+    </message>
+    <message>
+        <source>Restored %1 mascot(s). Missing templates: %2</source>
+        <translation>已恢复 %1 个桌宠。缺少模板：%2</translation>
+    </message>
+    <message>
+        <source>Delete Combination</source>
+        <translation>删除组合</translation>
+    </message>
+    <message>
+        <source>Delete this saved combination?</source>
+        <translation>要删除这个已保存的组合吗？</translation>
+    </message>
     <!-- Settings page -->
     <message>
         <source>Settings</source>

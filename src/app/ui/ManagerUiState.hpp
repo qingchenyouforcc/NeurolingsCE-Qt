@@ -28,6 +28,7 @@
 class QAction;
 class QLabel;
 class QListWidget;
+class QPushButton;
 class QTranslator;
 class QWidget;
 
@@ -48,6 +49,11 @@ struct ShijimaManagerUiState {
     QLabel *mascotDescriptionLabel = nullptr;
     QWidget *homePage = nullptr;
     QWidget *createPage = nullptr;
+    QWidget *combinationsPage = nullptr;
+    QListWidget *combinationListWidget = nullptr;
+    QLabel *combinationDetailsLabel = nullptr;
+    QPushButton *restoreCombinationButton = nullptr;
+    QPushButton *deleteCombinationButton = nullptr;
     QWidget *settingsPage = nullptr;
     std::unique_ptr<ManagerTrayController> trayController;
     QString settingsKey;
