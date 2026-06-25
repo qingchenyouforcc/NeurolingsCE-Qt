@@ -256,6 +256,10 @@ void GitHubUpdateManager::checkForUpdates(CheckMode mode)
 void GitHubUpdateManager::downloadAndPrepareUpdate()
 {
     if (!canDownloadInstaller()) {
+        APP_LOG_WARN("update") << "Download requested while installer cannot be downloaded"
+            << " state=" << static_cast<int>(m_state)
+            << " assetKind=" << static_cast<int>(m_selectedAsset.kind)
+            << " asset=" << m_selectedAsset.name.toStdString();
         return;
     }
 
@@ -263,12 +267,16 @@ void GitHubUpdateManager::downloadAndPrepareUpdate()
 
     QDir cacheDir(updateCacheRoot());
     if (!cacheDir.exists() && !cacheDir.mkpath(QStringLiteral("."))) {
+        APP_LOG_ERROR("update") << "Could not create update cache directory path="
+            << cacheDir.absolutePath().toStdString();
         setState(State::Error, tr("Could not create the update cache directory."));
         return;
     }
 
     QString versionDir = cacheDir.filePath(m_latestVersion);
     if (!QDir().mkpath(versionDir)) {
+        APP_LOG_ERROR("update") << "Could not create versioned update cache directory path="
+            << versionDir.toStdString();
         setState(State::Error, tr("Could not create the versioned update cache directory."));
         return;
     }
@@ -279,18 +287,34 @@ void GitHubUpdateManager::downloadAndPrepareUpdate()
         safeAssetName.contains(QLatin1Char('\\')) ||
         safeAssetName.contains(QLatin1Char(':')))
     {
+        APP_LOG_ERROR("update") << "Rejected unsafe update asset name asset="
+            << m_selectedAsset.name.toStdString();
         setState(State::Error, tr("Unsafe update asset name."));
+        return;
+    }
+    if (!m_selectedAsset.url.isValid() || m_selectedAsset.url.isEmpty()) {
+        APP_LOG_ERROR("update") << "Selected update asset has invalid URL asset="
+            << m_selectedAsset.name.toStdString()
+            << " url=" << m_selectedAsset.url.toString().toStdString();
+        setState(State::Error, tr("The selected update asset URL is invalid."));
         return;
     }
 
     m_downloadTargetPath = QDir(versionDir).filePath(safeAssetName);
     m_partialDownloadPath = m_downloadTargetPath + QStringLiteral(".part");
 
-    QFile::remove(m_partialDownloadPath);
+    if (QFileInfo::exists(m_partialDownloadPath) && !QFile::remove(m_partialDownloadPath)) {
+        APP_LOG_WARN("update") << "Could not remove stale partial update file path="
+            << m_partialDownloadPath.toStdString();
+    }
     m_downloadFile = new QFile(m_partialDownloadPath, this);
     if (!m_downloadFile->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QString fileError = m_downloadFile->errorString();
         delete m_downloadFile;
         m_downloadFile = nullptr;
+        APP_LOG_ERROR("update") << "Could not open update file for writing path="
+            << m_partialDownloadPath.toStdString()
+            << " error=" << fileError.toStdString();
         setState(State::Error, tr("Could not open the update file for writing."));
         return;
     }
@@ -625,7 +649,11 @@ void GitHubUpdateManager::onCheckFinished()
     }
     catch (std::exception const& ex) {
         APP_LOG_ERROR("update") << "Exception while processing update response: " << ex.what();
-        setState(State::Error, QString::fromUtf8(ex.what()));
+        setState(State::Error, tr("The update service returned an invalid response."));
+    }
+    catch (...) {
+        APP_LOG_ERROR("update") << "Unknown exception while processing update response";
+        setState(State::Error, tr("The update service returned an invalid response."));
     }
 
     reply->deleteLater();
@@ -644,7 +672,9 @@ void GitHubUpdateManager::onDownloadReadyRead()
 
     if (m_downloadFile->write(bytes) != bytes.size()) {
         APP_LOG_ERROR("update") << "Failed to write update chunk to disk target="
-            << m_partialDownloadPath.toStdString();
+            << m_partialDownloadPath.toStdString()
+            << " chunkSize=" << bytes.size()
+            << " fileError=" << m_downloadFile->errorString().toStdString();
         setState(State::Error, tr("Could not write the downloaded update to disk."));
         m_downloadReply->abort();
     }
@@ -660,7 +690,19 @@ void GitHubUpdateManager::onDownloadFinished()
     m_downloadReply = nullptr;
 
     if (m_downloadFile != nullptr) {
-        m_downloadFile->flush();
+        if (!m_downloadFile->flush()) {
+            QString fileError = m_downloadFile->errorString();
+            APP_LOG_ERROR("update") << "Failed to flush downloaded update file target="
+                << m_partialDownloadPath.toStdString()
+                << " fileError=" << fileError.toStdString();
+            m_downloadFile->close();
+            m_downloadFile->deleteLater();
+            m_downloadFile = nullptr;
+            QFile::remove(m_partialDownloadPath);
+            setState(State::Error, tr("Could not write the downloaded update to disk."));
+            reply->deleteLater();
+            return;
+        }
         m_downloadFile->close();
         m_downloadFile->deleteLater();
         m_downloadFile = nullptr;
@@ -684,14 +726,16 @@ void GitHubUpdateManager::onDownloadFinished()
     if (!QFile::rename(m_partialDownloadPath, m_downloadTargetPath)) {
         QFile::remove(m_partialDownloadPath);
         APP_LOG_ERROR("update") << "Failed to finalize installer download target="
-            << m_downloadTargetPath.toStdString();
+            << m_downloadTargetPath.toStdString()
+            << " partial=" << m_partialDownloadPath.toStdString();
         setState(State::Error, tr("Could not finalize the downloaded installer."));
         reply->deleteLater();
         return;
     }
 
     APP_LOG_INFO("update") << "Installer download complete; verifying checksum path="
-        << m_downloadTargetPath.toStdString();
+        << m_downloadTargetPath.toStdString()
+        << " size=" << QFileInfo(m_downloadTargetPath).size();
     downloadChecksumManifest();
     reply->deleteLater();
 }
@@ -713,7 +757,12 @@ void GitHubUpdateManager::downloadChecksumManifest()
             return;
         }
 
-        persistDownloadedInstaller(m_downloadTargetPath);
+        if (!persistDownloadedInstaller(m_downloadTargetPath)) {
+            QFile::remove(m_downloadTargetPath);
+            setState(State::Error,
+                tr("Could not persist the verified installer state. Open the release page and install manually."));
+            return;
+        }
         APP_LOG_INFO("update") << "Installer checksum verified from update manifest path="
             << m_downloadTargetPath.toStdString();
         setState(State::ReadyToInstall);
@@ -722,6 +771,9 @@ void GitHubUpdateManager::downloadChecksumManifest()
 
     if (!m_checksumManifestUrl.isValid() || m_checksumManifestUrl.isEmpty()) {
         QFile::remove(m_downloadTargetPath);
+        APP_LOG_ERROR("update") << "No checksum manifest is available for installer asset="
+            << m_selectedAsset.name.toStdString()
+            << " target=" << m_downloadTargetPath.toStdString();
         setState(State::Error,
             tr("The release does not include SHA256SUMS.txt, so the installer was not started automatically. Open the release page and install manually."));
         return;
@@ -741,7 +793,8 @@ void GitHubUpdateManager::downloadChecksumManifest()
     QNetworkProxy proxy = proxyForUrl(request.url());
     m_network->setProxy(proxy);
     APP_LOG_INFO("update") << "Downloading checksum manifest url="
-        << m_checksumManifestUrl.toString().toStdString();
+        << m_checksumManifestUrl.toString().toStdString()
+        << " proxy=" << proxyDescription(proxy).toStdString();
     m_checksumReply = m_network->get(request);
     connect(m_checksumReply, &QNetworkReply::finished,
         this, &GitHubUpdateManager::onChecksumFinished);
@@ -789,7 +842,13 @@ void GitHubUpdateManager::onChecksumFinished()
         return;
     }
 
-    persistDownloadedInstaller(m_downloadTargetPath);
+    if (!persistDownloadedInstaller(m_downloadTargetPath)) {
+        QFile::remove(m_downloadTargetPath);
+        setState(State::Error,
+            tr("Could not persist the verified installer state. Open the release page and install manually."));
+        reply->deleteLater();
+        return;
+    }
     APP_LOG_INFO("update") << "Installer checksum verified path="
         << m_downloadTargetPath.toStdString();
     setState(State::ReadyToInstall);
@@ -884,6 +943,12 @@ void GitHubUpdateManager::processLatestReleaseDocument(QByteArray const& bytes)
         manifestObject.value(QStringLiteral("assets")).toObject(),
         &m_checksumManifestUrl);
     clearOutdatedSuppression();
+    APP_LOG_INFO("update") << "Update manifest parsed latestVersion="
+        << m_latestVersion.toStdString()
+        << " releaseUrl=" << m_releaseUrl.toStdString()
+        << " asset=" << m_selectedAsset.name.toStdString()
+        << " assetKind=" << static_cast<int>(m_selectedAsset.kind)
+        << " checksumManifestUrl=" << m_checksumManifestUrl.toString().toStdString();
 
     if (versionNumberFor(m_latestVersion) <= versionNumberFor(m_currentVersion)) {
         setState(State::UpToDate);
@@ -933,6 +998,9 @@ bool GitHubUpdateManager::verifyDownloadedInstallerWithManifest(
     }
 
     if (expectedHash.isEmpty()) {
+        APP_LOG_ERROR("update") << "Checksum manifest did not contain selected asset"
+            << " asset=" << m_selectedAsset.name.toStdString()
+            << " lines=" << lines.size();
         errorMessage = tr("SHA256SUMS.txt does not contain a hash for %1. The installer was not started automatically.")
             .arg(m_selectedAsset.name);
         return false;
@@ -943,6 +1011,10 @@ bool GitHubUpdateManager::verifyDownloadedInstallerWithManifest(
         return false;
     }
     if (actualHash != expectedHash) {
+        APP_LOG_ERROR("update") << "Installer checksum mismatch path="
+            << m_downloadTargetPath.toStdString()
+            << " expected=" << expectedHash.toStdString()
+            << " actual=" << actualHash.toStdString();
         errorMessage = tr("The downloaded installer failed SHA-256 verification. Open the release page and install manually.");
         return false;
     }
@@ -1245,20 +1317,41 @@ void GitHubUpdateManager::clearOutdatedSuppression()
     }
 }
 
-void GitHubUpdateManager::persistDownloadedInstaller(QString const& path)
+bool GitHubUpdateManager::persistDownloadedInstaller(QString const& path)
 {
     m_downloadedInstallerPath = path;
     QString error;
     m_downloadedInstallerSha256 = sha256ForFile(path, error);
+    if (m_downloadedInstallerSha256.isEmpty()) {
+        APP_LOG_ERROR("update") << "Could not persist installer; checksum calculation failed path="
+            << path.toStdString()
+            << " error=" << error.toStdString();
+        m_downloadedInstallerPath.clear();
+        return false;
+    }
     m_settings->setValue(settingsDownloadedVersionKey(), m_latestVersion);
     m_settings->setValue(settingsDownloadedPathKey(), path);
     m_settings->setValue(settingsDownloadedSha256Key(), m_downloadedInstallerSha256);
+    m_settings->sync();
+    if (m_settings->status() != QSettings::NoError) {
+        APP_LOG_ERROR("update") << "Could not persist installer settings"
+            << " status=" << static_cast<int>(m_settings->status())
+            << " path=" << path.toStdString();
+        return false;
+    }
+    APP_LOG_INFO("update") << "Persisted verified installer path="
+        << path.toStdString()
+        << " sha256=" << m_downloadedInstallerSha256.toStdString();
+    return true;
 }
 
 QString GitHubUpdateManager::sha256ForFile(QString const& path, QString &errorMessage) const
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
+        APP_LOG_ERROR("update") << "Could not open installer for checksum path="
+            << path.toStdString()
+            << " error=" << file.errorString().toStdString();
         errorMessage = tr("Could not read the downloaded installer for checksum verification.");
         return {};
     }
@@ -1267,6 +1360,9 @@ QString GitHubUpdateManager::sha256ForFile(QString const& path, QString &errorMe
     while (!file.atEnd()) {
         QByteArray chunk = file.read(1024 * 1024);
         if (chunk.isEmpty() && file.error() != QFileDevice::NoError) {
+            APP_LOG_ERROR("update") << "Could not read installer for checksum path="
+                << path.toStdString()
+                << " error=" << file.errorString().toStdString();
             errorMessage = tr("Could not read the downloaded installer for checksum verification.");
             return {};
         }

@@ -147,7 +147,7 @@ private:
     bool latestVersionIgnored() const;
     bool reminderSuppressed() const;
     void clearOutdatedSuppression();
-    void persistDownloadedInstaller(QString const& path);
+    bool persistDownloadedInstaller(QString const& path);
     QString sha256ForFile(QString const& path, QString &errorMessage) const;
     void emitStartupSignalIfNeeded();
 

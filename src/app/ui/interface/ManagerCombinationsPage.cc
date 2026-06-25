@@ -17,9 +17,12 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
+#include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
+
+#include <exception>
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -53,6 +56,8 @@ constexpr int kCombinationTypeRole = Qt::UserRole;
 constexpr int kCombinationIdRole = Qt::UserRole + 1;
 constexpr int kCombinationPayloadRole = Qt::UserRole + 2;
 constexpr int kCombinationIsRestorableRole = Qt::UserRole + 3;
+constexpr int kMaxMascotsPerEntry = 50;
+constexpr int kMaxMascotsPerCombination = 200;
 
 enum class CombinationType {
     LastBeforeClose = 0,
@@ -73,11 +78,28 @@ QString formatSavedAt(QString const& isoDate)
     return savedAt.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
 }
 
-QJsonObject parseCombination(QString const& payload)
+QString sanitizedForLog(QString value)
 {
+    value = value.simplified();
+    if (value.size() > 180) {
+        value = value.left(177) + QStringLiteral("...");
+    }
+    return value;
+}
+
+QJsonObject parseCombination(QString const& payload, char const *context)
+{
+    if (payload.trimmed().isEmpty()) {
+        return {};
+    }
     QJsonParseError error;
     QJsonDocument document = QJsonDocument::fromJson(payload.toUtf8(), &error);
     if (error.error != QJsonParseError::NoError || !document.isObject()) {
+        APP_LOG_WARN("combination") << "Invalid combination payload context="
+            << (context == nullptr ? "unknown" : context)
+            << " parseError=" << error.errorString().toStdString()
+            << " size=" << payload.size()
+            << " preview=" << sanitizedForLog(payload).toStdString();
         return {};
     }
     return document.object();
@@ -116,9 +138,16 @@ QJsonObject currentCombinationObject(ShijimaManagerRuntimeState const& runtime)
 QJsonArray savedCombinationArray(QSettings const& settings)
 {
     QString payload = settings.value(kSavedCombinationsKey).toString();
+    if (payload.trimmed().isEmpty()) {
+        return {};
+    }
     QJsonParseError error;
     QJsonDocument document = QJsonDocument::fromJson(payload.toUtf8(), &error);
     if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        APP_LOG_WARN("combination") << "Invalid saved combination list"
+            << " parseError=" << error.errorString().toStdString()
+            << " size=" << payload.size()
+            << " preview=" << sanitizedForLog(payload).toStdString();
         return {};
     }
     return document.array();
@@ -138,17 +167,30 @@ QJsonObject savedCombinationById(QSettings const& settings, QString const& id)
     return {};
 }
 
-void writeSavedCombinationArray(QSettings& settings, QJsonArray const& array)
+bool writeSavedCombinationArray(QSettings& settings, QJsonArray const& array)
 {
     settings.setValue(kSavedCombinationsKey,
         QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact)));
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        APP_LOG_ERROR("combination") << "Failed to persist saved combinations"
+            << " status=" << static_cast<int>(settings.status())
+            << " count=" << array.size();
+        return false;
+    }
+    APP_LOG_INFO("combination") << "Saved combination list persisted count="
+        << array.size();
+    return true;
 }
 
 int totalMascotCount(QJsonObject const& combination)
 {
     int total = 0;
     for (auto const& value : combination.value(QStringLiteral("mascots")).toArray()) {
-        total += value.toObject().value(QStringLiteral("count")).toInt();
+        int count = value.toObject().value(QStringLiteral("count")).toInt();
+        if (count > 0) {
+            total += count;
+        }
     }
     return total;
 }
@@ -344,7 +386,7 @@ void ShijimaManager::setupCombinationsPage()
             }
             else {
                 QJsonObject combination = parseCombination(
-                    item->data(kCombinationPayloadRole).toString());
+                    item->data(kCombinationPayloadRole).toString(), "selection-details");
                 m_ui->combinationDetailsLabel->setText(
                     combinationDetails(item->text().section(QLatin1Char('\n'), 0, 0),
                         combination));
@@ -359,13 +401,14 @@ void ShijimaManager::setupCombinationsPage()
 void ShijimaManager::refreshCombinationPage()
 {
     if (m_ui->combinationListWidget == nullptr) {
+        APP_LOG_WARN("combination") << "Refresh requested before combination list was initialized";
         return;
     }
 
     m_ui->combinationListWidget->clear();
 
     QJsonObject lastCombination = parseCombination(
-        m_settings->value(kLastCombinationKey).toString());
+        m_settings->value(kLastCombinationKey).toString(), "last-before-close");
     QString lastPayload = combinationToPayload(lastCombination);
     auto *lastItem = new QListWidgetItem;
     lastItem->setText(tr("Last Combination Before Close") + QStringLiteral("\n") +
@@ -379,9 +422,16 @@ void ShijimaManager::refreshCombinationPage()
     m_ui->combinationListWidget->addItem(lastItem);
 
     QJsonArray saved = savedCombinationArray(*m_settings);
+    int skipped = 0;
     for (auto const& value : saved) {
         QJsonObject entry = value.toObject();
         QJsonObject combination = entry.value(QStringLiteral("combination")).toObject();
+        if (combination.isEmpty() || !combination.value(QStringLiteral("mascots")).isArray()) {
+            ++skipped;
+            APP_LOG_WARN("combination") << "Skipping invalid saved combination entry id="
+                << entry.value(QStringLiteral("id")).toString().toStdString();
+            continue;
+        }
         QString name = entry.value(QStringLiteral("name")).toString();
         if (name.isEmpty()) {
             name = tr("Untitled Combination");
@@ -396,6 +446,9 @@ void ShijimaManager::refreshCombinationPage()
         item->setSizeHint(QSize(0, 58));
         m_ui->combinationListWidget->addItem(item);
     }
+    APP_LOG_DEBUG("combination") << "Combination page refreshed saved="
+        << saved.size() << " skipped=" << skipped
+        << " lastRestorable=" << (totalMascotCount(lastCombination) > 0);
 
     if (m_ui->restoreCombinationButton != nullptr) {
         m_ui->restoreCombinationButton->setEnabled(false);
@@ -410,7 +463,32 @@ void ShijimaManager::refreshCombinationPage()
 
 void ShijimaManager::saveCurrentCombination()
 {
-    QJsonObject combination = currentCombinationObject(*m_runtime);
+    if (m_settings == nullptr || m_runtime == nullptr) {
+        APP_LOG_ERROR("combination") << "Cannot save combination; manager state is incomplete";
+        return;
+    }
+
+    QJsonObject combination;
+    try {
+        combination = currentCombinationObject(*m_runtime);
+    }
+    catch (std::exception const& ex) {
+        APP_LOG_ERROR("combination") << "Failed to collect current combination: "
+            << ex.what();
+        QMessageBox::warning(this, tr("Combinations"),
+            tr("Could not save the current combination."));
+        return;
+    }
+    catch (...) {
+        APP_LOG_ERROR("combination") << "Failed to collect current combination: unknown exception";
+        QMessageBox::warning(this, tr("Combinations"),
+            tr("Could not save the current combination."));
+        return;
+    }
+
+    int mascotCount = totalMascotCount(combination);
+    APP_LOG_INFO("combination") << "Save current combination requested mascotCount="
+        << mascotCount;
     if (totalMascotCount(combination) == 0) {
         QMessageBox::information(this,
             tr("Combinations"),
@@ -435,12 +513,21 @@ void ShijimaManager::saveCurrentCombination()
     }
 
     QJsonArray saved = savedCombinationArray(*m_settings);
+    QString id = QString::number(QDateTime::currentMSecsSinceEpoch());
     saved.append(QJsonObject {
-        { QStringLiteral("id"), QString::number(QDateTime::currentMSecsSinceEpoch()) },
+        { QStringLiteral("id"), id },
         { QStringLiteral("name"), name },
         { QStringLiteral("combination"), combination },
     });
-    writeSavedCombinationArray(*m_settings, saved);
+    if (!writeSavedCombinationArray(*m_settings, saved)) {
+        QMessageBox::warning(this,
+            tr("Combinations"),
+            tr("Could not save the combination settings."));
+        return;
+    }
+    APP_LOG_INFO("combination") << "Saved current combination id="
+        << id.toStdString() << " name=" << sanitizedForLog(name).toStdString()
+        << " mascotCount=" << mascotCount;
     refreshCombinationPage();
 }
 
@@ -454,7 +541,8 @@ void ShijimaManager::restoreSelectedCombination()
         return;
     }
 
-    QJsonObject combination = parseCombination(item->data(kCombinationPayloadRole).toString());
+    QJsonObject combination = parseCombination(
+        item->data(kCombinationPayloadRole).toString(), "selected-combination");
     if (totalMascotCount(combination) == 0) {
         QMessageBox::information(this,
             tr("Combinations"),
@@ -462,18 +550,58 @@ void ShijimaManager::restoreSelectedCombination()
         return;
     }
 
-    restoreCombination(combination, true);
+    try {
+        restoreCombination(combination, true);
+    }
+    catch (std::exception const& ex) {
+        APP_LOG_ERROR("combination") << "Failed to restore selected combination: "
+            << ex.what();
+        QMessageBox::warning(this, tr("Combinations"),
+            tr("Could not restore this combination."));
+    }
+    catch (...) {
+        APP_LOG_ERROR("combination") << "Failed to restore selected combination: unknown exception";
+        QMessageBox::warning(this, tr("Combinations"),
+            tr("Could not restore this combination."));
+    }
 }
 
 int ShijimaManager::restoreCombination(QJsonObject const& combination, bool showMessages)
 {
-    if (totalMascotCount(combination) == 0) {
+    int requestedTotal = totalMascotCount(combination);
+    if (requestedTotal == 0) {
+        APP_LOG_DEBUG("combination") << "Restore skipped for empty combination";
         return 0;
     }
 
-    killAll();
+    APP_LOG_INFO("combination") << "Restoring combination requestedTotal="
+        << requestedTotal << " showMessages=" << showMessages;
+
+    try {
+        killAll();
+    }
+    catch (std::exception const& ex) {
+        APP_LOG_ERROR("combination") << "Failed to clear running mascots before restore: "
+            << ex.what();
+        if (showMessages) {
+            QMessageBox::warning(this, tr("Combinations"),
+                tr("Could not clear the current mascots before restoring."));
+        }
+        return 0;
+    }
+    catch (...) {
+        APP_LOG_ERROR("combination") << "Failed to clear running mascots before restore: unknown exception";
+        if (showMessages) {
+            QMessageBox::warning(this, tr("Combinations"),
+                tr("Could not clear the current mascots before restoring."));
+        }
+        return 0;
+    }
+
     QStringList missing;
+    QStringList failed;
     int restored = 0;
+    int attempted = 0;
     for (auto const& value : combination.value(QStringLiteral("mascots")).toArray()) {
         QJsonObject savedMascot = value.toObject();
         QString name = savedMascot.value(QStringLiteral("name")).toString();
@@ -485,21 +613,62 @@ int ShijimaManager::restoreCombination(QJsonObject const& combination, bool show
             missing.append(name);
             continue;
         }
+        if (count > kMaxMascotsPerEntry) {
+            APP_LOG_WARN("combination") << "Clamping excessive mascot count name="
+                << name.toStdString() << " requested=" << count
+                << " limit=" << kMaxMascotsPerEntry;
+            count = kMaxMascotsPerEntry;
+        }
         for (int i = 0; i < count; ++i) {
-            if (spawn(name.toStdString()) != nullptr) {
-                ++restored;
+            if (attempted >= kMaxMascotsPerCombination) {
+                APP_LOG_WARN("combination") << "Combination restore reached safety limit limit="
+                    << kMaxMascotsPerCombination;
+                break;
             }
+            ++attempted;
+            try {
+                if (spawn(name.toStdString()) != nullptr) {
+                    ++restored;
+                }
+                else {
+                    failed.append(name);
+                }
+            }
+            catch (std::exception const& ex) {
+                failed.append(name);
+                APP_LOG_ERROR("combination") << "Mascot spawn failed during combination restore name="
+                    << name.toStdString() << " error=" << ex.what();
+            }
+            catch (...) {
+                failed.append(name);
+                APP_LOG_ERROR("combination") << "Mascot spawn failed during combination restore name="
+                    << name.toStdString() << " error=unknown";
+            }
+        }
+        if (attempted >= kMaxMascotsPerCombination) {
+            break;
         }
     }
 
     updateStatusBar();
+    missing.removeDuplicates();
+    failed.removeDuplicates();
+    APP_LOG_INFO("combination") << "Combination restore finished requested="
+        << requestedTotal << " attempted=" << attempted << " restored=" << restored
+        << " missing=" << missing.size() << " failed=" << failed.size();
     if (showMessages && !missing.isEmpty()) {
-        missing.removeDuplicates();
         QMessageBox::warning(this,
             tr("Combinations"),
             tr("Restored %1 mascot(s). Missing templates: %2")
                 .arg(restored)
                 .arg(missing.join(QStringLiteral(", "))));
+    }
+    else if (showMessages && !failed.isEmpty()) {
+        QMessageBox::warning(this,
+            tr("Combinations"),
+            tr("Restored %1 mascot(s). Some mascots could not be started: %2")
+                .arg(restored)
+                .arg(failed.join(QStringLiteral(", "))));
     }
     return restored;
 }
@@ -514,17 +683,36 @@ void ShijimaManager::restoreStartupCombination()
         QStringLiteral("last")).toString();
     QJsonObject combination;
     if (mode == QStringLiteral("last")) {
-        combination = parseCombination(m_settings->value(kLastCombinationKey).toString());
+        combination = parseCombination(m_settings->value(kLastCombinationKey).toString(),
+            "startup-last");
     }
     else if (mode == QStringLiteral("saved")) {
-        combination = savedCombinationById(*m_settings,
-            m_settings->value(QStringLiteral("startup/restoreCombinationId")).toString());
+        QString id = m_settings->value(QStringLiteral("startup/restoreCombinationId")).toString();
+        combination = savedCombinationById(*m_settings, id);
+        if (combination.isEmpty()) {
+            APP_LOG_WARN("combination") << "Startup saved combination not found id="
+                << id.toStdString();
+        }
     }
     else {
+        APP_LOG_WARN("combination") << "Unknown startup combination restore mode="
+            << mode.toStdString();
         return;
     }
 
-    restoreCombination(combination, false);
+    try {
+        int restored = restoreCombination(combination, false);
+        APP_LOG_INFO("combination") << "Startup combination restore finished mode="
+            << mode.toStdString() << " restored=" << restored;
+    }
+    catch (std::exception const& ex) {
+        APP_LOG_ERROR("combination") << "Startup combination restore failed mode="
+            << mode.toStdString() << " error=" << ex.what();
+    }
+    catch (...) {
+        APP_LOG_ERROR("combination") << "Startup combination restore failed mode="
+            << mode.toStdString() << " error=unknown";
+    }
 }
 
 void ShijimaManager::deleteSelectedCombination()
@@ -559,7 +747,14 @@ void ShijimaManager::deleteSelectedCombination()
             updated.append(entry);
         }
     }
-    writeSavedCombinationArray(*m_settings, updated);
+    if (!writeSavedCombinationArray(*m_settings, updated)) {
+        QMessageBox::warning(this,
+            tr("Delete Combination"),
+            tr("Could not update the saved combinations."));
+        return;
+    }
+    APP_LOG_INFO("combination") << "Deleted saved combination id="
+        << id.toStdString() << " remaining=" << updated.size();
     refreshCombinationPage();
 }
 
@@ -568,7 +763,14 @@ void ShijimaManager::saveLastCombinationBeforeShutdown()
     if (m_settings == nullptr || m_runtime == nullptr) {
         return;
     }
-    m_settings->setValue(kLastCombinationKey,
-        combinationToPayload(currentCombinationObject(*m_runtime)));
+    QJsonObject combination = currentCombinationObject(*m_runtime);
+    m_settings->setValue(kLastCombinationKey, combinationToPayload(combination));
     m_settings->sync();
+    if (m_settings->status() != QSettings::NoError) {
+        APP_LOG_ERROR("combination") << "Failed to persist last combination before shutdown"
+            << " status=" << static_cast<int>(m_settings->status());
+        return;
+    }
+    APP_LOG_INFO("combination") << "Last combination persisted before shutdown mascotCount="
+        << totalMascotCount(combination);
 }
