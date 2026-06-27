@@ -28,6 +28,7 @@ class PrivateActiveWindowObserver;
 class ActiveWindowObserver : public QObject {
 private:
     PrivateActiveWindowObserver *m_private = nullptr;
+    bool m_backendDeathReported = false;
 public:
     ActiveWindowObserver();
     int tickFrequency();

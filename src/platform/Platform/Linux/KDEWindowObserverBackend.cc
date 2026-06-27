@@ -35,7 +35,12 @@ KDEWindowObserverBackend::KDEWindowObserverBackend(): WindowObserverBackend(),
 }
 
 bool KDEWindowObserverBackend::alive() {
-    return isKWinScriptLoaded();
+    try {
+        return isKWinScriptLoaded();
+    }
+    catch (...) {
+        return false;
+    }
 }
 
 bool KDEWindowObserverBackend::isKWinScriptLoaded() {
@@ -69,9 +74,13 @@ void KDEWindowObserverBackend::startKWinScript() {
 }
 
 KDEWindowObserverBackend::~KDEWindowObserverBackend() {
-    if (alive()) {
-        KWin::stopScript(m_kwinScriptID);
-        KWin::unloadScript(m_kwinScriptName);
+    try {
+        if (alive()) {
+            KWin::stopScript(m_kwinScriptID);
+            KWin::unloadScript(m_kwinScriptName);
+        }
+    }
+    catch (...) {
     }
 }
 

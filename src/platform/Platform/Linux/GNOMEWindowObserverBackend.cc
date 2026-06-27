@@ -71,7 +71,12 @@ GNOMEWindowObserverBackend::~GNOMEWindowObserverBackend() {
 }
 
 bool GNOMEWindowObserverBackend::alive() {
-    return GNOME::isExtensionEnabled(m_gnomeScriptUUID);
+    try {
+        return GNOME::isExtensionEnabled(m_gnomeScriptUUID);
+    }
+    catch (...) {
+        return false;
+    }
 }
 
 }

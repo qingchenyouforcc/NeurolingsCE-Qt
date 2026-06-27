@@ -43,6 +43,7 @@ public:
     bool handleMessage(const QDBusMessage &message,
         const QDBusConnection &connection) override;
     bool alive() { return (m_backend == nullptr) || m_backend->alive(); }
+    void disableBackend() { m_backend.reset(); m_activeWindow = {}; m_previousActiveWindow = {}; }
     ActiveWindow getActiveWindow() { return m_activeWindow; }
 };
 

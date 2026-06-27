@@ -16,8 +16,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // 
 
-#include <stdexcept>
 #include "../ActiveWindowObserver.hpp"
+#include "shijima-qt/AppLog.hpp"
 #include "PrivateActiveWindowObserver.hpp"
 
 namespace Platform {
@@ -32,7 +32,11 @@ int ActiveWindowObserver::tickFrequency() {
 
 void ActiveWindowObserver::tick() {
     if (!m_private->alive()) {
-        throw std::runtime_error("Active window observer died");
+        if (!m_backendDeathReported) {
+            APP_LOG_WARN("platform") << "Active window observer backend died; disabling window tracking";
+            m_backendDeathReported = true;
+        }
+        m_private->disableBackend();
     }
 }
 

@@ -121,8 +121,10 @@ void initialize(int argc, char **argv) {
     sigaction(SIGTERM, &action, NULL);
     sigaction(SIGHUP, &action, NULL);
 
-    // Wayland does not allow windows to reposition themselves.
-    // Set WAYLAND_DISPLAY to an invalid value to prevent its use.
+    // Wayland does not allow windows to reposition themselves. The Linux
+    // platform backend below also uses X11-specific Qt native interfaces, so
+    // force Qt onto xcb before QApplication chooses a platform plugin.
+    setenv("QT_QPA_PLATFORM", "xcb", 1);
     setenv("WAYLAND_DISPLAY", "", 1);
 }
 
