@@ -357,10 +357,6 @@ ICO credits:
 
 **Join STNC to learn more**
 
-**STNC Swarm Tech Intelligence Center QQ Group: 125081756**
-
-**STNC Project Feedback QQ Group: 423902950**
-
 ## License
 
 This project is open-sourced under the [GNU General Public License v3.0](LICENSE).
