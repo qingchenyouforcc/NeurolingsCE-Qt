@@ -348,7 +348,6 @@ ICO credits:
 - **Author**: [轻尘呦](https://space.bilibili.com/178381315)
 - **Repository**: https://github.com/qingchenyouforcc/NeurolingsCE
 - **Bug Reports**: [GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE/issues)
-- **Feedback QQ Group**: 423902950
 - **Chat QQ Group**: 125081756
 
 **Interested in Neuro community project development?**
