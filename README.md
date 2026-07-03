@@ -350,7 +350,6 @@ NeurolingsCE/
 - **作者**：[轻尘呦](https://space.bilibili.com/178381315)
 - **项目地址**：https://github.com/qingchenyouforcc/NeurolingsCE
 - **问题反馈**：[GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE/issues)
-- **反馈 QQ 群**：423902950
 - **交流 QQ 群**：125081756
 
 **如果你对neuro社区项目开发感兴趣的话**
