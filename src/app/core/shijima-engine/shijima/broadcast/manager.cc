@@ -17,6 +17,7 @@
 // 
 
 #include "manager.hpp"
+#include <algorithm>
 #include <cmath>
 #include <shijima/log.hpp>
 
@@ -24,6 +25,15 @@ namespace shijima {
 namespace broadcast {
 
 //FIXME: This implementation does not scale well
+
+namespace {
+
+// ScanMove interactions should only claim a mascot that is already nearby.
+// Shimeji artwork conventionally uses a 128px canvas, so two canvas widths
+// leave enough room for a short approach without targeting across the desktop.
+constexpr double max_scan_distance = 256.0;
+
+}
 
 server manager::start_broadcast(std::string const& affordance, math::vec2 anchor) {
     #ifdef SHIJIMA_LOGGING_ENABLED
@@ -34,32 +44,41 @@ server manager::start_broadcast(std::string const& affordance, math::vec2 anchor
     return new_server;
 }
 
-bool manager::try_connect(client &peer, double y, std::string const& affordance,
+bool manager::try_connect(client &peer, math::vec2 anchor,
+    std::string const& affordance,
     std::string const& client_behavior, std::string const& server_behavior)
 {
     #ifdef SHIJIMA_LOGGING_ENABLED
         log(SHIJIMA_LOG_BROADCASTS, "Trying to connect: " + affordance);
     #endif
     auto &servers = m_servers[affordance];
-    for (long i=0; i<(long)servers.size(); ++i) {
-        auto &server = servers[i];
-        if (!server.active()) {
-            servers.erase(servers.begin() + i);
-            --i;
+    servers.erase(std::remove_if(servers.begin(), servers.end(),
+        [](server &candidate) { return !candidate.active(); }), servers.end());
+
+    server *nearest = nullptr;
+    double nearest_distance = max_scan_distance;
+    for (auto &candidate : servers) {
+        auto target = candidate.get_anchor();
+        double distance = std::fabs(anchor.x - target.x);
+        if (std::fabs(anchor.y - target.y) > 1 ||
+            distance > max_scan_distance || !candidate.available())
+        {
             continue;
         }
-        if (std::fabs(y - server.get_anchor().y) > 1) {
-            continue;
-        }
-        if (server.available()) {
-            peer = server.connect(client_behavior, server_behavior);
-            #ifdef SHIJIMA_LOGGING_ENABLED
-                log(SHIJIMA_LOG_BROADCASTS, "Connected: " + affordance);
-            #endif
-            return true;
+        if (nearest == nullptr || distance < nearest_distance) {
+            nearest = &candidate;
+            nearest_distance = distance;
         }
     }
-    return false;
+    if (nearest == nullptr) {
+        return false;
+    }
+
+    peer = nearest->connect(client_behavior, server_behavior);
+    #ifdef SHIJIMA_LOGGING_ENABLED
+        log(SHIJIMA_LOG_BROADCASTS, "Connected: " + affordance);
+    #endif
+    return true;
 }
 
 }

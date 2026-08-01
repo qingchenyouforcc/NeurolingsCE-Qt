@@ -20,6 +20,7 @@
 #include "shijima-qt/MascotApi.hpp"
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/SafePath.hpp"
+#include "core/shijima-engine/shijima/broadcast/manager.hpp"
 #include "core/shijima-engine/shijima/scripting/context.hpp"
 
 #include <QJsonArray>
@@ -572,6 +573,34 @@ void testScriptExecutionTimeout() {
         "script execution timeout should interrupt an infinite loop");
 }
 
+void testBroadcastTargetsNearbyMascots() {
+    shijima::broadcast::manager broadcasts;
+    auto far = broadcasts.start_broadcast("CuddleEvil", { 500, 100 });
+    shijima::broadcast::client client;
+
+    expect(!broadcasts.try_connect(client, { 0, 100 }, "CuddleEvil",
+        "IHugYou", "IAmHugged"),
+        "scan interactions should reject distant mascot targets");
+    expect(!client.connected(),
+        "a rejected distant target should not connect the client");
+    expect(far.available(),
+        "a rejected distant target should remain available");
+
+    auto near = broadcasts.start_broadcast("CuddleEvil", { 200, 100 });
+    auto nearest = broadcasts.start_broadcast("CuddleEvil", { 64, 100 });
+    expect(broadcasts.try_connect(client, { 0, 100 }, "CuddleEvil",
+        "IHugYou", "IAmHugged"),
+        "scan interactions should connect to a nearby mascot target");
+    expect(client.connected(),
+        "an accepted nearby target should connect the client");
+    expect(client.get_target().x == 64,
+        "scan interactions should prefer the nearest available target");
+    expect(near.available(),
+        "a farther nearby target should remain available");
+    expect(!nearest.available(),
+        "the selected nearest target should be reserved");
+}
+
 }
 
 int main() {
@@ -585,6 +614,7 @@ int main() {
     testCommandDispatcher();
     testSafeChildPath();
     testScriptExecutionTimeout();
+    testBroadcastTargetsNearbyMascots();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

@@ -32,7 +32,7 @@ private:
     std::map<std::string, std::vector<server>> m_servers;
 public:
     server start_broadcast(std::string const& affordance, math::vec2 anchor);
-    bool try_connect(client &peer, double y, std::string const& affordance,
+    bool try_connect(client &peer, math::vec2 anchor, std::string const& affordance,
         std::string const& client_behavior, std::string const& server_behavior);
 };
 

@@ -32,7 +32,7 @@ void scanmove::init(mascot::tick &ctx) {
     if (mascot->env == nullptr || mascot->env->broadcasts == nullptr) {
         return;
     }
-    mascot->env->broadcasts->try_connect(client, mascot->anchor.y,
+    mascot->env->broadcasts->try_connect(client, mascot->anchor,
         vars.get_string("Affordance"), vars.get_string("Behavior"),
         vars.get_string("TargetBehavior"));
 }
