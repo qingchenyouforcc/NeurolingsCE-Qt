@@ -92,6 +92,18 @@
         <translation>尚未检查压缩包。</translation>
     </message>
     <message>
+        <source>Description</source>
+        <translation>描述</translation>
+    </message>
+    <message>
+        <source>Select a mascot to view its description.</source>
+        <translation>选择桌宠后查看其描述。</translation>
+    </message>
+    <message>
+        <source>No description provided.</source>
+        <translation>未提供描述。</translation>
+    </message>
+    <message>
         <source>Choose an output folder</source>
         <translation>选择输出文件夹</translation>
     </message>

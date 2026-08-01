@@ -60,6 +60,17 @@ static QImage loadPreviewImage(QString const& filePath) {
     return frame;
 }
 
+static QString findFileCaseInsensitive(QDir const& dir, QString const& fileName) {
+    auto entries = dir.entryInfoList(QDir::Files | QDir::Readable,
+        QDir::Name | QDir::IgnoreCase);
+    for (auto const& entry : entries) {
+        if (entry.fileName().compare(fileName, Qt::CaseInsensitive) == 0) {
+            return entry.absoluteFilePath();
+        }
+    }
+    return {};
+}
+
 MascotData::MascotData(): m_valid(false) {}
 
 MascotData::MascotData(QString const& path, int id):
@@ -104,7 +115,9 @@ MascotData::MascotData(QString const& packagePath, QString const& cachePath, int
         shijima::parser parser;
         parser.parse(m_actionsXML.toStdString(), m_behaviorsXML.toStdString());
     }
-    dir.cd("img");
+    if (!dir.cd("img")) {
+        throw std::runtime_error("mascot package does not contain an img directory");
+    }
     m_imgRoot = QDir::cleanPath(cachePath + QDir::separator() + "img");
     QDirIterator iter { dir.absolutePath(), QDir::Files,
         QDirIterator::NoIteratorFlags };
@@ -112,7 +125,7 @@ MascotData::MascotData(QString const& packagePath, QString const& cachePath, int
     while (iter.hasNext()) {
         auto entry = iter.nextFileInfo();
         auto basename = entry.fileName();
-        if (basename.endsWith(".png")) {
+        if (basename.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive)) {
             images.append(basename);
         }
     }
@@ -120,8 +133,14 @@ MascotData::MascotData(QString const& packagePath, QString const& cachePath, int
     if (images.isEmpty()) {
         throw std::runtime_error("mascot package does not contain preview images");
     }
-    QImage preview = renderPreview(loadPreviewImage(
-        dir.absoluteFilePath(images[0])));
+    QString previewPath = findFileCaseInsensitive(dir, QStringLiteral("a.png"));
+    if (previewPath.isEmpty()) {
+        previewPath = findFileCaseInsensitive(dir, QStringLiteral("cover.png"));
+    }
+    if (previewPath.isEmpty()) {
+        previewPath = dir.absoluteFilePath(images[0]);
+    }
+    QImage preview = renderPreview(loadPreviewImage(previewPath));
     m_preview = QPixmap::fromImage(preview);
 }
 

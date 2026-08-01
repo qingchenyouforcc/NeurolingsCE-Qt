@@ -843,6 +843,59 @@ void writeFallbackMetadata(QString const& sourcePath, QString const& fallbackNam
     }
 }
 
+void tryExtractInfoJson(QString const& archivePath, QString const& mascotName,
+    QString const& targetPath)
+{
+    QString targetFile = QDir(targetPath).absoluteFilePath(
+        QStringLiteral("info.json"));
+    if (QFile::exists(targetFile)) {
+        return;
+    }
+
+    shimejifinder::libunarr::archive archive;
+    QString error;
+    if (!openPackage(archivePath, archive, error)) {
+        return;
+    }
+
+    QString mascot = mascotName.toLower();
+    QString mascotDirectory = mascot + QStringLiteral(".mascot");
+    QString rootMatch;
+    QString mascotMatch;
+    for (size_t i = 0; i < archive.size(); ++i) {
+        QString path = normalizedArchivePath(
+            QString::fromStdString(archive.at(i)->path()));
+        QStringList parts = path.toLower().split(QLatin1Char('/'),
+            Qt::SkipEmptyParts);
+        if (parts.isEmpty() || parts.constLast() != QStringLiteral("info.json")) {
+            continue;
+        }
+        if (parts.size() == 1) {
+            rootMatch = path;
+        }
+        else if (parts[parts.size() - 2] == mascot ||
+            parts[parts.size() - 2] == mascotDirectory)
+        {
+            mascotMatch = path;
+            break;
+        }
+    }
+
+    QString sourcePath = mascotMatch.isEmpty() ? rootMatch : mascotMatch;
+    if (sourcePath.isEmpty()) {
+        return;
+    }
+    QByteArray bytes = readPackageFile(archivePath, sourcePath, error);
+    if (bytes.isEmpty()) {
+        return;
+    }
+    QSaveFile out(targetFile);
+    if (out.open(QFile::WriteOnly)) {
+        out.write(bytes);
+        out.commit();
+    }
+}
+
 void tryExtractBubbleContext(QString const& archivePath, QString const& mascotName,
     QString const& targetPath)
 {
@@ -884,6 +937,85 @@ void tryExtractBubbleContext(QString const& archivePath, QString const& mascotNa
     if (out.open(QFile::WriteOnly)) {
         out.write(bytes);
         out.commit();
+    }
+}
+
+bool legacyPreviewPathMatchesMascot(QString const& path,
+    QString const& mascotName)
+{
+    QStringList parts = path.toLower().split(QLatin1Char('/'),
+        Qt::SkipEmptyParts);
+    if (parts.size() < 2) {
+        return false;
+    }
+
+    qsizetype imgIndex = parts.indexOf(QStringLiteral("img"));
+    if (imgIndex < 0 || imgIndex >= parts.size() - 1) {
+        return false;
+    }
+
+    QString mascot = mascotName.toLower();
+    QString mascotDirectory = mascot + QStringLiteral(".mascot");
+    if (imgIndex == 0 && parts.size() == 2) {
+        return true;
+    }
+    if (imgIndex > 0 &&
+        (parts[imgIndex - 1] == mascot ||
+            parts[imgIndex - 1] == mascotDirectory))
+    {
+        return true;
+    }
+    return imgIndex + 2 < parts.size() &&
+        (parts[imgIndex + 1] == mascot ||
+            parts[imgIndex + 1] == mascotDirectory);
+}
+
+void tryExtractPreviewImages(QString const& archivePath,
+    QString const& mascotName, QString const& targetPath)
+{
+    shimejifinder::libunarr::archive archive;
+    QString error;
+    if (!openPackage(archivePath, archive, error)) {
+        return;
+    }
+
+    QDir imgDir(QDir(targetPath).absoluteFilePath(QStringLiteral("img")));
+    static QStringList const previewFileNames {
+        QStringLiteral("a.png"),
+        QStringLiteral("cover.png"),
+    };
+    for (auto const& fileName : previewFileNames) {
+        if (QFile::exists(imgDir.absoluteFilePath(fileName))) {
+            continue;
+        }
+
+        QString sourcePath;
+        for (size_t i = 0; i < archive.size(); ++i) {
+            QString path = normalizedArchivePath(
+                QString::fromStdString(archive.at(i)->path()));
+            if (path.section(QLatin1Char('/'), -1).compare(fileName,
+                    Qt::CaseInsensitive) == 0 &&
+                legacyPreviewPathMatchesMascot(path, mascotName))
+            {
+                sourcePath = path;
+                break;
+            }
+        }
+        if (sourcePath.isEmpty()) {
+            continue;
+        }
+
+        QByteArray bytes = readPackageFile(archivePath, sourcePath, error);
+        if (bytes.isEmpty() ||
+            (!imgDir.exists() && !QDir().mkpath(imgDir.absolutePath())))
+        {
+            continue;
+        }
+        QSaveFile out(imgDir.absoluteFilePath(fileName));
+        if (out.open(QFile::WriteOnly)) {
+            out.write(bytes);
+            out.commit();
+        }
     }
 }
 
@@ -1309,6 +1441,7 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
             QString qName = QString::fromStdString(name);
             seenNames.insert(qName);
             QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
+            tryExtractInfoJson(archiveInfo.absoluteFilePath(), qName, sourcePath);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
             analysis.candidates.append(inspectLegacyDirectory(sourcePath, qName));
         }
@@ -1431,7 +1564,10 @@ QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
             LegacyMascotConversionResult result;
             result.name = qName;
             QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
+            tryExtractInfoJson(archiveInfo.absoluteFilePath(), qName, sourcePath);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
+            tryExtractPreviewImages(archiveInfo.absoluteFilePath(), qName,
+                sourcePath);
 
             auto candidate = inspectLegacyDirectory(sourcePath, qName);
             result.name = candidate.metadata.name;
@@ -1532,7 +1668,10 @@ std::set<std::string> importArchive(QString const& archivePath,
         for (auto const& name : archive->shimejis()) {
             QString qName = QString::fromStdString(name);
             QString sourcePath = extractedLegacyMascotPath(tempDir.path(), qName);
+            tryExtractInfoJson(archiveInfo.absoluteFilePath(), qName, sourcePath);
             tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
+            tryExtractPreviewImages(archiveInfo.absoluteFilePath(), qName,
+                sourcePath);
             QString installedName;
             if (packageLegacyDirectory(sourcePath, storagePath, qName,
                 installedName, error))

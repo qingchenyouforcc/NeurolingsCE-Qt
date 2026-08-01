@@ -386,15 +386,18 @@ void testLegacyArchiveAnalysisAndConversion() {
     alphaMetadata.name = QStringLiteral("Alpha");
     alphaMetadata.version = QStringLiteral("1.0");
     alphaMetadata.author = QStringLiteral("tester");
+    alphaMetadata.description = QStringLiteral("Alpha mascot description");
 
     std::vector<TestZipEntry> entries {
         { QStringLiteral("Alpha/actions.xml"), minimalActionsXml() },
         { QStringLiteral("Alpha/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Alpha/img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("Alpha/img/a.png"), minimalPngBytes() },
         { QStringLiteral("Alpha/info.json"), MascotPackage::metadataToJson(alphaMetadata) },
         { QStringLiteral("Beta/actions.xml"), minimalActionsXml() },
         { QStringLiteral("Beta/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Beta/img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("Beta/img/cover.png"), minimalPngBytes() },
         { QStringLiteral("Broken/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Broken/img/shime1.png"), minimalPngBytes() },
     };
@@ -416,6 +419,10 @@ void testLegacyArchiveAnalysisAndConversion() {
     auto *alpha = findCandidate(QStringLiteral("Alpha"));
     expect(alpha != nullptr && alpha->convertible,
         "valid candidate with metadata should be convertible");
+    expect(alpha != nullptr && alpha->metadata.version == QStringLiteral("1.0") &&
+        alpha->metadata.author == QStringLiteral("tester") &&
+        alpha->metadata.description == QStringLiteral("Alpha mascot description"),
+        "legacy analysis should preserve info.json metadata");
     auto *beta = findCandidate(QStringLiteral("Beta"));
     expect(beta != nullptr && beta->convertible && beta->generatedMetadata,
         "candidate without info.json should use fallback metadata");
@@ -451,6 +458,22 @@ void testLegacyArchiveAnalysisAndConversion() {
         QString error;
         expect(MascotPackage::inspectPackage(result.packagePath, metadata, error),
             "converted package should pass package inspection");
+        if (result.name == QStringLiteral("Alpha")) {
+            expect(metadata.version == QStringLiteral("1.0") &&
+                metadata.author == QStringLiteral("tester") &&
+                metadata.description == QStringLiteral("Alpha mascot description"),
+                "converted package should preserve info.json metadata");
+        }
+
+        QString extractedPath = QDir(temp.path()).absoluteFilePath(
+            QStringLiteral("verify-") + result.name);
+        expect(MascotPackage::extractPackage(result.packagePath, extractedPath,
+            error), "converted package should extract for preview verification");
+        QString previewName = result.name == QStringLiteral("Alpha")
+            ? QStringLiteral("a.png") : QStringLiteral("cover.png");
+        expect(QFile::exists(QDir(extractedPath).absoluteFilePath(
+            QStringLiteral("img/") + previewName)),
+            "conversion should preserve the mascot GUI preview image");
     }
 }
 

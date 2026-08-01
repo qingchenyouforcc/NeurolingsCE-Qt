@@ -192,9 +192,28 @@ void ShijimaManager::setupCreatePage()
     candidateLayout->addWidget(statusLabel);
     auto *candidateList = new QListWidget(candidatePanel);
     candidateList->setMinimumHeight(150);
-    candidateList->setSelectionMode(QListWidget::NoSelection);
+    candidateList->setSelectionMode(QListWidget::SingleSelection);
     candidateLayout->addWidget(candidateList, 1);
+    auto *descriptionLabel = new QLabel(tr("Description"), candidatePanel);
+    candidateLayout->addWidget(descriptionLabel);
+    auto *descriptionText = new QPlainTextEdit(candidatePanel);
+    descriptionText->setReadOnly(true);
+    descriptionText->setMinimumHeight(72);
+    descriptionText->setMaximumHeight(110);
+    descriptionText->setPlaceholderText(tr("Select a mascot to view its description."));
+    candidateLayout->addWidget(descriptionText);
     root->addWidget(candidatePanel, 1);
+
+    connect(candidateList, &QListWidget::currentItemChanged, this,
+        [this, descriptionText](QListWidgetItem *current) {
+            if (current == nullptr) {
+                descriptionText->clear();
+                return;
+            }
+            QString description = current->data(Qt::UserRole + 1).toString();
+            descriptionText->setPlainText(description.isEmpty()
+                ? tr("No description provided.") : description);
+        });
 
     auto *outputPanel = makeCreatePanel(m_ui->createPage);
     auto *outputLayout = new QVBoxLayout(outputPanel);
@@ -223,7 +242,8 @@ void ShijimaManager::setupCreatePage()
     outputLayout->addWidget(resultText);
     root->addWidget(outputPanel);
 
-    connect(chooseZipButton, &ElaPushButton::clicked, this, [this, zipEdit, candidateList, statusLabel, resultText]() {
+    connect(chooseZipButton, &ElaPushButton::clicked, this, [this, zipEdit,
+        candidateList, statusLabel, descriptionText, resultText]() {
         QString path = QFileDialog::getOpenFileName(this, tr("Choose Shimeji Zip Archive"),
             QString(), tr("Zip Archives (*.zip);;All Files (*)"));
         if (path.isEmpty()) {
@@ -231,6 +251,7 @@ void ShijimaManager::setupCreatePage()
         }
         zipEdit->setText(path);
         candidateList->clear();
+        descriptionText->clear();
         statusLabel->setText(tr("Archive selected. Run content check before generating."));
         resultText->clear();
     });
@@ -243,7 +264,8 @@ void ShijimaManager::setupCreatePage()
     });
 
     connect(checkButton, &ElaPushButton::clicked, this,
-        [this, zipEdit, candidateList, statusLabel, checkButton, resultText]() {
+        [this, zipEdit, candidateList, statusLabel, descriptionText,
+            checkButton, resultText]() {
             QString path = zipEdit->text().trimmed();
             if (path.isEmpty()) {
                 QMessageBox::warning(this, tr("Create"), tr("Choose a .zip archive first."));
@@ -252,13 +274,16 @@ void ShijimaManager::setupCreatePage()
             checkButton->setEnabled(false);
             statusLabel->setText(tr("Checking archive content..."));
             candidateList->clear();
+            descriptionText->clear();
             resultText->clear();
 
             QtConcurrent::run([path]() {
                 return MascotPackage::analyzeLegacyArchive(path);
-            }).then([this, candidateList, statusLabel, checkButton](LegacyArchiveAnalysis analysis) {
+            }).then([this, candidateList, statusLabel, descriptionText,
+                checkButton](LegacyArchiveAnalysis analysis) {
                 ShijimaManagerRuntimeInternal::dispatchToMainThread(
-                    [this, candidateList, statusLabel, checkButton, analysis]() {
+                    [this, candidateList, statusLabel, descriptionText,
+                        checkButton, analysis]() {
                         checkButton->setEnabled(true);
                         candidateList->clear();
                         if (analysis.candidates.isEmpty()) {
@@ -275,6 +300,8 @@ void ShijimaManager::setupCreatePage()
                             }
                             auto *item = new QListWidgetItem(candidate.metadata.name);
                             item->setData(Qt::UserRole, candidate.name);
+                            item->setData(Qt::UserRole + 1,
+                                candidate.metadata.description);
                             item->setToolTip(candidateDetails(candidate));
                             item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
                             item->setCheckState(candidate.convertible
@@ -283,6 +310,10 @@ void ShijimaManager::setupCreatePage()
                                 item->setFlags(item->flags() & ~Qt::ItemIsEnabled);
                             }
                             candidateList->addItem(item);
+                        }
+
+                        if (candidateList->count() > 0) {
+                            candidateList->setCurrentRow(0);
                         }
 
                         statusLabel->setText(tr("Found %1 mascot(s), %2 ready to convert.")
