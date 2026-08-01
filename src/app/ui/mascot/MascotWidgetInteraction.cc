@@ -99,6 +99,11 @@ void ShijimaWidget::mouseDoubleClickEvent(QMouseEvent *event) {
         return;
     }
 
+    auto targetEnvironment = m_dragTarget->env();
+    if (targetEnvironment == nullptr || !targetEnvironment->allows_breeding) {
+        return;
+    }
+
     ShijimaManager::defaultManager()->spawn(
         m_dragTarget->mascotName().toStdString());
 }
