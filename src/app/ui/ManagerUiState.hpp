@@ -47,6 +47,9 @@ struct ShijimaManagerUiState {
     QLabel *mascotVersionLabel = nullptr;
     QLabel *mascotAuthorLabel = nullptr;
     QLabel *mascotDescriptionLabel = nullptr;
+    QWidget *mascotEmptyStateWidget = nullptr;
+    QWidget *spawnRandomButton = nullptr;
+    QWidget *deleteMascotButton = nullptr;
     QWidget *homePage = nullptr;
     QWidget *createPage = nullptr;
     QWidget *combinationsPage = nullptr;

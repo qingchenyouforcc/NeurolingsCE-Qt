@@ -62,6 +62,62 @@
         <source>Show Folder</source>
         <translation>打开文件夹</translation>
     </message>
+    <message>
+        <source>Mascot Manager</source>
+        <translation>桌宠管理器</translation>
+    </message>
+    <message>
+        <source>Browse your mascot library, start companions, and manage installed packages.</source>
+        <translation>浏览桌宠库、启动桌面伙伴并管理已安装的桌宠包。</translation>
+    </message>
+    <message>
+        <source>Spawn a random mascot from the library.</source>
+        <translation>从桌宠库中随机生成一个桌宠。</translation>
+    </message>
+    <message>
+        <source>Import mascot packages or Shimeji archives.</source>
+        <translation>导入桌宠包或 Shimeji 压缩包。</translation>
+    </message>
+    <message>
+        <source>Reload mascot packages from the library folder.</source>
+        <translation>重新加载桌宠库文件夹中的桌宠包。</translation>
+    </message>
+    <message>
+        <source>Open the mascot library folder.</source>
+        <translation>打开桌宠库文件夹。</translation>
+    </message>
+    <message>
+        <source>Mascot Library</source>
+        <translation>桌宠库</translation>
+    </message>
+    <message>
+        <source>Installed mascot templates. Use arrow keys to select and Enter to spawn.</source>
+        <translation>已安装的桌宠模板。使用方向键选择，按 Enter 键生成。</translation>
+    </message>
+    <message>
+        <source>No imported mascots yet</source>
+        <translation>尚未导入桌宠</translation>
+    </message>
+    <message>
+        <source>Import a .mascot package or Shimeji archive to get started.</source>
+        <translation>导入 .mascot 包或 Shimeji 压缩包即可开始使用。</translation>
+    </message>
+    <message>
+        <source>Import Mascot...</source>
+        <translation>导入桌宠...</translation>
+    </message>
+    <message>
+        <source>Import a mascot package or Shimeji archive.</source>
+        <translation>导入桌宠包或 Shimeji 压缩包。</translation>
+    </message>
+    <message>
+        <source>Delete Selected</source>
+        <translation>删除所选项</translation>
+    </message>
+    <message>
+        <source>Delete the selected mascot packages.</source>
+        <translation>删除选中的桌宠包。</translation>
+    </message>
     <!-- Create page -->
     <message>
         <source>Create</source>
@@ -74,6 +130,42 @@
     <message>
         <source>Check a Shimeji zip archive, choose the mascots to convert, and write .mascot packages to a folder you choose.</source>
         <translation>检查 Shimeji zip 压缩包，选择要转换的桌宠，并将 .mascot 包写入你选择的文件夹。</translation>
+    </message>
+    <message>
+        <source>Step 1</source>
+        <translation>第 1 步</translation>
+    </message>
+    <message>
+        <source>Choose a Shimeji archive</source>
+        <translation>选择 Shimeji 压缩包</translation>
+    </message>
+    <message>
+        <source>Select the .zip archive that contains the mascots you want to convert.</source>
+        <translation>选择包含待转换桌宠的 .zip 压缩包。</translation>
+    </message>
+    <message>
+        <source>Shimeji archive</source>
+        <translation>Shimeji 压缩包</translation>
+    </message>
+    <message>
+        <source>No archive selected</source>
+        <translation>尚未选择压缩包</translation>
+    </message>
+    <message>
+        <source>Shimeji archive path</source>
+        <translation>Shimeji 压缩包路径</translation>
+    </message>
+    <message>
+        <source>Path to the selected Shimeji zip archive.</source>
+        <translation>所选 Shimeji zip 压缩包的路径。</translation>
+    </message>
+    <message>
+        <source>Choose a Shimeji zip archive to inspect.</source>
+        <translation>选择要检查的 Shimeji zip 压缩包。</translation>
+    </message>
+    <message>
+        <source>Inspect the selected archive and find convertible mascots.</source>
+        <translation>检查所选压缩包并查找可转换的桌宠。</translation>
     </message>
     <message>
         <source>Choose a .zip archive</source>
@@ -92,6 +184,34 @@
         <translation>尚未检查压缩包。</translation>
     </message>
     <message>
+        <source>Step 2</source>
+        <translation>第 2 步</translation>
+    </message>
+    <message>
+        <source>Review mascots</source>
+        <translation>检查桌宠</translation>
+    </message>
+    <message>
+        <source>Select the valid mascots to include in this conversion.</source>
+        <translation>选择本次要转换的有效桌宠。</translation>
+    </message>
+    <message>
+        <source>Select mascots to convert, then review or edit each complete info.json file.</source>
+        <translation>选择要转换的桌宠，然后检查或修改每个桌宠的完整 info.json 文件。</translation>
+    </message>
+    <message>
+        <source>Archive check status</source>
+        <translation>压缩包检查状态</translation>
+    </message>
+    <message>
+        <source>Mascots in archive</source>
+        <translation>压缩包中的桌宠</translation>
+    </message>
+    <message>
+        <source>Check the mascots that should be converted.</source>
+        <translation>勾选需要转换的桌宠。</translation>
+    </message>
+    <message>
         <source>Description</source>
         <translation>描述</translation>
     </message>
@@ -100,12 +220,96 @@
         <translation>选择桌宠后查看其描述。</translation>
     </message>
     <message>
+        <source>Selected mascot description</source>
+        <translation>所选桌宠的描述</translation>
+    </message>
+    <message>
+        <source>Description of the currently selected mascot.</source>
+        <translation>当前所选桌宠的描述。</translation>
+    </message>
+    <message>
         <source>No description provided.</source>
         <translation>未提供描述。</translation>
     </message>
     <message>
+        <source>info.json</source>
+        <translation>info.json</translation>
+    </message>
+    <message>
+        <source>Select a mascot to view and edit its complete info.json file.</source>
+        <translation>选择桌宠后查看并修改其完整 info.json 文件。</translation>
+    </message>
+    <message>
+        <source>Selected mascot info.json editor</source>
+        <translation>所选桌宠的 info.json 编辑器</translation>
+    </message>
+    <message>
+        <source>Complete editable JSON metadata for the currently selected mascot.</source>
+        <translation>当前所选桌宠的完整可编辑 JSON 元数据。</translation>
+    </message>
+    <message>
+        <source>Select a mascot to edit its metadata.</source>
+        <translation>选择桌宠以修改其元数据。</translation>
+    </message>
+    <message>
+        <source>info.json validation status</source>
+        <translation>info.json 验证状态</translation>
+    </message>
+    <message>
+        <source>Valid JSON.</source>
+        <translation>JSON 有效。</translation>
+    </message>
+    <message>
+        <source>Checking JSON...</source>
+        <translation>正在检查 JSON...</translation>
+    </message>
+    <message>
+        <source>Invalid JSON: %1</source>
+        <translation>JSON 无效：%1</translation>
+    </message>
+    <message>
+        <source>Fix invalid info.json content before generating.</source>
+        <translation>生成前请修正无效的 info.json 内容。</translation>
+    </message>
+    <message>
+        <source>Fix invalid info.json content before converting.</source>
+        <translation>转换前请修正无效的 info.json 内容。</translation>
+    </message>
+    <message>
         <source>Choose an output folder</source>
         <translation>选择输出文件夹</translation>
+    </message>
+    <message>
+        <source>Step 3</source>
+        <translation>第 3 步</translation>
+    </message>
+    <message>
+        <source>Generate mascot packages</source>
+        <translation>生成桌宠包</translation>
+    </message>
+    <message>
+        <source>Choose where to save the converted .mascot packages, then generate them.</source>
+        <translation>选择转换后的 .mascot 包保存位置，然后生成桌宠包。</translation>
+    </message>
+    <message>
+        <source>Output folder</source>
+        <translation>输出文件夹</translation>
+    </message>
+    <message>
+        <source>No output folder selected</source>
+        <translation>尚未选择输出文件夹</translation>
+    </message>
+    <message>
+        <source>Output folder path</source>
+        <translation>输出文件夹路径</translation>
+    </message>
+    <message>
+        <source>Folder where converted mascot packages will be saved.</source>
+        <translation>转换后的桌宠包保存到此文件夹。</translation>
+    </message>
+    <message>
+        <source>Choose the folder for converted mascot packages.</source>
+        <translation>选择转换后桌宠包的保存文件夹。</translation>
     </message>
     <message>
         <source>Choose Folder...</source>
@@ -114,6 +318,18 @@
     <message>
         <source>Generate .mascot</source>
         <translation>生成 .mascot</translation>
+    </message>
+    <message>
+        <source>Generate packages for the checked mascots.</source>
+        <translation>为勾选的桌宠生成桌宠包。</translation>
+    </message>
+    <message>
+        <source>Conversion results</source>
+        <translation>转换结果</translation>
+    </message>
+    <message>
+        <source>Results from the most recent package conversion.</source>
+        <translation>最近一次桌宠包转换的结果。</translation>
     </message>
     <message>
         <source>Conversion results will appear here.</source>
@@ -146,6 +362,18 @@
     <message>
         <source>No Shimeji mascots were found in the archive.</source>
         <translation>压缩包中没有找到 Shimeji 桌宠。</translation>
+    </message>
+    <message numerus="yes">
+        <source>Found %n mascot(s).</source>
+        <translation>
+            <numerusform>找到 %n 个桌宠。</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n ready to convert.</source>
+        <translation>
+            <numerusform>%n 个可转换。</numerusform>
+        </translation>
     </message>
     <message>
         <source>Found %1 mascot(s), %2 ready to convert.</source>
@@ -216,6 +444,150 @@
     <message>
         <source>Missing info.json; fallback metadata will be generated</source>
         <translation>缺少 info.json；将生成备用元数据</translation>
+    </message>
+    <message>
+        <source>Could not recognize this mascot in the archive</source>
+        <translation>无法识别压缩包中的这个桌宠</translation>
+    </message>
+    <message>
+        <source>Archive does not exist</source>
+        <translation>压缩包不存在</translation>
+    </message>
+    <message>
+        <source>Archive exceeds the maximum size of %1 bytes</source>
+        <translation>压缩包超过最大大小 %1 字节</translation>
+    </message>
+    <message>
+        <source>Could not create temporary directory</source>
+        <translation>无法创建临时目录</translation>
+    </message>
+    <message>
+        <source>Could not analyze archive</source>
+        <translation>无法分析压缩包</translation>
+    </message>
+    <message>
+        <source>No Shimeji mascots were found in the archive</source>
+        <translation>压缩包中没有找到 Shimeji 桌宠</translation>
+    </message>
+    <message>
+        <source>No convertible mascots were found</source>
+        <translation>没有找到可转换的桌宠</translation>
+    </message>
+    <message>
+        <source>Could not create output directory</source>
+        <translation>无法创建输出目录</translation>
+    </message>
+    <message>
+        <source>Selected mascot was not found</source>
+        <translation>找不到所选桌宠</translation>
+    </message>
+    <message>
+        <source>Edited info.json is too large</source>
+        <translation>修改后的 info.json 过大</translation>
+    </message>
+    <message>
+        <source>Edited info.json is invalid</source>
+        <translation>修改后的 info.json 无效</translation>
+    </message>
+    <message>
+        <source>Edited info.json has an invalid package name</source>
+        <translation>修改后的 info.json 包含无效的桌宠包名称</translation>
+    </message>
+    <message>
+        <source>Could not write edited info.json</source>
+        <translation>无法写入修改后的 info.json</translation>
+    </message>
+    <message>
+        <source>Extracted archive directory is missing</source>
+        <translation>解压后的压缩包目录缺失</translation>
+    </message>
+    <message>
+        <source>Archive extracted an unsafe path</source>
+        <translation>压缩包解压出了不安全的路径</translation>
+    </message>
+    <message>
+        <source>Archive contains symbolic links</source>
+        <translation>压缩包包含符号链接</translation>
+    </message>
+    <message>
+        <source>Archive contains too many extracted files</source>
+        <translation>压缩包包含的文件过多</translation>
+    </message>
+    <message>
+        <source>Archive extracted data is too large</source>
+        <translation>压缩包解压后的数据过大</translation>
+    </message>
+    <message>
+        <source>Extracted file %1 exceeds size limits</source>
+        <translation>解压后的文件 %1 超出大小限制</translation>
+    </message>
+    <message>
+        <source>Source mascot directory does not exist</source>
+        <translation>源桌宠目录不存在</translation>
+    </message>
+    <message>
+        <source>Mascot package source is missing required files</source>
+        <translation>桌宠包源目录缺少必需文件</translation>
+    </message>
+    <message>
+        <source>Could not write %1</source>
+        <translation>无法写入 %1</translation>
+    </message>
+    <message>
+        <source>Could not write package entry</source>
+        <translation>无法写入桌宠包条目</translation>
+    </message>
+    <message>
+        <source>Mascot package is too large for ZIP32 central directory</source>
+        <translation>桌宠包过大，无法使用 ZIP32 中央目录</translation>
+    </message>
+    <message>
+        <source>Mascot package central directory is too large</source>
+        <translation>桌宠包的中央目录过大</translation>
+    </message>
+    <message>
+        <source>Mascot package contains too many entries</source>
+        <translation>桌宠包包含的条目过多</translation>
+    </message>
+    <message>
+        <source>Mascot package entry path is too long</source>
+        <translation>桌宠包条目路径过长</translation>
+    </message>
+    <message>
+        <source>Mascot package entry is too large for ZIP32</source>
+        <translation>桌宠包条目过大，无法使用 ZIP32</translation>
+    </message>
+    <message>
+        <source>Mascot package is too large for ZIP32 offsets</source>
+        <translation>桌宠包过大，超出 ZIP32 偏移范围</translation>
+    </message>
+    <message>
+        <source>Mascot package exceeds the maximum size of %1 bytes</source>
+        <translation>桌宠包超过最大大小 %1 字节</translation>
+    </message>
+    <message>
+        <source>Invalid metadata</source>
+        <translation>元数据无效</translation>
+    </message>
+    <message>
+        <source>Invalid info.json</source>
+        <translation>info.json 格式无效</translation>
+    </message>
+    <message>
+        <source>info.json must contain a non-empty name</source>
+        <translation>info.json 必须包含非空名称</translation>
+    </message>
+    <message>
+        <source>info.json is invalid; fallback metadata will be generated (%1)</source>
+        <translation>info.json 无效；将生成备用元数据（%1）</translation>
+    </message>
+    <message>
+        <source>Unknown error</source>
+        <translation>未知错误</translation>
+    </message>
+    <message>
+        <source>The archive contains invalid or unsupported content.</source>
+        <translation>压缩包包含无效或不受支持的内容。</translation>
     </message>
     <!-- Combinations page -->
     <message>

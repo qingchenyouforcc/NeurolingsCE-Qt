@@ -23,6 +23,7 @@
 #include "../ManagerUiHelpers.hpp"
 #include "../../core/update/GitHubUpdateManager.hpp"
 #include <QApplication>
+#include <QBoxLayout>
 #include <QDesktopServices>
 #include <QDialog>
 #include <QFontMetrics>
@@ -33,6 +34,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSizePolicy>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -74,8 +76,43 @@ void configureDialogButton(QPushButton *button)
     const QFontMetrics metrics(button->font());
     const int horizontalPadding = 44;
     button->setMinimumWidth(metrics.horizontalAdvance(button->text()) + horizontalPadding);
+    button->setMinimumHeight(34);
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 }
+
+class ResponsiveAboutButtonRow final : public QWidget {
+public:
+    explicit ResponsiveAboutButtonRow(QWidget *parent = nullptr,
+        int compactWidth = 440):
+        QWidget(parent),
+        m_compactWidth(compactWidth),
+        m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(0, 0, 0, 0);
+        m_layout->setSpacing(8);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    }
+
+    void addButton(QPushButton *button)
+    {
+        m_layout->addWidget(button);
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        bool compact = width() > 0 && width() < m_compactWidth;
+        m_layout->setDirection(compact
+            ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    }
+
+private:
+    int m_compactWidth;
+    QBoxLayout *m_layout;
+
+    Q_DISABLE_COPY_MOVE(ResponsiveAboutButtonRow)
+};
 
 QLabel *makeSectionTitle(QString const& text, QString const& color)
 {
@@ -267,8 +304,7 @@ void ShijimaManager::showAboutDialog()
     publishedLabel->setStyleSheet(QString("color: %1;").arg(colors.details));
     rightLayout->addWidget(publishedLabel);
 
-    auto *primaryButtonsRow = new QHBoxLayout;
-    primaryButtonsRow->setSpacing(8);
+    auto *primaryButtonsRow = new ResponsiveAboutButtonRow(rightPane, 520);
     QPushButton *checkButton = new QPushButton(tr("Check for Updates"));
     QPushButton *releaseButton = new QPushButton(
         m_updateManager != nullptr ? m_updateManager->releaseButtonText() : tr("View Release Notes"));
@@ -276,21 +312,19 @@ void ShijimaManager::showAboutDialog()
     for (QPushButton *button : { checkButton, releaseButton, installButton }) {
         button->setStyleSheet(buttonStyle);
         configureDialogButton(button);
-        primaryButtonsRow->addWidget(button);
+        primaryButtonsRow->addButton(button);
     }
-    rightLayout->addLayout(primaryButtonsRow);
+    rightLayout->addWidget(primaryButtonsRow);
 
-    auto *secondaryButtonsRow = new QHBoxLayout;
-    secondaryButtonsRow->setSpacing(8);
+    auto *secondaryButtonsRow = new ResponsiveAboutButtonRow(rightPane, 420);
     QPushButton *ignoreButton = new QPushButton(tr("Ignore This Version"));
     QPushButton *laterButton = new QPushButton(tr("Remind Me Later"));
     for (QPushButton *button : { ignoreButton, laterButton }) {
         button->setStyleSheet(buttonStyle);
         configureDialogButton(button);
-        secondaryButtonsRow->addWidget(button);
+        secondaryButtonsRow->addButton(button);
     }
-    secondaryButtonsRow->addStretch();
-    rightLayout->addLayout(secondaryButtonsRow);
+    rightLayout->addWidget(secondaryButtonsRow);
     rightLayout->addStretch();
 
     auto refreshUpdateCard = [this, latestVersionValue, statusLabel, detailLabel, publishedLabel,
@@ -321,8 +355,10 @@ void ShijimaManager::showAboutDialog()
 
         checkButton->setEnabled(m_updateManager->canCheckForUpdates());
         releaseButton->setText(m_updateManager->releaseButtonText());
+        configureDialogButton(releaseButton);
         releaseButton->setEnabled(m_updateManager->hasRelease());
         installButton->setText(m_updateManager->installButtonText());
+        configureDialogButton(installButton);
         installButton->setEnabled(m_updateManager->canDownloadInstaller()
             || m_updateManager->canInstallDownloadedUpdate());
         ignoreButton->setEnabled(m_updateManager->shouldShowIgnoreActions());

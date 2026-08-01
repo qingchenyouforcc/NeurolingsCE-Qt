@@ -40,6 +40,7 @@
 #include <QStringList>
 #include <QTimer>
 #include <QTranslator>
+#include <QWidget>
 #include "ElaTheme.h"
 
 namespace ShijimaManagerUiInternal {
@@ -80,6 +81,7 @@ void applyMascotListTheme(QListWidget& listWidget) {
     QColor bgAlt = eTheme->getThemeColor(mode, ElaThemeType::BasicBase);
     QColor hover = eTheme->getThemeColor(mode, ElaThemeType::BasicHover);
     QColor selected = eTheme->getThemeColor(mode, ElaThemeType::PrimaryNormal);
+    QColor selectedText = eTheme->getThemeColor(mode, ElaThemeType::BasicTextInvert);
     QColor border = eTheme->getThemeColor(mode, ElaThemeType::BasicBorder);
     listWidget.setStyleSheet(QString(
         "QListWidget {"
@@ -88,6 +90,9 @@ void applyMascotListTheme(QListWidget& listWidget) {
         "  border: 1px solid %3;"
         "  border-radius: 6px;"
         "  outline: none;"
+        "}"
+        "QListWidget:focus {"
+        "  border: 2px solid %5;"
         "}"
         "QListWidget::item {"
         "  padding: 4px;"
@@ -98,7 +103,7 @@ void applyMascotListTheme(QListWidget& listWidget) {
         "}"
         "QListWidget::item:selected {"
         "  background-color: %5;"
-        "  color: white;"
+        "  color: %8;"
         "}"
         "QScrollBar:vertical {"
         "  background: %6;"
@@ -115,7 +120,7 @@ void applyMascotListTheme(QListWidget& listWidget) {
         "}"
     ).arg(bg.name(), text.name(), border.name(),
           hover.name(), selected.name(), bgAlt.name(),
-          border.name()));
+          border.name(), selectedText.name()));
 }
 
 }
@@ -204,10 +209,41 @@ void ShijimaManager::updateSelectedMascotDetails() {
         return;
     }
 
+    bool hasTemplates = m_ui->listWidget != nullptr && m_ui->listWidget->count() > 0;
+    const auto& loadedMascots = m_runtime->templates.loadedMascots();
+    bool hasImportedTemplates = false;
+    for (auto *templateData : loadedMascots) {
+        if (templateData != nullptr && templateData->deletable()) {
+            hasImportedTemplates = true;
+            break;
+        }
+    }
+    if (m_ui->mascotEmptyStateWidget != nullptr) {
+        m_ui->mascotEmptyStateWidget->setVisible(!hasImportedTemplates);
+    }
+    if (m_ui->listWidget != nullptr) {
+        m_ui->listWidget->setVisible(hasImportedTemplates);
+    }
+    if (m_ui->spawnRandomButton != nullptr) {
+        m_ui->spawnRandomButton->setEnabled(hasTemplates);
+    }
+
     MascotData *data = nullptr;
-    auto selected = m_ui->listWidget->selectedItems();
+    auto selected = hasImportedTemplates
+        ? m_ui->listWidget->selectedItems() : QList<QListWidgetItem *> {};
+    bool canDelete = false;
+    for (auto *item : selected) {
+        auto *selectedData = loadedMascots.value(item->text(), nullptr);
+        if (selectedData != nullptr && selectedData->deletable()) {
+            canDelete = true;
+            break;
+        }
+    }
+    if (m_ui->deleteMascotButton != nullptr) {
+        m_ui->deleteMascotButton->setEnabled(canDelete);
+    }
     if (!selected.isEmpty()) {
-        data = m_runtime->templates.loadedMascots().value(selected.first()->text(), nullptr);
+        data = loadedMascots.value(selected.first()->text(), nullptr);
     }
 
     if (data == nullptr) {

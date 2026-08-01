@@ -19,6 +19,7 @@
 //
 
 #include <QByteArray>
+#include <QHash>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -40,6 +41,10 @@ struct LegacyMascotCandidate {
     bool generatedMetadata = false;
     QStringList warnings;
     QStringList errors;
+    QString sourceName;
+    QByteArray infoJson;
+    QString infoJsonError;
+    bool infoJsonValid = false;
 };
 
 struct LegacyArchiveAnalysis {
@@ -61,6 +66,7 @@ MascotMetadata defaultMetadata();
 MascotMetadata metadataFromJson(QByteArray const& bytes);
 QByteArray metadataToJson(MascotMetadata const& metadata);
 QString sanitizedPackageBaseName(QString const& name);
+bool isValidPackageName(QString const& name);
 QString packagePathForName(QString const& storagePath, QString const& name);
 QString cachePathForName(QString const& cacheRootPath, QString const& name);
 
@@ -79,6 +85,10 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath);
 QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
     QString const& archivePath, QString const& outputPath,
     QStringList const& selectedNames);
+QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
+    QString const& archivePath, QString const& outputPath,
+    QStringList const& selectedNames,
+    QHash<QString, QByteArray> const& infoJsonOverrides);
 std::set<std::string> importArchive(QString const& archivePath,
     QString const& storagePath);
 void migrateLegacyDirectories(QString const& storagePath);

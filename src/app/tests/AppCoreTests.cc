@@ -20,6 +20,7 @@
 #include "shijima-qt/MascotApi.hpp"
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/SafePath.hpp"
+#include "shijima-qt/SecurityLimits.hpp"
 #include "core/shijima-engine/shijima/broadcast/manager.hpp"
 #include "core/shijima-engine/shijima/scripting/context.hpp"
 
@@ -372,6 +373,12 @@ void testMascotPackageNames() {
         QStringLiteral("Mascot"), "empty package name should use fallback");
     expect(MascotPackage::sanitizedPackageBaseName(QStringLiteral("../Name")) ==
         QStringLiteral(".._Name"), "path separators should not survive package names");
+    expect(MascotPackage::isValidPackageName(QStringLiteral("Friendly Mascot")),
+        "ordinary mascot names should be valid package names");
+    expect(!MascotPackage::isValidPackageName(QStringLiteral("CON")),
+        "Windows reserved device names should be rejected");
+    expect(!MascotPackage::isValidPackageName(QString(201, QLatin1Char('a'))),
+        "overlong package names should be rejected");
 }
 
 void testLegacyArchiveAnalysisAndConversion() {
@@ -382,22 +389,30 @@ void testLegacyArchiveAnalysisAndConversion() {
     QString outputPath = tempDir.absoluteFilePath(QStringLiteral("out"));
     QDir().mkpath(outputPath);
 
-    MascotMetadata alphaMetadata;
-    alphaMetadata.name = QStringLiteral("Alpha");
-    alphaMetadata.version = QStringLiteral("1.0");
-    alphaMetadata.author = QStringLiteral("tester");
-    alphaMetadata.description = QStringLiteral("Alpha mascot description");
+    QByteArray alphaInfoJson = QStringLiteral(
+        "{\r\n"
+        "  \"name\": \"Alpha Display\",\r\n"
+        "  \"version\": \"1.0\",\r\n"
+        "  \"description\": \"Alpha mascot description\",\r\n"
+        "  \"author\": \"tester\",\r\n"
+        "  \"sourceExtra\": 42,\r\n"
+        "  \"separator\": \"line\u2028separator\"\r\n"
+        "}\r\n").toUtf8();
 
     std::vector<TestZipEntry> entries {
         { QStringLiteral("Alpha/actions.xml"), minimalActionsXml() },
         { QStringLiteral("Alpha/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Alpha/img/shime1.png"), minimalPngBytes() },
         { QStringLiteral("Alpha/img/a.png"), minimalPngBytes() },
-        { QStringLiteral("Alpha/info.json"), MascotPackage::metadataToJson(alphaMetadata) },
+        { QStringLiteral("Alpha/info.json"), alphaInfoJson },
         { QStringLiteral("Beta/actions.xml"), minimalActionsXml() },
         { QStringLiteral("Beta/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Beta/img/shime1.png"), minimalPngBytes() },
         { QStringLiteral("Beta/img/cover.png"), minimalPngBytes() },
+        { QStringLiteral("Invalid/actions.xml"), minimalActionsXml() },
+        { QStringLiteral("Invalid/behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("Invalid/img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("Invalid/info.json"), QByteArrayLiteral("{broken") },
         { QStringLiteral("Broken/behaviors.xml"), minimalBehaviorsXml() },
         { QStringLiteral("Broken/img/shime1.png"), minimalPngBytes() },
     };
@@ -405,13 +420,14 @@ void testLegacyArchiveAnalysisAndConversion() {
 
     auto analysis = MascotPackage::analyzeLegacyArchive(archivePath);
     expect(analysis.ok, "legacy archive with valid candidates should be OK");
-    expect(analysis.candidates.size() >= 3,
+    expect(analysis.candidates.size() >= 4,
         "analysis should include valid and incomplete candidates");
 
     auto findCandidate = [&analysis](QString const& name) {
         auto it = std::find_if(analysis.candidates.begin(), analysis.candidates.end(),
             [&name](LegacyMascotCandidate const& candidate) {
-                return candidate.name == name || candidate.metadata.name == name;
+                return candidate.sourceName == name || candidate.name == name ||
+                    candidate.metadata.name == name;
             });
         return it == analysis.candidates.end() ? nullptr : &(*it);
     };
@@ -419,28 +435,80 @@ void testLegacyArchiveAnalysisAndConversion() {
     auto *alpha = findCandidate(QStringLiteral("Alpha"));
     expect(alpha != nullptr && alpha->convertible,
         "valid candidate with metadata should be convertible");
+    expect(alpha != nullptr && alpha->infoJsonValid,
+        "valid candidate metadata should be marked as valid JSON");
     expect(alpha != nullptr && alpha->metadata.version == QStringLiteral("1.0") &&
         alpha->metadata.author == QStringLiteral("tester") &&
         alpha->metadata.description == QStringLiteral("Alpha mascot description"),
         "legacy analysis should preserve info.json metadata");
+    expect(alpha != nullptr && alpha->sourceName == QStringLiteral("Alpha"),
+        "legacy analysis should retain the archive source name");
+    expect(alpha != nullptr && alpha->metadata.name == QStringLiteral("Alpha Display"),
+        "legacy analysis should keep the metadata display name separate");
+    expect(alpha != nullptr && alpha->infoJson.contains("\"sourceExtra\": 42"),
+        "legacy analysis should preserve the complete info.json document");
     auto *beta = findCandidate(QStringLiteral("Beta"));
     expect(beta != nullptr && beta->convertible && beta->generatedMetadata,
         "candidate without info.json should use fallback metadata");
+    expect(beta != nullptr && beta->infoJsonValid,
+        "generated fallback metadata should be valid JSON");
+    auto *invalid = findCandidate(QStringLiteral("Invalid"));
+    expect(invalid != nullptr && invalid->convertible &&
+        invalid->generatedMetadata && invalid->infoJson == QByteArrayLiteral("{broken"),
+        "analysis should preserve invalid info.json content for editing");
+    expect(invalid != nullptr && !invalid->infoJsonValid,
+        "invalid existing info.json should require repair before conversion");
+    expect(invalid != nullptr && !invalid->infoJsonError.isEmpty(),
+        "invalid existing info.json should retain its validation reason");
     auto *broken = findCandidate(QStringLiteral("Broken"));
     expect(broken != nullptr && !broken->convertible &&
         broken->errors.join(QStringLiteral(";")).contains(QStringLiteral("actions.xml")),
         "candidate missing actions.xml should report a content error");
 
-    QFile existing(QDir(outputPath).absoluteFilePath(QStringLiteral("Alpha.mascot")));
-    expect(existing.open(QFile::WriteOnly), "existing package placeholder should be writable");
-    existing.write("existing");
-    existing.close();
+    QString untouchedOutputPath = tempDir.absoluteFilePath(
+        QStringLiteral("untouched-out"));
+    auto untouchedResults = MascotPackage::writeLegacyArchiveSelectionAsPackages(
+        archivePath, untouchedOutputPath, QStringList { QStringLiteral("Alpha") });
+    expect(untouchedResults.size() == 1 && untouchedResults.constFirst().ok,
+        "untouched metadata should convert successfully through the legacy API");
+    QString untouchedExtractPath = tempDir.absoluteFilePath(
+        QStringLiteral("untouched-verify"));
+    QString untouchedError;
+    expect(MascotPackage::extractPackage(untouchedResults.constFirst().packagePath,
+        untouchedExtractPath, untouchedError),
+        "untouched package should extract for metadata verification");
+    QFile untouchedInfo(QDir(untouchedExtractPath).absoluteFilePath(
+        QStringLiteral("info.json")));
+    bool untouchedInfoOpened = untouchedInfo.open(QFile::ReadOnly);
+    expect(untouchedInfoOpened, "untouched package info.json should be readable");
+    expect(untouchedInfoOpened && untouchedInfo.readAll() == alphaInfoJson,
+        "untouched conversion should preserve info.json bytes exactly");
 
+    QFile existing(QDir(outputPath).absoluteFilePath(
+        QStringLiteral("Alpha Edited.mascot")));
+    bool const existingOpened = existing.open(QFile::WriteOnly);
+    expect(existingOpened, "existing package placeholder should be writable");
+    if (existingOpened) {
+        existing.write("existing");
+        existing.close();
+    }
+
+    QByteArray editedAlphaInfoJson = QByteArrayLiteral(
+        "{\n"
+        "  \"name\": \"Alpha Edited\",\n"
+        "  \"version\": \"2.0\",\n"
+        "  \"description\": \"Edited Alpha description\",\n"
+        "  \"author\": \"editor\",\n"
+        "  \"custom\": \"kept\"\n"
+        "}\n");
+    QHash<QString, QByteArray> infoJsonOverrides {
+        { QStringLiteral("Alpha"), editedAlphaInfoJson },
+    };
     auto results = MascotPackage::writeLegacyArchiveSelectionAsPackages(
         archivePath, outputPath, QStringList {
             QStringLiteral("Alpha"),
             QStringLiteral("Beta"),
-        });
+        }, infoJsonOverrides);
     expect(results.size() == 2, "selected legacy candidates should produce two results");
     expect(std::all_of(results.begin(), results.end(),
         [](LegacyMascotConversionResult const& result) { return result.ok; }),
@@ -448,28 +516,75 @@ void testLegacyArchiveAnalysisAndConversion() {
 
     bool alphaAvoidedOverwrite = std::any_of(results.begin(), results.end(),
         [](LegacyMascotConversionResult const& result) {
-            return result.name == QStringLiteral("Alpha") &&
-                result.packagePath.endsWith(QStringLiteral("Alpha-2.mascot"));
+            return result.name == QStringLiteral("Alpha Edited") &&
+                result.packagePath.endsWith(QStringLiteral("Alpha Edited-2.mascot"));
         });
     expect(alphaAvoidedOverwrite, "conversion should avoid overwriting existing packages");
+
+    QByteArray invalidPackageNameJson = QByteArrayLiteral(
+        "{\"name\":\"CON\",\"version\":\"1\"}");
+    QHash<QString, QByteArray> invalidNameOverride {
+        { QStringLiteral("Alpha"), invalidPackageNameJson },
+    };
+    auto invalidNameResults = MascotPackage::writeLegacyArchiveSelectionAsPackages(
+        archivePath, tempDir.absoluteFilePath(QStringLiteral("invalid-name-out")),
+        QStringList { QStringLiteral("Alpha") }, invalidNameOverride);
+    expect(invalidNameResults.size() == 1 && !invalidNameResults.constFirst().ok &&
+        invalidNameResults.constFirst().errorMessage == QStringLiteral(
+            "Edited info.json has an invalid package name"),
+        "edited metadata should reject non-portable package names");
+
+    QHash<QString, QByteArray> invalidJsonOverride {
+        { QStringLiteral("Alpha"), QByteArrayLiteral("{broken") },
+    };
+    auto invalidJsonResults = MascotPackage::writeLegacyArchiveSelectionAsPackages(
+        archivePath, tempDir.absoluteFilePath(QStringLiteral("invalid-json-out")),
+        QStringList { QStringLiteral("Alpha") }, invalidJsonOverride);
+    expect(invalidJsonResults.size() == 1 && !invalidJsonResults.constFirst().ok &&
+        invalidJsonResults.constFirst().errorMessage == QStringLiteral(
+            "Edited info.json is invalid"),
+        "edited metadata should reject malformed JSON");
+
+    QByteArray oversizedInfoJson(static_cast<qsizetype>(
+        SecurityLimits::kMascotSingleFileMaxBytes + 1), ' ');
+    QHash<QString, QByteArray> oversizedOverride {
+        { QStringLiteral("Alpha"), oversizedInfoJson },
+    };
+    auto oversizedResults = MascotPackage::writeLegacyArchiveSelectionAsPackages(
+        archivePath, tempDir.absoluteFilePath(QStringLiteral("oversized-json-out")),
+        QStringList { QStringLiteral("Alpha") }, oversizedOverride);
+    expect(oversizedResults.size() == 1 && !oversizedResults.constFirst().ok &&
+        oversizedResults.constFirst().errorMessage == QStringLiteral(
+            "Edited info.json is too large"),
+        "edited metadata should reject oversized JSON");
 
     for (auto const& result : results) {
         MascotMetadata metadata;
         QString error;
         expect(MascotPackage::inspectPackage(result.packagePath, metadata, error),
             "converted package should pass package inspection");
-        if (result.name == QStringLiteral("Alpha")) {
-            expect(metadata.version == QStringLiteral("1.0") &&
-                metadata.author == QStringLiteral("tester") &&
-                metadata.description == QStringLiteral("Alpha mascot description"),
-                "converted package should preserve info.json metadata");
+        if (result.name == QStringLiteral("Alpha Edited")) {
+            expect(metadata.version == QStringLiteral("2.0") &&
+                metadata.author == QStringLiteral("editor") &&
+                metadata.description == QStringLiteral("Edited Alpha description"),
+                "converted package should apply edited info.json metadata");
         }
 
         QString extractedPath = QDir(temp.path()).absoluteFilePath(
             QStringLiteral("verify-") + result.name);
         expect(MascotPackage::extractPackage(result.packagePath, extractedPath,
             error), "converted package should extract for preview verification");
-        QString previewName = result.name == QStringLiteral("Alpha")
+        if (result.name == QStringLiteral("Alpha Edited")) {
+            QFile extractedInfo(QDir(extractedPath).absoluteFilePath(
+                QStringLiteral("info.json")));
+            bool infoOpened = extractedInfo.open(QFile::ReadOnly);
+            expect(infoOpened,
+                "converted package info.json should be readable");
+            expect(infoOpened &&
+                extractedInfo.readAll().contains("\"custom\": \"kept\""),
+                "converted package should preserve edited custom JSON fields");
+        }
+        QString previewName = result.name == QStringLiteral("Alpha Edited")
             ? QStringLiteral("a.png") : QStringLiteral("cover.png");
         expect(QFile::exists(QDir(extractedPath).absoluteFilePath(
             QStringLiteral("img/") + previewName)),

@@ -34,14 +34,17 @@
 #include <QFrame>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPainter>
 #include <QRadioButton>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStyleOptionFocusRect>
 #include <QVariant>
 #include <QVBoxLayout>
 #include "ElaPushButton.h"
@@ -50,6 +53,68 @@
 #include "ElaToggleSwitch.h"
 
 namespace {
+
+void drawKeyboardFocusFrame(QWidget *widget)
+{
+    if (!widget->hasFocus()) {
+        return;
+    }
+
+    QStyleOptionFocusRect option;
+    option.initFrom(widget);
+    option.rect = widget->rect().adjusted(3, 3, -3, -3);
+    QPainter painter(widget);
+    widget->style()->drawPrimitive(
+        QStyle::PE_FrameFocusRect, &option, &painter, widget);
+}
+
+class SettingsPushButton final : public ElaPushButton {
+public:
+    using ElaPushButton::ElaPushButton;
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        ElaPushButton::paintEvent(event);
+        drawKeyboardFocusFrame(this);
+    }
+
+private:
+    Q_DISABLE_COPY_MOVE(SettingsPushButton)
+};
+
+class SettingsToggleSwitch final : public ElaToggleSwitch {
+public:
+    explicit SettingsToggleSwitch(QWidget *parent = nullptr):
+        ElaToggleSwitch(parent)
+    {
+        setFocusPolicy(Qt::StrongFocus);
+    }
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override
+    {
+        if (!event->isAutoRepeat() &&
+            (event->key() == Qt::Key_Space ||
+                event->key() == Qt::Key_Return ||
+                event->key() == Qt::Key_Enter))
+        {
+            setIsToggled(!getIsToggled());
+            event->accept();
+            return;
+        }
+        ElaToggleSwitch::keyPressEvent(event);
+    }
+
+    void paintEvent(QPaintEvent *event) override
+    {
+        ElaToggleSwitch::paintEvent(event);
+        drawKeyboardFocusFrame(this);
+    }
+
+private:
+    Q_DISABLE_COPY_MOVE(SettingsToggleSwitch)
+};
 
 QString settingsTr(char const* sourceText)
 {
@@ -112,6 +177,9 @@ QLabel *makeSectionDescription(QWidget *parent, QString const& text)
 QWidget *createSettingsRow(QWidget *parent, QString const& title,
     QString const& subtitle, QWidget *control, QLabel **subtitleLabelOut = nullptr)
 {
+    control->setAccessibleName(title);
+    control->setAccessibleDescription(subtitle);
+
     auto colors = themedSettingsColors();
     auto *area = new QFrame(parent);
     area->setObjectName(QStringLiteral("SettingsRowCard"));
@@ -150,6 +218,16 @@ QWidget *createSettingsRow(QWidget *parent, QString const& title,
         *subtitleLabelOut = subtitleLabel;
     }
     return area;
+}
+
+void updateSettingsSummary(QLabel *label, QWidget *control, QString const& summary)
+{
+    if (label != nullptr) {
+        label->setText(summary);
+    }
+    if (control != nullptr) {
+        control->setAccessibleDescription(summary);
+    }
 }
 
 void addSettingsSection(QVBoxLayout *layout, QWidget *parent, QString const& title,
@@ -382,7 +460,7 @@ void ShijimaManager::setupSettingsPage() {
         bool initial = m_settings->value(key, QVariant::fromValue(true)).toBool();
         m_runtime->environment.setAllowsBreeding(initial);
 
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
             m_runtime->environment.setAllowsBreeding(checked);
@@ -399,7 +477,7 @@ void ShijimaManager::setupSettingsPage() {
         static const QString key = "speechBubbleEnabled";
         bool initial = m_settings->value(key, QVariant::fromValue(true)).toBool();
 
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
             m_settings->setValue("speechBubbleEnabled", QVariant::fromValue(checked));
@@ -431,13 +509,13 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Detach Speed"),
             detachSummaryForSettings(static_cast<int>(m_runtime->environment.detachThreshold())),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             static const QString key = "detachThreshold";
             int threshold = static_cast<int>(m_runtime->environment.detachThreshold());
             QDialog dialog(this);
@@ -470,10 +548,8 @@ void ShijimaManager::setupSettingsPage() {
             if (dialog.exec() == QDialog::Accepted) {
                 m_runtime->environment.setDetachThreshold(spin->value());
                 m_settings->setValue(key, m_runtime->environment.detachThreshold());
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(detachSummaryForSettings(
-                        static_cast<int>(m_runtime->environment.detachThreshold())));
-                }
+                updateSettingsSummary(summaryLabel, btn, detachSummaryForSettings(
+                    static_cast<int>(m_runtime->environment.detachThreshold())));
             }
         });
 
@@ -485,7 +561,7 @@ void ShijimaManager::setupSettingsPage() {
         tr("Adjust the manager presentation, sandbox appearance, and application language."));
 
     {
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(windowedMode());
 
         if (!m_ui->windowedModeAction) {
@@ -512,13 +588,13 @@ void ShijimaManager::setupSettingsPage() {
         updateSandboxBackground();
 
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Background Color"),
             backgroundSummaryForSettings(m_ui->sandboxBackground),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             QColorDialog dialog { this };
             dialog.setCurrentColor(m_ui->sandboxBackground);
             if (dialog.exec() == QDialog::Accepted) {
@@ -526,9 +602,8 @@ void ShijimaManager::setupSettingsPage() {
                 m_settings->setValue("windowedModeBackground",
                     ShijimaManagerUiInternal::colorToString(dialog.selectedColor()));
                 updateSandboxBackground();
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(backgroundSummaryForSettings(m_ui->sandboxBackground));
-                }
+                updateSettingsSummary(summaryLabel, btn,
+                    backgroundSummaryForSettings(m_ui->sandboxBackground));
             }
         });
 
@@ -537,13 +612,13 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Scale"),
             scaleSummaryForSettings(m_runtime->environment.userScale()),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             static const QString key = "userScale";
             double scale = m_runtime->environment.userScale();
             QDialog dialog { this };
@@ -588,10 +663,8 @@ void ShijimaManager::setupSettingsPage() {
 
             if (dialog.exec() == QDialog::Accepted) {
                 m_settings->setValue(key, m_runtime->environment.userScale());
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(scaleSummaryForSettings(
-                        m_runtime->environment.userScale()));
-                }
+                updateSettingsSummary(summaryLabel, btn,
+                    scaleSummaryForSettings(m_runtime->environment.userScale()));
             }
         });
 
@@ -600,13 +673,13 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Language"),
             languageSummaryForSettings(m_ui->currentLanguage),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             QDialog dialog(this);
             dialog.setWindowTitle(tr("Select Language"));
             dialog.setMinimumWidth(320);
@@ -632,10 +705,8 @@ void ShijimaManager::setupSettingsPage() {
             layout->addWidget(buttons);
 
             if (dialog.exec() == QDialog::Accepted) {
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(languageSummaryForSettings(
-                        btnZh->isChecked() ? QStringLiteral("zh_CN") : QStringLiteral("en")));
-                }
+                updateSettingsSummary(summaryLabel, btn, languageSummaryForSettings(
+                    btnZh->isChecked() ? QStringLiteral("zh_CN") : QStringLiteral("en")));
                 switchLanguage(btnZh->isChecked() ? QStringLiteral("zh_CN") : QStringLiteral("en"));
             }
         });
@@ -649,7 +720,7 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(startupLaunchAtLoginEnabled());
         auto *row = createSettingsRow(settingsContent,
             tr("Start at Login"),
@@ -665,16 +736,14 @@ void ShijimaManager::setupSettingsPage() {
                     toggle->blockSignals(false);
                     QMessageBox::warning(this, tr("Startup"), errorMessage);
                 }
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(startupLaunchSummary());
-                }
+                updateSettingsSummary(summaryLabel, toggle, startupLaunchSummary());
             });
         settingsLayout->addWidget(row);
     }
 
     {
         bool initial = m_settings->value("startup/silent", false).toBool();
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
             m_settings->setValue("startup/silent", checked);
@@ -688,13 +757,13 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Configure..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Configure..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Startup Combination"),
             startupCombinationSummary(*m_settings),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             QDialog dialog(this);
             dialog.setWindowTitle(tr("Startup Combination"));
             dialog.setMinimumWidth(420);
@@ -720,9 +789,8 @@ void ShijimaManager::setupSettingsPage() {
                 QString id = data.section(QLatin1Char(':'), 1);
                 m_settings->setValue("startup/restoreCombinationMode", mode);
                 m_settings->setValue("startup/restoreCombinationId", id);
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(startupCombinationSummary(*m_settings));
-                }
+                updateSettingsSummary(summaryLabel, btn,
+                    startupCombinationSummary(*m_settings));
             }
         });
         settingsLayout->addWidget(row);
@@ -734,7 +802,7 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         bool initial = m_settings->value("update/checkOnStartup", true).toBool();
-        auto *toggle = new ElaToggleSwitch(settingsContent);
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
             m_settings->setValue("update/checkOnStartup", checked);
@@ -748,13 +816,13 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         QLabel *summaryLabel = nullptr;
-        auto *btn = new ElaPushButton(tr("Configure..."), settingsContent);
+        auto *btn = new SettingsPushButton(tr("Configure..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Update Proxy"),
             proxySummaryForSettings(*m_settings),
             btn,
             &summaryLabel);
-        connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
+        connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             QDialog dialog(this);
             dialog.setWindowTitle(tr("Update Proxy"));
             dialog.setMinimumWidth(420);
@@ -825,9 +893,8 @@ void ShijimaManager::setupSettingsPage() {
                 if (m_updateManager != nullptr) {
                     m_updateManager->reloadNetworkSettings();
                 }
-                if (summaryLabel != nullptr) {
-                    summaryLabel->setText(proxySummaryForSettings(*m_settings));
-                }
+                updateSettingsSummary(summaryLabel, btn,
+                    proxySummaryForSettings(*m_settings));
             }
         });
 

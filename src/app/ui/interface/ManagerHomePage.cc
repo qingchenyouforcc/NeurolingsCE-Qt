@@ -20,26 +20,150 @@
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
 #include "../ManagerUiHelpers.hpp"
+#include <QBoxLayout>
 #include <QDesktopServices>
 #include <QFrame>
-#include <QFontMetrics>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QPainter>
+#include <QResizeEvent>
 #include <QSizePolicy>
-#include <QStyle>
+#include <QStyleOptionFocusRect>
 #include <QUrl>
 #include <QVBoxLayout>
+#include "ElaFlowLayout.h"
 #include "ElaPushButton.h"
+#include "ElaText.h"
 #include "ElaTheme.h"
+#include "ElaToolButton.h"
 
-static void configureActionButton(ElaPushButton *button)
+namespace {
+
+constexpr int kCompactHomeWidth = 640;
+
+void drawHomeFocusFrame(QWidget *widget)
 {
-    const QFontMetrics metrics(button->font());
-    const int horizontalPadding = 44;
-    button->setMinimumWidth(metrics.horizontalAdvance(button->text()) + horizontalPadding);
-    button->setMinimumHeight(34);
+    if (!widget->hasFocus()) {
+        return;
+    }
+
+    QStyleOptionFocusRect option;
+    option.initFrom(widget);
+    option.rect = widget->rect().adjusted(3, 3, -3, -3);
+    QPainter painter(widget);
+    widget->style()->drawPrimitive(
+        QStyle::PE_FrameFocusRect, &option, &painter, widget);
+}
+
+class HomePushButton final : public ElaPushButton {
+public:
+    using ElaPushButton::ElaPushButton;
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        ElaPushButton::paintEvent(event);
+        drawHomeFocusFrame(this);
+    }
+
+private:
+    Q_DISABLE_COPY_MOVE(HomePushButton)
+};
+
+class HomeToolButton final : public ElaToolButton {
+public:
+    explicit HomeToolButton(QWidget *parent = nullptr):
+        ElaToolButton(parent)
+    {
+        setFocusPolicy(Qt::StrongFocus);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        ElaToolButton::paintEvent(event);
+        drawHomeFocusFrame(this);
+    }
+
+private:
+    Q_DISABLE_COPY_MOVE(HomeToolButton)
+};
+
+class ResponsiveHomeContent final : public QWidget {
+public:
+    ResponsiveHomeContent(QWidget *library, QWidget *details, QWidget *parent = nullptr):
+        QWidget(parent),
+        m_details(details),
+        m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(0, 0, 0, 0);
+        m_layout->setSpacing(10);
+        m_layout->addWidget(library, 1);
+        m_layout->addWidget(details);
+        applyLayoutMode();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        applyLayoutMode();
+    }
+
+private:
+    void applyLayoutMode()
+    {
+        bool compact = width() > 0 && width() < kCompactHomeWidth;
+        m_layout->setDirection(compact
+            ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+        m_details->setMinimumWidth(compact ? 0 : 220);
+        m_details->setMaximumWidth(compact ? QWIDGETSIZE_MAX : 300);
+    }
+
+    QWidget *m_details;
+    QBoxLayout *m_layout;
+
+    Q_DISABLE_COPY_MOVE(ResponsiveHomeContent)
+};
+
+void configureHomeButton(QWidget *button, QString const& accessibleName,
+    QString const& accessibleDescription, int iconWidth = 0)
+{
+    button->setMinimumHeight(38);
+    constexpr int horizontalPadding = 32;
+    button->setMinimumWidth(button->fontMetrics().horizontalAdvance(accessibleName)
+        + iconWidth + horizontalPadding);
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    button->setAccessibleName(accessibleName);
+    button->setAccessibleDescription(accessibleDescription);
+    button->setToolTip(accessibleDescription);
+}
+
+void configurePrimaryButton(HomePushButton *button, QString const& description)
+{
+    configureHomeButton(button, button->text(), description);
+    button->setLightDefaultColor(ElaThemeColor(ElaThemeType::Light, PrimaryNormal));
+    button->setLightHoverColor(ElaThemeColor(ElaThemeType::Light, PrimaryHover));
+    button->setLightPressColor(ElaThemeColor(ElaThemeType::Light, PrimaryPress));
+    button->setLightTextColor(ElaThemeColor(ElaThemeType::Light, BasicTextInvert));
+    button->setDarkDefaultColor(ElaThemeColor(ElaThemeType::Dark, PrimaryNormal));
+    button->setDarkHoverColor(ElaThemeColor(ElaThemeType::Dark, PrimaryHover));
+    button->setDarkPressColor(ElaThemeColor(ElaThemeType::Dark, PrimaryPress));
+    button->setDarkTextColor(ElaThemeColor(ElaThemeType::Dark, BasicTextInvert));
+}
+
+HomeToolButton *createHomeCommand(QWidget *parent, QString const& text,
+    QString const& description, ElaIconType::IconName icon)
+{
+    auto *button = new HomeToolButton(parent);
+    button->setText(text);
+    button->setElaIcon(icon);
+    button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    button->setIsTransparent(false);
+    configureHomeButton(button, text, description, button->iconSize().width());
+    return button;
+}
+
 }
 
 static QLabel *createMetaLabel(QWidget *parent)
@@ -57,12 +181,11 @@ static void applyHomeTheme(QWidget *homePage)
     QColor panel = eTheme->getThemeColor(mode, ElaThemeType::BasicBase);
     QColor border = eTheme->getThemeColor(mode, ElaThemeType::BasicBorder);
     QColor text = eTheme->getThemeColor(mode, ElaThemeType::BasicText);
-    QColor muted = text;
-    muted.setAlpha(190);
+    QColor muted = eTheme->getThemeColor(mode, ElaThemeType::BasicDetailsText);
     QColor preview = eTheme->getThemeColor(mode, ElaThemeType::WindowBase);
 
     homePage->setStyleSheet(QString(
-        "#homeActionBar, #mascotDetailsPanel {"
+        "#homeActionBar, #mascotDetailsPanel, #mascotLibrarySurface {"
         "  background-color: %1;"
         "  border: 1px solid %2;"
         "  border-radius: 8px;"
@@ -70,6 +193,9 @@ static void applyHomeTheme(QWidget *homePage)
         "#homeSectionTitle {"
         "  color: %3;"
         "  font-weight: 600;"
+        "}"
+        "#homePageDescription, #homeEmptyDescription {"
+        "  color: %4;"
         "}"
         "#mascotPreview {"
         "  background-color: %5;"
@@ -87,52 +213,53 @@ static void applyHomeTheme(QWidget *homePage)
 void ShijimaManager::setupHomePage() {
     m_ui->homePage = new QWidget(this);
     auto *homeLayout = new QVBoxLayout(m_ui->homePage);
-    homeLayout->setContentsMargins(12, 12, 12, 12);
-    homeLayout->setSpacing(10);
+    homeLayout->setContentsMargins(16, 14, 16, 14);
+    homeLayout->setSpacing(12);
+
+    auto *pageTitle = new ElaText(tr("Mascot Manager"), m_ui->homePage);
+    pageTitle->setTextPixelSize(20);
+    pageTitle->setWordWrap(false);
+    pageTitle->setStyleSheet(QStringLiteral(
+        "#ElaText { background-color: transparent; border: none; }"));
+    homeLayout->addWidget(pageTitle);
+
+    auto *pageDescription = new QLabel(
+        tr("Browse your mascot library, start companions, and manage installed packages."),
+        m_ui->homePage);
+    pageDescription->setObjectName(QStringLiteral("homePageDescription"));
+    pageDescription->setWordWrap(true);
+    homeLayout->addWidget(pageDescription);
 
     auto *actionBar = new QFrame(m_ui->homePage);
     actionBar->setObjectName(QStringLiteral("homeActionBar"));
-    auto *actionRow = new QHBoxLayout(actionBar);
-    actionRow->setContentsMargins(10, 8, 10, 8);
-    actionRow->setSpacing(8);
+    auto *actionFlow = new ElaFlowLayout(actionBar, 10, 8, 8);
+    actionFlow->setIsAnimation(false);
 
-    auto *btnSpawn = new ElaPushButton(tr("Spawn Random"));
-    btnSpawn->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
-    configureActionButton(btnSpawn);
+    auto *btnSpawn = new HomePushButton(tr("Spawn Random"), actionBar);
+    configurePrimaryButton(btnSpawn,
+        tr("Spawn a random mascot from the library."));
+    m_ui->spawnRandomButton = btnSpawn;
     connect(btnSpawn, &ElaPushButton::clicked, this, &ShijimaManager::spawnClicked);
-    actionRow->addWidget(btnSpawn);
+    actionFlow->addWidget(btnSpawn);
 
-    auto *btnImport = new ElaPushButton(tr("Import"));
-    btnImport->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
-    configureActionButton(btnImport);
-    connect(btnImport, &ElaPushButton::clicked, this, &ShijimaManager::importAction);
-    actionRow->addWidget(btnImport);
+    auto *btnImport = createHomeCommand(actionBar, tr("Import"),
+        tr("Import mascot packages or Shimeji archives."), ElaIconType::FileImport);
+    connect(btnImport, &ElaToolButton::clicked, this, &ShijimaManager::importAction);
+    actionFlow->addWidget(btnImport);
 
-    auto *btnRefresh = new ElaPushButton(tr("Refresh"));
-    btnRefresh->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
-    configureActionButton(btnRefresh);
-    connect(btnRefresh, &ElaPushButton::clicked, this, &ShijimaManager::syncMascotLibrary);
-    actionRow->addWidget(btnRefresh);
+    auto *btnRefresh = createHomeCommand(actionBar, tr("Refresh"),
+        tr("Reload mascot packages from the library folder."), ElaIconType::ArrowsRotate);
+    connect(btnRefresh, &ElaToolButton::clicked,
+        this, &ShijimaManager::syncMascotLibrary);
+    actionFlow->addWidget(btnRefresh);
 
-    auto *btnDelete = new ElaPushButton(tr("Delete"));
-    btnDelete->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
-    configureActionButton(btnDelete);
-    connect(btnDelete, &ElaPushButton::clicked, this, &ShijimaManager::deleteAction);
-    actionRow->addWidget(btnDelete);
-
-    auto *btnFolder = new ElaPushButton(tr("Show Folder"));
-    btnFolder->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
-    configureActionButton(btnFolder);
-    connect(btnFolder, &ElaPushButton::clicked, [this]() {
+    auto *btnFolder = createHomeCommand(actionBar, tr("Show Folder"),
+        tr("Open the mascot library folder."), ElaIconType::FolderOpen);
+    connect(btnFolder, &ElaToolButton::clicked, this, [this]() {
         QDesktopServices::openUrl(QUrl::fromLocalFile(m_runtime->mascotsPath));
     });
-    actionRow->addWidget(btnFolder);
-
-    actionRow->addStretch();
+    actionFlow->addWidget(btnFolder);
     homeLayout->addWidget(actionBar);
-
-    auto *contentRow = new QHBoxLayout;
-    contentRow->setSpacing(10);
 
     auto *libraryColumn = new QWidget(m_ui->homePage);
     auto *libraryLayout = new QVBoxLayout(libraryColumn);
@@ -142,10 +269,46 @@ void ShijimaManager::setupHomePage() {
     libraryTitle->setObjectName(QStringLiteral("homeSectionTitle"));
     libraryLayout->addWidget(libraryTitle);
 
-    m_ui->listWidget->setParent(m_ui->homePage);
+    auto *librarySurface = new QFrame(libraryColumn);
+    librarySurface->setObjectName(QStringLiteral("mascotLibrarySurface"));
+    auto *librarySurfaceLayout = new QVBoxLayout(librarySurface);
+    librarySurfaceLayout->setContentsMargins(8, 8, 8, 8);
+
+    m_ui->listWidget->setParent(librarySurface);
     m_ui->listWidget->setUniformItemSizes(true);
-    libraryLayout->addWidget(m_ui->listWidget, 1);
-    contentRow->addWidget(libraryColumn, 1);
+    m_ui->listWidget->setAccessibleName(tr("Mascot Library"));
+    m_ui->listWidget->setAccessibleDescription(
+        tr("Installed mascot templates. Use arrow keys to select and Enter to spawn."));
+    librarySurfaceLayout->addWidget(m_ui->listWidget, 1);
+
+    auto *emptyState = new QWidget(librarySurface);
+    m_ui->mascotEmptyStateWidget = emptyState;
+    auto *emptyLayout = new QVBoxLayout(emptyState);
+    emptyLayout->setContentsMargins(24, 24, 24, 24);
+    emptyLayout->setSpacing(8);
+    emptyLayout->addStretch();
+
+    auto *emptyTitle = new QLabel(tr("No imported mascots yet"), emptyState);
+    emptyTitle->setObjectName(QStringLiteral("homeSectionTitle"));
+    emptyTitle->setAlignment(Qt::AlignCenter);
+    emptyLayout->addWidget(emptyTitle);
+
+    auto *emptyDescription = new QLabel(
+        tr("Import a .mascot package or Shimeji archive to get started."), emptyState);
+    emptyDescription->setObjectName(QStringLiteral("homeEmptyDescription"));
+    emptyDescription->setAlignment(Qt::AlignCenter);
+    emptyDescription->setWordWrap(true);
+    emptyLayout->addWidget(emptyDescription);
+
+    auto *emptyImportButton = new HomePushButton(tr("Import Mascot..."), emptyState);
+    configurePrimaryButton(emptyImportButton,
+        tr("Import a mascot package or Shimeji archive."));
+    connect(emptyImportButton, &ElaPushButton::clicked,
+        this, &ShijimaManager::importAction);
+    emptyLayout->addWidget(emptyImportButton, 0, Qt::AlignHCenter);
+    emptyLayout->addStretch();
+    librarySurfaceLayout->addWidget(emptyState, 1);
+    libraryLayout->addWidget(librarySurface, 1);
 
     auto *details = new QFrame(m_ui->homePage);
     details->setObjectName(QStringLiteral("mascotDetailsPanel"));
@@ -193,8 +356,24 @@ void ShijimaManager::setupHomePage() {
     m_ui->mascotDescriptionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     detailsLayout->addWidget(m_ui->mascotDescriptionLabel, 1);
 
-    contentRow->addWidget(details);
-    homeLayout->addLayout(contentRow, 1);
+    auto *btnDelete = createHomeCommand(details, tr("Delete Selected"),
+        tr("Delete the selected mascot packages."), ElaIconType::TrashCan);
+    btnDelete->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btnDelete->setEnabled(false);
+    m_ui->deleteMascotButton = btnDelete;
+    connect(btnDelete, &ElaToolButton::clicked, this, &ShijimaManager::deleteAction);
+    detailsLayout->addWidget(btnDelete);
+
+    auto *responsiveContent = new ResponsiveHomeContent(
+        libraryColumn, details, m_ui->homePage);
+    homeLayout->addWidget(responsiveContent, 1);
+
+    setTabOrder(btnSpawn, btnImport);
+    setTabOrder(btnImport, btnRefresh);
+    setTabOrder(btnRefresh, btnFolder);
+    setTabOrder(btnFolder, m_ui->listWidget);
+    setTabOrder(m_ui->listWidget, emptyImportButton);
+    setTabOrder(emptyImportButton, btnDelete);
     applyHomeTheme(m_ui->homePage);
     connect(eTheme, &ElaTheme::themeModeChanged, m_ui->homePage, [this]() {
         applyHomeTheme(m_ui->homePage);

@@ -51,6 +51,8 @@
 
 namespace {
 
+constexpr qsizetype kPortablePackageBaseNameMaxUtf8Bytes = 200;
+
 class ExactPathExtractor : public shimejifinder::extractor {
 public:
     explicit ExactPathExtractor(QString root): m_root(QDir::cleanPath(root)) {}
@@ -1023,6 +1025,7 @@ LegacyMascotCandidate inspectLegacyDirectory(QString const& sourcePath,
     QString const& fallbackName)
 {
     LegacyMascotCandidate candidate;
+    candidate.sourceName = fallbackName;
     candidate.name = fallbackName;
     candidate.metadata.name = fallbackName;
 
@@ -1044,13 +1047,22 @@ LegacyMascotCandidate inspectLegacyDirectory(QString const& sourcePath,
     }
 
     QFile info(sourceDir.absoluteFilePath(QStringLiteral("info.json")));
-    if (info.exists() && info.open(QFile::ReadOnly)) {
+    bool loadedInfoJson = info.exists() && info.open(QFile::ReadOnly);
+    if (loadedInfoJson) {
+        candidate.infoJson = info.readAll();
         try {
-            candidate.metadata = MascotPackage::metadataFromJson(info.readAll());
+            candidate.metadata = MascotPackage::metadataFromJson(candidate.infoJson);
             candidate.name = candidate.metadata.name;
+            candidate.infoJsonValid =
+                MascotPackage::isValidPackageName(candidate.metadata.name);
+            if (!candidate.infoJsonValid) {
+                candidate.infoJsonError = QStringLiteral(
+                    "Edited info.json has an invalid package name");
+            }
         }
         catch (std::exception const& ex) {
             candidate.generatedMetadata = true;
+            candidate.infoJsonError = QString::fromUtf8(ex.what());
             candidate.warnings.append(QStringLiteral(
                 "info.json is invalid; fallback metadata will be generated (%1)")
                 .arg(QString::fromUtf8(ex.what())));
@@ -1065,6 +1077,15 @@ LegacyMascotCandidate inspectLegacyDirectory(QString const& sourcePath,
     if (candidate.metadata.name.trimmed().isEmpty()) {
         candidate.metadata.name = fallbackName;
         candidate.name = fallbackName;
+    }
+    if (candidate.generatedMetadata && !loadedInfoJson) {
+        candidate.infoJson = MascotPackage::metadataToJson(candidate.metadata);
+        candidate.infoJsonValid =
+            MascotPackage::isValidPackageName(candidate.metadata.name);
+        if (!candidate.infoJsonValid) {
+            candidate.infoJsonError = QStringLiteral(
+                "Edited info.json has an invalid package name");
+        }
     }
     candidate.convertible = candidate.errors.isEmpty();
     return candidate;
@@ -1160,6 +1181,34 @@ QString sanitizedPackageBaseName(QString const& name) {
         result = QStringLiteral("Mascot");
     }
     return result;
+}
+
+bool isValidPackageName(QString const& name)
+{
+    if (name.trimmed().isEmpty()) {
+        return false;
+    }
+    QString const baseName = sanitizedPackageBaseName(name);
+    if (baseName.toUtf8().size() > kPortablePackageBaseNameMaxUtf8Bytes) {
+        return false;
+    }
+    QString const deviceName = baseName.section(QLatin1Char('.'), 0, 0).toUpper();
+    if (deviceName == QStringLiteral("CON") ||
+        deviceName == QStringLiteral("PRN") ||
+        deviceName == QStringLiteral("AUX") ||
+        deviceName == QStringLiteral("NUL"))
+    {
+        return false;
+    }
+    if (deviceName.size() == 4 &&
+        (deviceName.startsWith(QStringLiteral("COM")) ||
+            deviceName.startsWith(QStringLiteral("LPT"))) &&
+        deviceName.at(3) >= QLatin1Char('1') &&
+        deviceName.at(3) <= QLatin1Char('9'))
+    {
+        return false;
+    }
+    return true;
 }
 
 QString packagePathForName(QString const& storagePath, QString const& name) {
@@ -1451,6 +1500,7 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
                 continue;
             }
             LegacyMascotCandidate candidate;
+            candidate.sourceName = name;
             candidate.name = name;
             candidate.metadata.name = name;
             if (!it.value().hasActions) {
@@ -1493,6 +1543,15 @@ LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
 QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
     QString const& archivePath, QString const& outputPath,
     QStringList const& selectedNames)
+{
+    return writeLegacyArchiveSelectionAsPackages(
+        archivePath, outputPath, selectedNames, {});
+}
+
+QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
+    QString const& archivePath, QString const& outputPath,
+    QStringList const& selectedNames,
+    QHash<QString, QByteArray> const& infoJsonOverrides)
 {
     APP_LOG_INFO("package") << "Converting legacy archive path=\""
         << archivePath.toStdString() << "\" output=\""
@@ -1570,17 +1629,53 @@ QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
                 sourcePath);
 
             auto candidate = inspectLegacyDirectory(sourcePath, qName);
-            result.name = candidate.metadata.name;
             if (!candidate.convertible) {
                 result.errorMessage = candidate.errors.join(QStringLiteral("; "));
                 results.append(result);
                 continue;
             }
 
-            ensureLegacyMetadata(sourcePath, qName);
-            if (candidate.generatedMetadata) {
-                writeFallbackMetadata(sourcePath, qName);
+            auto overrideIt = infoJsonOverrides.constFind(qName);
+            if (overrideIt != infoJsonOverrides.constEnd()) {
+                if (static_cast<std::uint64_t>(overrideIt->size()) >
+                    SecurityLimits::kMascotSingleFileMaxBytes)
+                {
+                    result.errorMessage = QStringLiteral("Edited info.json is too large");
+                    results.append(result);
+                    continue;
+                }
+                try {
+                    candidate.metadata = metadataFromJson(*overrideIt);
+                }
+                catch (...) {
+                    result.errorMessage = QStringLiteral("Edited info.json is invalid");
+                    results.append(result);
+                    continue;
+                }
+                if (!isValidPackageName(candidate.metadata.name)) {
+                    result.errorMessage = QStringLiteral(
+                        "Edited info.json has an invalid package name");
+                    results.append(result);
+                    continue;
+                }
+                QSaveFile infoFile(QDir(sourcePath).absoluteFilePath(
+                    QStringLiteral("info.json")));
+                if (!infoFile.open(QFile::WriteOnly) ||
+                    infoFile.write(*overrideIt) != overrideIt->size() ||
+                    !infoFile.commit())
+                {
+                    result.errorMessage = QStringLiteral("Could not write edited info.json");
+                    results.append(result);
+                    continue;
+                }
             }
+            else {
+                ensureLegacyMetadata(sourcePath, qName);
+                if (candidate.generatedMetadata) {
+                    writeFallbackMetadata(sourcePath, qName);
+                }
+            }
+            result.name = candidate.metadata.name;
             QString targetPath = uniquePackagePath(outputPath, candidate.metadata.name,
                 reservedOutputPaths);
             if (writePackageFromDirectory(sourcePath, targetPath, result.errorMessage)) {
