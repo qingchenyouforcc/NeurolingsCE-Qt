@@ -3,6 +3,9 @@
 
 **[English](README_EN.md) | 中文**
 
+> [!NOTE]
+**该应用0.x.x版本均为测试版！有bug请及时在Issue反馈！**
+
 跨平台桌面看板娘（Shimeji）应用，基于 [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt) 深度修改而来。
 
 使用 C++17 / Qt6 构建，支持 Windows、Linux 和 macOS。
