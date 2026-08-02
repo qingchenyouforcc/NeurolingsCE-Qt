@@ -38,10 +38,13 @@
 #include <QListWidget>
 #include <QRandomGenerator>
 #include <QScreen>
+#include <QSettings>
 
 using namespace shijima;
 
 namespace {
+
+QString const kDefaultMascotTemplate = QStringLiteral("@");
 
 void refreshMascotCounts(MascotSessionStore& sessions) {
     long count = sessions.size();
@@ -545,6 +548,73 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
             << "\" with unknown exception";
     }
     return nullptr;
+}
+
+bool ShijimaManager::showCodexNotification(CodexActivity const& activity) {
+    if (!m_settings->value(QStringLiteral("codex/enabled"), false).toBool()) {
+        APP_LOG_DEBUG("codex") << "Codex notification ignored because bubbles are disabled";
+        return true;
+    }
+
+    QString configured = m_settings->value(
+        QStringLiteral("codex/companionTemplate"), kDefaultMascotTemplate)
+        .toString().trimmed();
+    if (configured.isEmpty()) {
+        configured = kDefaultMascotTemplate;
+    }
+    QString selected = configured;
+    // Older development builds used the display label as the persisted
+    // default. Treat those aliases as the bundled template without
+    // rewriting the user's setting.
+    if (!m_runtime->templates.loadedMascots().contains(selected) &&
+        (selected == QStringLiteral("Default") ||
+            selected == QStringLiteral("Default Mascot")) &&
+        m_runtime->templates.loadedMascots().contains(kDefaultMascotTemplate))
+    {
+        selected = kDefaultMascotTemplate;
+    }
+    if (!m_runtime->templates.loadedMascots().contains(selected)) {
+        APP_LOG_WARN("codex") << "Configured Codex companion template is missing name=\""
+            << selected.toStdString() << "\"; falling back to Default Mascot";
+        selected = kDefaultMascotTemplate;
+    }
+    if (!m_runtime->templates.loadedMascots().contains(selected)) {
+        APP_LOG_ERROR("codex") << "Default Mascot template is unavailable";
+        return false;
+    }
+
+    ShijimaWidget *target = nullptr;
+    for (auto mascot : m_runtime->sessions.mascots()) {
+        if (mascot != nullptr && !mascot->markedForDeletion() &&
+            mascot->mascotName() == selected)
+        {
+            target = mascot;
+            break;
+        }
+    }
+    if (target == nullptr) {
+        target = spawn(selected.toStdString());
+    }
+    if (target == nullptr && selected != kDefaultMascotTemplate) {
+        APP_LOG_WARN("codex") << "Configured Codex companion could not spawn; retrying Default Mascot";
+        target = spawn(kDefaultMascotTemplate.toStdString());
+    }
+    if (target == nullptr) {
+        return false;
+    }
+
+    QString message = activity.lastAssistantMessage.trimmed();
+    if (message.isEmpty()) {
+        message = QStringLiteral("任务已完成，没有可显示的回复。");
+    }
+    // The content is used only for this in-memory bubble and is never written
+    // to settings or logs.  Bound it before entering the UI queue.
+    message = truncateCodexGraphemes(message, 512);
+    target->showCodexNotification(message);
+    APP_LOG_INFO("codex") << "Codex notification displayed state=\""
+        << codexActivityStateName(activity.state).toStdString()
+        << " template=\"" << target->mascotName().toStdString() << "\"";
+    return true;
 }
 
 void ShijimaManager::spawnClicked() {

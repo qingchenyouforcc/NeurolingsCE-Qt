@@ -494,6 +494,26 @@ MascotCommandStatus MascotCommandService::showManagerWindow() const {
     return MascotCommandStatus::success();
 }
 
+MascotCommandStatus MascotCommandService::showCodexNotification(
+    CodexActivity const& activity) const
+{
+    if (activity.type != QStringLiteral("agent-turn-complete")) {
+        return MascotCommandStatus::success();
+    }
+    bool delivered = false;
+    m_manager->onTickSync([&delivered, &activity](ShijimaManager *manager) {
+        delivered = manager->showCodexNotification(activity);
+    });
+    // A disabled Codex bubble is an accepted event.  Codex should not retry a
+    // notification simply because the user chose to mute companion bubbles.
+    if (!delivered) {
+        return MascotCommandStatus::failure(503,
+            QStringLiteral("codex_notification_unavailable"),
+            QStringLiteral("No mascot is available for the Codex notification"));
+    }
+    return MascotCommandStatus::success();
+}
+
 MascotCommandStatus MascotCommandService::getLoadedMascot(int mascotId,
     LoadedMascotInfo &out) const
 {

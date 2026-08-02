@@ -73,6 +73,8 @@ QString helpText() {
         "      List running mascots.\n"
         "  --version, -v\n"
         "      Show version information.\n"
+        "  --codex-notify JSON\n"
+        "      Receive one Codex agent-turn-complete notification.\n"
         "\n"
         "Global options:\n"
         "  --quiet\n"
@@ -146,6 +148,9 @@ QJsonObject helpJson() {
     appendCommand(QStringLiteral("--version"), QJsonArray { QStringLiteral("-v") },
         QStringLiteral("--version|-v"),
         QStringLiteral("Show version information."));
+    appendCommand(QStringLiteral("--codex-notify"), QJsonArray {},
+        QStringLiteral("--codex-notify JSON"),
+        QStringLiteral("Receive one Codex notification."));
 
     object["commands"] = commands;
 
@@ -226,6 +231,17 @@ QJsonObject buildLoadedListJson(CliExecutionResult const& result) {
 QJsonObject buildCommandJson(CliCommand const& command,
     CliExecutionResult const& result)
 {
+    if (command.kind == CliCommandKind::CodexNotify) {
+        QJsonObject object;
+        object[QStringLiteral("handled")] = result.codexHandled;
+        if (!result.codexEventType.isEmpty()) {
+            object[QStringLiteral("event_type")] = result.codexEventType;
+        }
+        if (!result.codexState.isEmpty()) {
+            object[QStringLiteral("state")] = result.codexState;
+        }
+        return object;
+    }
     if (command.kind == CliCommandKind::DocumentList ||
         command.kind == CliCommandKind::ListMascots)
     {
@@ -390,6 +406,9 @@ void writeStandardTextOutput(CliCommand const& command,
     }
     if (command.kind == CliCommandKind::DocumentMascot) {
         writeDocumentMascotText(command, result);
+        return;
+    }
+    if (command.kind == CliCommandKind::CodexNotify) {
         return;
     }
     if (result.mascot.has_value()) {

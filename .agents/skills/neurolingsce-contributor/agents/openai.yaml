@@ -1,0 +1,4 @@
+interface:
+  display_name: "NeurolingsCE Contributor"
+  short_description: "Contribute safely to NeurolingsCE subsystems"
+  default_prompt: "Use $neurolingsce-contributor to locate the correct subsystem, preserve GUI-thread boundaries, and verify changes."

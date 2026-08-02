@@ -19,6 +19,8 @@
 #include "InternalCli.hpp"
 
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/CodexActivity.hpp"
+#include "shijima-qt/CodexConfigManager.hpp"
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
 
@@ -29,6 +31,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
 #include <QRandomGenerator>
@@ -59,6 +62,8 @@ char const *commandKindName(CliCommandKind kind) {
             return "document_stop";
         case CliCommandKind::DocumentMascot:
             return "document_mascot";
+        case CliCommandKind::CodexNotify:
+            return "codex_notify";
         case CliCommandKind::ListMascots:
             return "list_mascots";
         case CliCommandKind::ListLoadedMascots:
@@ -684,6 +689,67 @@ CliExecutionResult failExecution(CliExecutionResult result, CliError const& erro
     return result;
 }
 
+CliExecutionResult executeCodexNotify(CliCommand const& command,
+    CliExecutionResult result)
+{
+    QJsonParseError parseError;
+    auto document = QJsonDocument::fromJson(command.codexNotifyPayload.toUtf8(),
+        &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        return failExecution(result, makeError(QStringLiteral("invalid_arguments"),
+            QStringLiteral("Invalid Codex notification JSON: %1")
+                .arg(parseError.errorString()), 2));
+    }
+
+    QStringList forwardCommand;
+    QString forwardError;
+    if (!loadCodexForwardNotifyCommand(codexConfigPath(), forwardCommand,
+        &forwardError))
+    {
+        APP_LOG_WARN("cli") << "Could not load Codex notify forwarding command: "
+            << forwardError.toStdString();
+    }
+    else if (!forwardCommand.isEmpty()) {
+        QString program = forwardCommand.takeFirst();
+        forwardCommand.append(command.codexNotifyPayload);
+        qint64 processId = 0;
+        if (!QProcess::startDetached(program, forwardCommand, QDir::currentPath(),
+            &processId))
+        {
+            APP_LOG_WARN("cli") << "Could not forward Codex notification to "
+                << QFileInfo(program).fileName().toStdString();
+        }
+    }
+
+    CodexActivity activity;
+    QString activityError;
+    bool recognized = false;
+    if (!codexActivityFromJson(document.object(), activity, &recognized,
+        &activityError)) {
+        return failExecution(result, makeError(QStringLiteral("invalid_arguments"),
+            QStringLiteral("Invalid Codex notification: %1").arg(activityError), 2));
+    }
+    result.codexEventType = activity.type;
+    if (!recognized) {
+        APP_LOG_DEBUG("cli") << "Ignoring unknown Codex notification type=\""
+            << activity.type.toStdString() << "\"";
+        return result;
+    }
+
+    QJsonObject response;
+    CliError error;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("show_codex_notification") },
+        { QStringLiteral("payload"), document.object() },
+    }, response, error)) {
+        return failExecution(result, error);
+    }
+    result.codexHandled = response.value(QStringLiteral("handled")).toBool(true);
+    result.codexState = response.value(QStringLiteral("state"))
+        .toString(codexActivityStateName(activity.state));
+    return result;
+}
+
 CliExecutionResult executeDocumentStop(CliCommand const& command,
     CliExecutionResult result)
 {
@@ -949,6 +1015,8 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
             return executeLoadedMascotList(command, result);
         case CliCommandKind::DocumentMascot:
             return executeStandaloneMascotCommand(command, result);
+        case CliCommandKind::CodexNotify:
+            return executeCodexNotify(command, result);
         case CliCommandKind::DocumentSummon:
         case CliCommandKind::SpawnMascot:
             return executeSpawnLikeCommand(command, result);

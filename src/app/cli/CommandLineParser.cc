@@ -18,6 +18,10 @@
 
 #include "InternalCli.hpp"
 
+#include "shijima-qt/CodexActivity.hpp"
+
+#include <QJsonDocument>
+#include <QJsonParseError>
 #include <QHash>
 #include <QSet>
 
@@ -68,6 +72,7 @@ QSet<QString> const& documentCommands() {
         QStringLiteral("-l"),
         QStringLiteral("--version"),
         QStringLiteral("-v"),
+        QStringLiteral("--codex-notify"),
     };
     return commands;
 }
@@ -106,6 +111,7 @@ QString documentHelpText(char const *argv0) {
         "Document commands:\n"
         "  %2 --help|-h\n"
         "  %2 --version|-v\n"
+        "  %2 --codex-notify JSON\n"
         "  %2 --list|-l\n"
         "  %2 --summon|-s mascot --name NAME [label]\n"
         "  %2 --summon|-s mascot --data-id ID [label]\n"
@@ -169,6 +175,8 @@ QString commandUsage(char const *argv0, QString const& commandName) {
             QStringLiteral("Usage: %1 [globals...] --list|-l") },
         { QStringLiteral("--version"),
             QStringLiteral("Usage: %1 [globals...] --version|-v") },
+        { QStringLiteral("--codex-notify"),
+            QStringLiteral("Usage: %1 [globals...] --codex-notify JSON [--json]") },
     };
 
     auto it = usages.constFind(commandName);
@@ -290,6 +298,9 @@ CliCommandKind documentCommandKind(QString const& token) {
     }
     if (token == QStringLiteral("--mascot") || token == QStringLiteral("-m")) {
         return CliCommandKind::DocumentMascot;
+    }
+    if (token == QStringLiteral("--codex-notify")) {
+        return CliCommandKind::CodexNotify;
     }
     return CliCommandKind::DocumentCloseAll;
 }
@@ -457,6 +468,47 @@ CliParseResult parseDocumentCommand(ArgCursor &args, CliParseResult result,
     CliCommand &command = result.command;
     command.documentStyle = true;
     command.kind = documentCommandKind(commandToken);
+
+    if (command.kind == CliCommandKind::CodexNotify) {
+        if (!args.hasNext()) {
+            return failParse(result, QStringLiteral("Missing Codex notification JSON"),
+                argv0, commandToken);
+        }
+        command.codexNotifyPayload = args.take();
+        if (command.codexNotifyPayload.toUtf8().size() > kCodexNotifyMaxBytes) {
+            return failParse(result,
+                QStringLiteral("Codex notification JSON exceeds the maximum size of %1 bytes")
+                    .arg(kCodexNotifyMaxBytes), argv0, commandToken);
+        }
+        QJsonParseError jsonError;
+        auto document = QJsonDocument::fromJson(
+            command.codexNotifyPayload.toUtf8(), &jsonError);
+        if (jsonError.error != QJsonParseError::NoError || !document.isObject()) {
+            return failParse(result,
+                QStringLiteral("Invalid Codex notification JSON: %1")
+                    .arg(jsonError.errorString()), argv0, commandToken);
+        }
+        CodexActivity activity;
+        QString activityError;
+        if (!codexActivityFromJson(document.object(), activity, nullptr,
+            &activityError)) {
+            return failParse(result,
+                QStringLiteral("Invalid Codex notification: %1").arg(activityError),
+                argv0, commandToken);
+        }
+        while (args.hasNext()) {
+            auto option = args.take();
+            if (option == QStringLiteral("--json")) {
+                command.global.json = true;
+                continue;
+            }
+            return failParse(result,
+                QStringLiteral("Unexpected argument: %1").arg(option),
+                argv0, commandToken);
+        }
+        result.global = command.global;
+        return result;
+    }
 
     if (command.kind == CliCommandKind::Help ||
         command.kind == CliCommandKind::Version ||

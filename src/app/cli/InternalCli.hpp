@@ -35,6 +35,7 @@ enum class CliCommandKind {
     DocumentCloseAll,
     DocumentStop,
     DocumentMascot,
+    CodexNotify,
     ListMascots,
     ListLoadedMascots,
     SpawnMascot,
@@ -60,6 +61,7 @@ struct CliCommand {
     QString mascotAction;
     QString mascotArchivePath;
     QString mascotTemplateName;
+    QString codexNotifyPayload;
     QString selector;
     QStringList selectors;
     QStringList behaviors;
@@ -83,6 +85,9 @@ struct CliExecutionResult {
     QList<LoadedMascotInfo> loadedMascots;
     std::optional<MascotInfo> mascot;
     QString removedTemplateName;
+    bool codexHandled = false;
+    QString codexEventType;
+    QString codexState;
     std::optional<CliError> error;
 };
 
