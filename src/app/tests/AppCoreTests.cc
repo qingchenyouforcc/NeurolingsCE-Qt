@@ -25,7 +25,10 @@
 #include "shijima-qt/SafePath.hpp"
 #include "shijima-qt/SecurityLimits.hpp"
 #include "core/shijima-engine/shijima/broadcast/manager.hpp"
+#include "core/shijima-engine/shijima/behavior/manager.hpp"
+#include "core/shijima-engine/shijima/mascot/manager.hpp"
 #include "core/shijima-engine/shijima/scripting/context.hpp"
+#include "ui/mascot/MascotHoldGesture.hpp"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -40,6 +43,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace {
@@ -1032,6 +1037,176 @@ void testBroadcastTargetsNearbyMascots() {
         "the selected nearest target should be reserved");
 }
 
+void testBehaviorPreferenceRestoration() {
+    using shijima::behavior::base;
+    using shijima::behavior::list;
+
+    auto hold = std::make_shared<base>(
+        "Hold", 1, false, shijima::scripting::condition(true));
+    auto natural = std::make_shared<base>(
+        "Natural", 1, false, shijima::scripting::condition(true));
+    auto other = std::make_shared<base>(
+        "Other", 1, false, shijima::scripting::condition(true));
+    hold->add_next = false;
+    hold->next_list = std::make_unique<list>(
+        std::vector<std::shared_ptr<base>> { natural });
+
+    shijima::scripting::context script;
+    shijima::behavior::manager behaviors(script,
+        list(std::vector<std::shared_ptr<base>> { hold, natural, other }),
+        "Hold");
+    auto state = std::make_shared<shijima::mascot::state>();
+    auto active = behaviors.next(state);
+    expect(active == hold,
+        "behavior preference fixture should select the hold behavior first");
+
+    // Simulate the UI's temporary prefer_next_behavior() override, then clear
+    // it as a release would.  The behavior's own custom next-list must win.
+    behaviors.set_next("Other");
+    behaviors.restore_next(active);
+    auto restored = behaviors.next(state);
+    expect(restored == natural,
+        "clearing a temporary preference should restore Add=false next-list");
+}
+
+void testHotspotBehaviorRepeatsAcrossActionCompletion() {
+    // Keep the fixture close to the installed Cerber package: a Stay action
+    // with a 250ms pose, wrapped in a non-looping Sequence through an
+    // ActionReference with Duration=3, plus a natural StandUp successor.
+    // This exercises parser -> action -> mascot manager -> behavior manager,
+    // rather than only testing next-list bookkeeping.
+    std::string const actions = R"xml(
+        <Mascot>
+          <ActionList>
+            <Action Name="Stand" Type="Stay">
+              <Animation>
+                <Pose Image="/stand.png" ImageAnchor="0,0" Velocity="0,0" Duration="250" />
+                <Hotspot Shape="Rectangle" Origin="0,0" Size="10,10" Behavior="Pat" />
+              </Animation>
+            </Action>
+            <Action Name="StandUp" Type="Sequence" Loop="false">
+              <ActionReference Name="Stand" Duration="3" />
+            </Action>
+            <Action Name="PatAction" Type="Stay" Draggable="false">
+              <Animation>
+                <Pose Image="/pat.png" ImageAnchor="0,0" Velocity="0,0" Duration="250" />
+                <Hotspot Shape="Rectangle" Origin="0,0" Size="10,10" Behavior="Pat" />
+              </Animation>
+            </Action>
+            <Action Name="Pat" Type="Sequence" Loop="false">
+              <ActionReference Name="PatAction" Duration="3" />
+            </Action>
+          </ActionList>
+        </Mascot>
+    )xml";
+    std::string const behaviors = R"xml(
+        <Mascot>
+          <BehaviorList>
+            <Behavior Name="Pat" Frequency="0" Hidden="true">
+              <NextBehaviorList Add="false">
+                <BehaviorReference Name="StandUp" Frequency="1" />
+              </NextBehaviorList>
+            </Behavior>
+            <Behavior Name="StandUp" Frequency="1" />
+          </BehaviorList>
+        </Mascot>
+    )xml";
+
+    shijima::mascot::manager mascot(actions, behaviors,
+        { { 0, 0 }, "StandUp", false });
+    auto env = std::make_shared<shijima::mascot::environment>();
+    env->floor = { 0, -100, 100 };
+    env->ceiling = { -100, -100, 100 };
+    env->screen = { -100, 100, 100, -100 };
+    env->work_area = env->screen;
+    env->subtick_count = 1;
+    mascot.state->env = env;
+
+    mascot.tick();
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "StandUp",
+        "hotspot fixture should start in StandUp behavior");
+    expect(mascot.hotspot_behavior({ 0, 0 }) == "Pat",
+        "hotspot fixture should resolve Pat at the pressed coordinate");
+
+    // A long press keeps this preference active once per action round.  The
+    // first four ticks cross the real Cerber action boundary and must start
+    // Pat again instead of falling back to StandUp.
+    for (int i = 0; i < 4; ++i) {
+        mascot.prefer_next_behavior("Pat");
+        mascot.tick();
+    }
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "Pat",
+        "first completed pat action should restart Pat");
+
+    // Keep the preference through another action boundary to verify that a
+    // held gesture produces at least two complete pat rounds.
+    for (int i = 0; i < 4; ++i) {
+        mascot.prefer_next_behavior("Pat");
+        mascot.tick();
+    }
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "Pat",
+        "second completed pat action should restart Pat while held");
+
+    // Releasing restores the behavior's natural successor rather than
+    // leaving the temporary preference in place.
+    mascot.clear_preferred_next_behavior();
+    for (int i = 0; i < 8 && mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "Pat"; ++i)
+    {
+        mascot.tick();
+    }
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "StandUp",
+        "releasing a held pat should restore the natural StandUp successor");
+}
+
+void testMascotHoldGestureBoundaries() {
+    using Gesture = shijima::ui::MascotHoldGesture;
+
+    expect(!Gesture::reachesLongPress(Gesture::kTriggerAfterMs - 1, 0),
+        "mascot hold should wait for the long-press threshold");
+    expect(Gesture::reachesLongPress(Gesture::kTriggerAfterMs,
+        Gesture::kMovementTolerancePx),
+        "mascot hold should trigger at the threshold within tolerance");
+    expect(!Gesture::reachesLongPress(Gesture::kTriggerAfterMs,
+        Gesture::kMovementTolerancePx + 1),
+        "mascot hold should cancel after crossing movement tolerance");
+    expect(!Gesture::reachesLongPress(Gesture::kTriggerAfterMs, -1),
+        "mascot hold should reject invalid movement distances");
+
+    expect(Gesture::qualifiesAsClick(0,
+        Gesture::kClickMovementTolerancePx),
+        "a stationary press should remain a click candidate");
+    expect(Gesture::qualifiesAsClick(Gesture::kClickDurationMs,
+        Gesture::kClickMovementTolerancePx),
+        "a click should include the duration boundary");
+    expect(!Gesture::qualifiesAsClick(Gesture::kClickDurationMs + 1, 0),
+        "a press beyond click duration should not become a click");
+    expect(!Gesture::qualifiesAsClick(10,
+        Gesture::kClickMovementTolerancePx + 1),
+        "a moved press should not become a click");
+
+    expect(!Gesture::cancelsForEvent(QEvent::FocusOut, Qt::LeftButton),
+        "focus loss should not cancel a hold while left button remains down");
+    expect(!Gesture::cancelsForEvent(QEvent::WindowDeactivate,
+        Qt::LeftButton),
+        "window deactivation should not cancel a held left-button gesture");
+    expect(!Gesture::cancelsForEvent(QEvent::ApplicationDeactivate,
+        Qt::LeftButton),
+        "application deactivation should not cancel a held left-button gesture");
+    expect(Gesture::cancelsForEvent(QEvent::FocusOut, Qt::NoButton),
+        "focus loss after a lost release should cancel the stale gesture");
+    expect(Gesture::cancelsForEvent(QEvent::UngrabMouse, Qt::LeftButton),
+        "an explicit mouse ungrab should cancel even while left is down");
+    expect(Gesture::cancelsForEvent(QEvent::Hide, Qt::LeftButton),
+        "hiding a mascot should cancel its active gesture");
+    expect(Gesture::cancelsForEvent(QEvent::Close, Qt::LeftButton),
+        "closing a mascot should cancel its active gesture");
+}
+
 }
 
 int main() {
@@ -1049,6 +1224,9 @@ int main() {
     testSafeChildPath();
     testScriptExecutionTimeout();
     testBroadcastTargetsNearbyMascots();
+    testBehaviorPreferenceRestoration();
+    testHotspotBehaviorRepeatsAcrossActionCompletion();
+    testMascotHoldGestureBoundaries();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

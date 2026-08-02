@@ -32,3 +32,4 @@ shijima 目录是引擎的公共类型和状态机实现。可按 parser → mas
 - parser 生成的引用必须在进入 factory 前解析完成；运行时 action 不应重新解析 XML。
 - animation/pose 的时间单位与 runtime subtick 相关；改变持续时间时检查 tick.hpp 和 action/animation。
 - environment 是无 Qt 的几何/交互抽象；屏幕、窗口、缩放数据由 runtime 填充。
+- mascot manager 的临时行为预选必须在交互结束时恢复当前 behavior 的 next-list，保持 `Add` 与 `NextBehaviorList` 的 XML 语义；hotspot 查询必须沿复合 action 的当前子节点转发，覆盖真实 mascot 的 Sequence/ActionReference 包装。

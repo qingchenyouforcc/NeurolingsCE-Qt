@@ -43,6 +43,9 @@ public:
     manager(scripting::context &ctx, list initial_list,
         std::string const& first_behavior);
     void set_next(std::string const& next_name);
+    // Restore the next-list selected by a currently active behavior after a
+    // temporary set_next() preference has been cleared.
+    void restore_next(std::shared_ptr<base> behavior);
     std::shared_ptr<base> next(std::shared_ptr<mascot::state> state);
 };
 

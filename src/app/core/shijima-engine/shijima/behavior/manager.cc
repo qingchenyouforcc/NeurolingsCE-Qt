@@ -49,6 +49,36 @@ void manager::set_next(std::string const& next_name) {
     }
 }
 
+void manager::restore_next(std::shared_ptr<base> behavior) {
+    if (behavior == nullptr) {
+        set_next("");
+        return;
+    }
+    if (behavior->referenced != nullptr) {
+        behavior = behavior->referenced;
+    }
+
+    // Keep the same Add/NextBehaviorList semantics used after a normal
+    // behavior selection in next().  This is intentionally different from
+    // set_next(""): clearing a temporary preference must not discard a
+    // behavior's custom next-list.
+    if (!behavior->add_next) {
+        if (behavior->next_list != nullptr) {
+            next_list = *behavior->next_list;
+        }
+        else {
+            next_list = {};
+        }
+    }
+    else {
+        next_list = {};
+        next_list.sublists.push_back(initial_list);
+        if (behavior->next_list != nullptr) {
+            next_list.sublists.push_back(*behavior->next_list);
+        }
+    }
+}
+
 std::shared_ptr<base> manager::next(std::shared_ptr<mascot::state> state) {
     auto ctx = global.use();
     ctx->state = state;
@@ -87,19 +117,9 @@ std::shared_ptr<base> manager::next(std::shared_ptr<mascot::state> state) {
         behavior = behavior->referenced;
     }
 
-    // Adjust next_list
-    if (!behavior->add_next) {
-        // If "Add"="false", only use the options provided by the behavior
-        next_list = *behavior->next_list;
-    }
-    else {
-        // Otherwise, merge the initial list and the behavior list
-        next_list = {};
-        next_list.sublists.push_back(initial_list);
-        if (behavior->next_list != nullptr) {
-            next_list.sublists.push_back(*behavior->next_list);
-        }
-    }
+    // Adjust next_list using the same contract exposed for clearing a
+    // temporary preference.
+    restore_next(behavior);
 
     return behavior;
 }

@@ -19,7 +19,6 @@
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 
 #include <QDir>
-
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/ui/menus/ShijimaContextMenu.hpp"
 #include "shijima-qt/ui/widgets/SpeechBubbleWidget.hpp"
@@ -251,15 +250,13 @@ void ShijimaWidget::showContextMenu(QPoint const& pos) {
 }
 
 ShijimaWidget::~ShijimaWidget() {
+    cancelMouseInteraction();
     if (m_speechBubble != nullptr) {
         m_speechBubble->hideBubble();
         delete m_speechBubble;
         m_speechBubble = nullptr;
     }
-    if (m_dragTargetPt != nullptr) {
-        *m_dragTargetPt = nullptr;
-        m_dragTargetPt = nullptr;
-    }
+    clearDragTargetReference();
     if (m_inspector != nullptr) {
         m_inspector->close();
         delete m_inspector;

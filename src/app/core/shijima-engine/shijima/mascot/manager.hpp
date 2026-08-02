@@ -49,6 +49,7 @@ public:
     void detach_from_borders();
     void next_behavior(std::string const& name = "");
     void prefer_next_behavior(std::string const& name);
+    void clear_preferred_next_behavior();
     std::string hotspot_behavior(math::vec2 cursor);
     bool trigger_hotspot(math::vec2 cursor);
 

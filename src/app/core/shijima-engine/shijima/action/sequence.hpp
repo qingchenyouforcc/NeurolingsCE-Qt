@@ -35,6 +35,9 @@ protected:
     virtual std::shared_ptr<base> next_action();
 public:
     std::vector<std::shared_ptr<base>> actions;
+    std::shared_ptr<base> current_action() const {
+        return action;
+    }
     virtual bool requests_interpolation() override;
     virtual void init(mascot::tick &ctx) override;
     virtual bool subtick(int idx) override;

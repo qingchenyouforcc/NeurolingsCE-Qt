@@ -18,11 +18,35 @@
 
 #include "manager.hpp"
 #include "shijima/action/animation.hpp"
+#include "shijima/action/reference.hpp"
+#include "shijima/action/sequence.hpp"
 #include "shijima/mascot/environment.hpp"
 #include <stdexcept>
 
 namespace shijima {
 namespace mascot {
+
+namespace {
+
+std::string hotspot_behavior_at(std::shared_ptr<action::base> const& current,
+    math::vec2 cursor)
+{
+    if (current == nullptr) {
+        return "";
+    }
+    if (auto animation = dynamic_cast<action::animation *>(current.get())) {
+        return animation->hotspot_behavior_at(cursor);
+    }
+    if (auto reference = dynamic_cast<action::reference *>(current.get())) {
+        return hotspot_behavior_at(reference->target, cursor);
+    }
+    if (auto sequence = dynamic_cast<action::sequence *>(current.get())) {
+        return hotspot_behavior_at(sequence->current_action(), cursor);
+    }
+    return "";
+}
+
+}
 
 void manager::_next_behavior(std::string const& name) {
     if (name != "") {
@@ -123,12 +147,12 @@ void manager::prefer_next_behavior(std::string const& name) {
     behaviors.set_next(name);
 }
 
+void manager::clear_preferred_next_behavior() {
+    behaviors.restore_next(state->behavior);
+}
+
 std::string manager::hotspot_behavior(math::vec2 cursor) {
-    auto anim_action = dynamic_cast<action::animation *>(action.get());
-    if (anim_action == nullptr) {
-        return "";
-    }
-    std::string behavior = anim_action->hotspot_behavior_at(cursor);
+    std::string behavior = hotspot_behavior_at(action, cursor);
     if (behavior.empty()) {
         return "";
     }

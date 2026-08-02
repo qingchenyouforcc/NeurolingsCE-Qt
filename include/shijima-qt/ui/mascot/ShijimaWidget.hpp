@@ -35,6 +35,7 @@
 #include "shijima-qt/SoundEffectManager.hpp"
 
 class QCloseEvent;
+class QEvent;
 class QMouseEvent;
 class QPaintEvent;
 class ShijimaContextMenu;
@@ -89,6 +90,7 @@ public:
     void resetFallThroughTrackingIfDragged();
     void observeFallProgress(double anchorYBefore, double anchorYAfter);
 protected:
+    bool event(QEvent *) override;
     void paintEvent(QPaintEvent *) override;
     void mousePressEvent(QMouseEvent *) override;
     void mouseDoubleClickEvent(QMouseEvent *) override;
@@ -96,6 +98,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent *) override;
 private:
     void setDragTarget(ShijimaWidget *target);
+    void beginLeftPress(QPoint const& screenPos);
+    void clearDragTargetReference();
+    void cancelMouseInteraction();
     QPoint envPosFromScreen(QPoint const& screenPos) const;
     void startHotspotHold(QPoint const& screenPos);
     bool stopHotspotHold();
@@ -138,9 +143,12 @@ private:
     SpeechBubbleWidget *m_speechBubble = nullptr;
     QPoint m_lastPressGlobalPos;
     QElapsedTimer m_pressElapsedTimer;
+    int m_pressMaxMovement = 0;
+    bool m_leftPressActive = false;
     QTimer m_clickResetTimer;
     std::string m_hotspotHoldBehavior;
     QPoint m_hotspotHoldPressGlobalPos;
     bool m_hotspotHoldTriggered = false;
+    bool m_hotspotHoldPreferredNext = false;
     int m_clickCount = 0;
 };
