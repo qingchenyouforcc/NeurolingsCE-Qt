@@ -6,6 +6,21 @@ NeurolingsCE is a C++17/Qt 6 desktop application. First-party application code l
 
 Treat `ElaWidgetTools/`, `cpp-httplib/`, and most of `libshimejifinder/` as vendored dependencies. Build helpers belong in `cmake/`, packaging scripts in `src/tools/` and `installer/`, and generated output in `build/` or `out/`.
 
+## Agent Code Orientation
+
+src/app/README.md is the entry point for understanding the application layer. Every directory under src/app/ has a README.md that describes the directory responsibility, the main data/control flow, and the purpose of every source or header file in that directory. Before changing a file, read the nearest README and then follow its links to the caller/callee modules when the change crosses a boundary.
+
+Use the documentation hierarchy as a fast reading map:
+
+- src/app/README.md explains application startup, GUI tick flow, CLI/IPC flow, and the module index.
+- src/app/core/README.md explains shared services; core/commands/README.md is the JSON contract boundary and core/assets/README.md is the package/path security boundary.
+- src/app/runtime/README.md explains Manager lifecycle, template/session ownership, screen environments, imports, and tick ordering.
+- src/app/ui/README.md explains the QWidget layer; its child READMEs separate pages, mascot rendering/input, menus, dialogs, and speech bubbles.
+- src/app/core/shijima-engine/README.md and the nested engine READMEs explain parser → factory → behavior → action → state/environment execution. rapidxml/ and scripting/duktape/ are vendored boundaries.
+- src/app/cli/README.md and src/app/tests/README.md document command execution/output and the corresponding behavior/security tests.
+
+These READMEs are navigation documents, not substitutes for public headers or implementation contracts. When adding, moving, renaming, or materially changing a file under src/app/, update the nearest README and any parent directory index in the same change. Keep file responsibility descriptions aligned with the actual call graph, thread boundary, ownership/lifecycle rules, security limits, and JSON fields. Do not modify vendored engine/dependency sources merely to update documentation.
+
 ## Build, Test, and Development Commands
 
 Initialize dependencies after cloning:
