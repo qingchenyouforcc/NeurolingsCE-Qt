@@ -9,7 +9,7 @@ ui 把 Manager 和 Shijima 引擎状态呈现为 Qt 窗口、页面、托盘、�
 | interface | 主窗口导航、主页、创建/转换、组合、设置和关于页面。 |
 | mascot | 单只 mascot 的 QWidget 生命周期、渲染和鼠标交互。 |
 | menus | mascot 右键菜单和上下文动作。 |
-| widgets | speech bubble、Codex 文本截断和排版。 |
+| widgets | speech bubble、Codex Markdown 安全清洗/渲染、文本截断和排版。 |
 | dialogs | 强制进度、检查器和许可证对话框。 |
 
 ## 本目录文件

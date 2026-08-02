@@ -19,6 +19,9 @@
 #include <QGuiApplication>
 #include <QRect>
 #include <QString>
+#include <QTextBlock>
+#include <QTextCharFormat>
+#include <QTextDocument>
 
 #include <cstdlib>
 #include <iostream>
@@ -110,6 +113,57 @@ void testDurations() {
         "long Codex excerpts should cap at twelve seconds");
 }
 
+void testMarkdownRenderingAndSafety(QFont const& font) {
+    QString source = QStringLiteral("# **完成**\n\n"
+        "- `命令`\n- _结果_\n\n"
+        "[安全标签](https://example.invalid/never-open)\n"
+        "<script>alert('x')</script>");
+    QString sanitized = sanitizeCodexMarkdown(source);
+    expect(!sanitized.contains(QStringLiteral("example.invalid")),
+        "Codex Markdown sanitization should remove link destinations");
+    expect(sanitized.contains(QStringLiteral("**完成**")) &&
+        sanitized.contains(QStringLiteral("`命令`")),
+        "Codex Markdown sanitization should preserve safe formatting markers");
+    expect(sanitized.contains(QStringLiteral("&lt;script&gt;")),
+        "Codex Markdown sanitization should escape raw HTML tags");
+
+    auto excerpt = formatCodexBubbleExcerpt(source, font, 320, 200, 8);
+    expect(!excerpt.truncated && excerpt.text.contains(QStringLiteral("**完成**")),
+        "short Codex Markdown should retain formatting source");
+
+    QTextDocument document;
+    configureCodexMarkdownDocument(document, excerpt.text, font, 320);
+    expect(document.toPlainText().contains(QStringLiteral("完成")) &&
+        document.toPlainText().contains(QStringLiteral("命令")),
+        "configured Codex document should expose Markdown content as text");
+    expect(!document.toHtml().contains(QStringLiteral("<script"),
+        Qt::CaseInsensitive),
+        "configured Codex document should not contain executable HTML tags");
+    bool sawBold = false;
+    bool sawAnchor = false;
+    for (QTextBlock block = document.begin(); block != document.end();
+        block = block.next())
+    {
+        for (QTextBlock::Iterator iterator = block.begin();
+            iterator != block.end(); ++iterator)
+        {
+            auto fragment = iterator.fragment();
+            if (!fragment.isValid()) {
+                continue;
+            }
+            auto format = fragment.charFormat();
+            sawBold = sawBold || format.fontWeight() >= QFont::Bold;
+            sawAnchor = sawAnchor || format.isAnchor() ||
+                format.hasProperty(QTextFormat::AnchorHref);
+        }
+    }
+    expect(sawBold, "Codex Markdown document should render bold text");
+    expect(!sawAnchor,
+        "Codex Markdown document should clear links and remain non-interactive");
+    expect(codexMarkdownFits(source, font, 320, 200, 8),
+        "formatted Codex Markdown should use document layout for fit checks");
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -125,6 +179,7 @@ int main(int argc, char **argv) {
     testEmojiDoesNotLoop(font);
     testMultilineAndLargeFont(font);
     testDurations();
+    testMarkdownRenderingAndSafety(font);
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

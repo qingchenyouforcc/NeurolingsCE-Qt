@@ -22,6 +22,7 @@
 
 #include "shijima-qt/AppLog.hpp"
 
+#include <QAbstractTextDocumentLayout>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QPalette>
@@ -118,12 +119,12 @@ void SpeechBubbleWidget::showContent(Content const& content,
 
     QString body = m_text;
     int effectiveDurationMs = durationMs;
+    int maxTextHeight = kCodexMaxBubbleHeight
+        - titleHeight
+        - m_padding * 2
+        - m_tailHeight
+        - 4;
     if (m_currentCodex) {
-        int maxTextHeight = kCodexMaxBubbleHeight
-            - titleHeight
-            - m_padding * 2
-            - m_tailHeight
-            - 4;
         auto excerpt = formatCodexBubbleExcerpt(m_text, font, maxTextWidth,
             maxTextHeight, kCodexMaxBodyLines);
         body = excerpt.text;
@@ -132,8 +133,33 @@ void SpeechBubbleWidget::showContent(Content const& content,
     }
     m_content.body = body;
     m_text = body;
-    QRect textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
-        Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, body);
+    QRect textRect;
+    if (m_currentCodex) {
+        configureCodexMarkdownDocument(m_codexDocument, body, font,
+            maxTextWidth);
+        int bodyWidth = qBound(1, qCeil(m_codexDocument.idealWidth()),
+            maxTextWidth);
+        // idealWidth() is computed before wrapping. Reapply the actual width
+        // used by the bubble so headings/lists and code blocks are measured
+        // with exactly the same layout that paintEvent() will draw.
+        configureCodexMarkdownDocument(m_codexDocument, body, font,
+            bodyWidth);
+        qreal bodyHeight = m_codexDocument.documentLayout()
+            ->documentSize().height();
+        if (bodyHeight > maxTextHeight && bodyWidth < maxTextWidth) {
+            bodyWidth = maxTextWidth;
+            configureCodexMarkdownDocument(m_codexDocument, body, font,
+                bodyWidth);
+            bodyHeight = m_codexDocument.documentLayout()
+                ->documentSize().height();
+        }
+        textRect = QRect(0, 0, bodyWidth, qCeil(bodyHeight));
+    }
+    else {
+        m_codexDocument.clear();
+        textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
+            Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, body);
+    }
 
     int contentWidth = textRect.width();
     if (m_currentCodex) {
@@ -275,11 +301,25 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
         painter.setFont(font);
         textRect.setTop(titleRect.bottom() + 3);
     }
-    int bodyFlags = Qt::TextWordWrap;
-    bodyFlags |= m_currentCodex
-        ? Qt::AlignLeft | Qt::AlignTop
-        : Qt::AlignCenter;
-    painter.drawText(textRect, bodyFlags, m_text);
+    if (m_currentCodex) {
+        // QTextDocument's Markdown parser gives Codex notifications real
+        // emphasis, headings, lists and code spans. The document has no
+        // interaction flags and all anchor formats are cleared by the
+        // formatter, so untrusted text can never launch an external URL.
+        QAbstractTextDocumentLayout::PaintContext context;
+        context.palette = palette;
+        context.palette.setColor(QPalette::Text, textColor);
+        context.clip = textRect;
+        painter.save();
+        painter.translate(textRect.topLeft());
+        context.clip = QRectF(QPointF(0, 0), textRect.size());
+        m_codexDocument.documentLayout()->draw(&painter, context);
+        painter.restore();
+    }
+    else {
+        int bodyFlags = Qt::TextWordWrap | Qt::AlignCenter;
+        painter.drawText(textRect, bodyFlags, m_text);
+    }
 }
 
 #include "SpeechBubbleWidget.moc"

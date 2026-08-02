@@ -22,6 +22,7 @@
 #include <QQueue>
 #include <QString>
 #include <QStringList>
+#include <QTextDocument>
 #include <QTimer>
 #include <QWidget>
 
@@ -64,6 +65,10 @@ private:
     Content m_content;
     QQueue<Content> m_codexQueue;
     QString m_text;
+    // Only Codex notifications use this document.  Ordinary mascot bubbles
+    // continue through QPainter::drawText so their centered, three-second
+    // behavior remains unchanged.
+    QTextDocument m_codexDocument;
     QTimer m_hideTimer;
     QPoint m_anchorScreenPos;
     bool m_active = false;

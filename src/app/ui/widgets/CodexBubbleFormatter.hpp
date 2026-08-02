@@ -19,13 +19,38 @@
 // 
 
 #include <QFont>
+#include <QTextDocument>
 #include <QString>
 
 struct CodexBubbleExcerpt {
+    // The excerpt is a sanitized Markdown source string.  SpeechBubbleWidget
+    // renders it with QTextDocument; keeping the source here means that
+    // emphasis, lists and code spans survive the normal (non-truncated) path.
     QString text;
     int retainedGraphemes = 0;
     bool truncated = false;
 };
+
+// Escape raw HTML and remove Markdown link destinations before handing
+// untrusted Codex text to Qt's rich-text parser.  The operation is
+// intentionally idempotent so callers can safely pass an already-sanitized
+// excerpt back through the helper.
+QString sanitizeCodexMarkdown(QString const& source);
+
+// Return the text that a sanitized Markdown document visibly contains.  This
+// is used for duration accounting and tests; formatting markers are not
+// counted as visible graphemes.
+QString codexMarkdownPlainText(QString const& markdown);
+
+// Configure a QTextDocument for safe, non-interactive Codex rendering.
+// setMarkdown() itself never opens links, and this helper additionally clears
+// anchor formats so a future mouse/event path cannot accidentally make a
+// notification an external-link launcher.
+void configureCodexMarkdownDocument(QTextDocument &document,
+    QString const& markdown, QFont const& font, int textWidth);
+
+bool codexMarkdownFits(QString const& markdown, QFont const& font,
+    int textWidth, int maxTextHeight, int maxLines);
 
 CodexBubbleExcerpt formatCodexBubbleExcerpt(QString const& source,
     QFont const& font, int textWidth, int maxTextHeight, int maxLines);
