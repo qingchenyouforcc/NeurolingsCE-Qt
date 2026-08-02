@@ -26,8 +26,8 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QBoxLayout>
 #include <QFrame>
-#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -38,6 +38,7 @@
 #include <QMap>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSettings>
 #include <QSizePolicy>
 #include <QStyle>
@@ -58,6 +59,8 @@ constexpr int kCombinationPayloadRole = Qt::UserRole + 2;
 constexpr int kCombinationIsRestorableRole = Qt::UserRole + 3;
 constexpr int kMaxMascotsPerEntry = 50;
 constexpr int kMaxMascotsPerCombination = 200;
+constexpr int kCompactCombinationWidth = 720;
+constexpr int kCompactCombinationActionWidth = 520;
 
 enum class CombinationType {
     LastBeforeClose = 0,
@@ -248,10 +251,91 @@ QString combinationDetails(QString const& title, QJsonObject const& combination)
     return lines.join(QStringLiteral("\n"));
 }
 
+class ResponsiveCombinationActionRow final : public QWidget {
+public:
+    explicit ResponsiveCombinationActionRow(QWidget *parent = nullptr,
+        int compactWidth = kCompactCombinationActionWidth):
+        QWidget(parent),
+        m_compactWidth(compactWidth),
+        m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(0, 0, 0, 0);
+        m_layout->setSpacing(8);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    }
+
+    void addButton(ElaPushButton *button)
+    {
+        m_layout->addWidget(button);
+    }
+
+    void addStretch()
+    {
+        m_layout->addStretch();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        bool compact = width() > 0 && width() < m_compactWidth;
+        m_layout->setDirection(compact
+            ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    }
+
+private:
+    int m_compactWidth;
+    QBoxLayout *m_layout;
+
+    Q_DISABLE_COPY_MOVE(ResponsiveCombinationActionRow)
+};
+
+class ResponsiveCombinationContent final : public QWidget {
+public:
+    ResponsiveCombinationContent(QWidget *list, QWidget *details,
+        QWidget *parent = nullptr):
+        QWidget(parent),
+        m_details(details),
+        m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(0, 0, 0, 0);
+        m_layout->setSpacing(10);
+        m_layout->addWidget(list, 2);
+        m_layout->addWidget(details);
+        applyLayoutMode();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        applyLayoutMode();
+    }
+
+private:
+    void applyLayoutMode()
+    {
+        bool compact = width() > 0 && width() < kCompactCombinationWidth;
+        m_layout->setDirection(compact
+            ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+        m_details->setMinimumWidth(compact ? 0 : 260);
+        m_details->setMaximumWidth(compact ? QWIDGETSIZE_MAX : 340);
+    }
+
+    QWidget *m_details;
+    QBoxLayout *m_layout;
+
+    Q_DISABLE_COPY_MOVE(ResponsiveCombinationContent)
+};
+
 void configureCombinationButton(ElaPushButton *button)
 {
-    button->setMinimumHeight(34);
+    constexpr int horizontalPadding = 32;
+    button->setMinimumHeight(38);
+    button->setMinimumWidth(button->fontMetrics().horizontalAdvance(button->text())
+        + button->iconSize().width() + horizontalPadding);
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    button->setAccessibleName(button->text());
 }
 
 QFrame *makeCombinationPanel(QWidget *parent)
@@ -295,27 +379,26 @@ void ShijimaManager::setupCombinationsPage()
     root->addWidget(description);
 
     auto *actionPanel = makeCombinationPanel(m_ui->combinationsPage);
-    auto *actionLayout = new QHBoxLayout(actionPanel);
+    auto *actionLayout = new QVBoxLayout(actionPanel);
     actionLayout->setContentsMargins(14, 10, 14, 10);
     actionLayout->setSpacing(8);
+    auto *actionRow = new ResponsiveCombinationActionRow(actionPanel);
 
     auto *saveButton = new ElaPushButton(tr("Save Current Combination"), actionPanel);
     saveButton->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
     configureCombinationButton(saveButton);
     connect(saveButton, &ElaPushButton::clicked, this, &ShijimaManager::saveCurrentCombination);
-    actionLayout->addWidget(saveButton);
+    actionRow->addButton(saveButton);
 
     auto *refreshButton = new ElaPushButton(tr("Refresh"), actionPanel);
     refreshButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     configureCombinationButton(refreshButton);
     connect(refreshButton, &ElaPushButton::clicked, this, &ShijimaManager::refreshCombinationPage);
-    actionLayout->addWidget(refreshButton);
+    actionRow->addButton(refreshButton);
+    actionRow->addStretch();
 
-    actionLayout->addStretch();
+    actionLayout->addWidget(actionRow);
     root->addWidget(actionPanel);
-
-    auto *contentRow = new QHBoxLayout;
-    contentRow->setSpacing(10);
 
     auto *listPanel = makeCombinationPanel(m_ui->combinationsPage);
     auto *listLayout = new QVBoxLayout(listPanel);
@@ -330,11 +413,8 @@ void ShijimaManager::setupCombinationsPage()
     m_ui->combinationListWidget->setSelectionMode(QListWidget::SingleSelection);
     m_ui->combinationListWidget->setUniformItemSizes(false);
     listLayout->addWidget(m_ui->combinationListWidget, 1);
-    contentRow->addWidget(listPanel, 2);
 
     auto *detailsPanel = makeCombinationPanel(m_ui->combinationsPage);
-    detailsPanel->setMinimumWidth(260);
-    detailsPanel->setMaximumWidth(340);
     auto *detailsLayout = new QVBoxLayout(detailsPanel);
     detailsLayout->setContentsMargins(14, 12, 14, 12);
     detailsLayout->setSpacing(8);
@@ -364,8 +444,9 @@ void ShijimaManager::setupCombinationsPage()
         this, &ShijimaManager::deleteSelectedCombination);
     detailsLayout->addWidget(m_ui->deleteCombinationButton);
 
-    contentRow->addWidget(detailsPanel);
-    root->addLayout(contentRow, 1);
+    auto *responsiveContent = new ResponsiveCombinationContent(
+        listPanel, detailsPanel, m_ui->combinationsPage);
+    root->addWidget(responsiveContent, 1);
 
     connect(m_ui->combinationListWidget, &QListWidget::itemSelectionChanged, this, [this]() {
         auto *item = m_ui->combinationListWidget->currentItem();
