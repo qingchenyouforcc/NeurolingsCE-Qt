@@ -38,6 +38,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocale>
 #include <QMessageBox>
 #include <QScreen>
 #include <QSettings>
@@ -159,7 +160,20 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     elaStatusBar->addWidget(m_ui->statusLabel, 1);
     updateStatusBar();
 
-    QString savedLang = m_settings->value("language", "en").toString();
+    auto normalizeLanguageCode = [](QString code) {
+        code = code.trimmed();
+        if (code.compare("zh_CN", Qt::CaseInsensitive) == 0 ||
+            code.startsWith("zh", Qt::CaseInsensitive))
+        {
+            return QStringLiteral("zh_CN");
+        }
+        return QStringLiteral("en");
+    };
+
+    QString savedLang = m_settings->contains("language")
+        ? normalizeLanguageCode(m_settings->value("language").toString())
+        : normalizeLanguageCode(QLocale::system().name());
+    m_settings->setValue("language", savedLang);
     if (savedLang != "en") {
         m_ui->currentLanguage = "en";
         switchLanguage(savedLang);
