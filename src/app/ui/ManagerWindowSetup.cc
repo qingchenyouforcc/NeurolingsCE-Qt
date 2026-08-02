@@ -32,6 +32,9 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QEvent>
 #include <QFile>
 #include <QGuiApplication>
@@ -146,6 +149,7 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         this, &ShijimaManager::updateSelectedMascotDetails);
     m_ui->listWidget->setIconSize({ 64, 64 });
     m_ui->listWidget->installEventFilter(this);
+    m_ui->listWidget->setAcceptDrops(true);
     m_ui->listWidget->setSelectionMode(QListWidget::ExtendedSelection);
     ShijimaManagerUiInternal::applyMascotListTheme(*m_ui->listWidget);
     connect(eTheme, &ElaTheme::themeModeChanged, this, [this]() {
@@ -211,6 +215,22 @@ ShijimaManager::ShijimaManager(QWidget *parent):
 }
 
 bool ShijimaManager::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == m_ui->listWidget) {
+        if (event->type() == QEvent::DragEnter) {
+            dragEnterEvent(static_cast<QDragEnterEvent *>(event));
+            return event->isAccepted();
+        }
+        if (event->type() == QEvent::DragMove) {
+            auto *dragMoveEvent = static_cast<QDragMoveEvent *>(event);
+            dragMoveEvent->acceptProposedAction();
+            return true;
+        }
+        if (event->type() == QEvent::Drop) {
+            dropEvent(static_cast<QDropEvent *>(event));
+            return event->isAccepted();
+        }
+    }
+
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
         auto key = keyEvent->key();
