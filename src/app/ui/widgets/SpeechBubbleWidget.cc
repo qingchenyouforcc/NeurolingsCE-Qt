@@ -18,8 +18,12 @@
 
 #include "shijima-qt/ui/widgets/SpeechBubbleWidget.hpp"
 
+#include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/CodexActivity.hpp"
+
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QPalette>
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
@@ -33,45 +37,124 @@ SpeechBubbleWidget::SpeechBubbleWidget(QWidget *parent)
     setAttribute(Qt::WA_DeleteOnClose, false);
 
     m_hideTimer.setSingleShot(true);
-    connect(&m_hideTimer, &QTimer::timeout, this, &SpeechBubbleWidget::hideBubble);
+    connect(&m_hideTimer, &QTimer::timeout, this, [this]() {
+        if (!m_codexQueue.isEmpty()) {
+            m_active = false;
+            hide();
+            showNextCodexBubble();
+        }
+        else {
+            hideBubble();
+        }
+    });
 }
 
 void SpeechBubbleWidget::showBubble(const QString &text, const QPoint &anchorScreenPos) {
-    m_text = text;
-    m_active = true;
+    showContent(Content { {}, text, Tone::Normal }, anchorScreenPos, 3000);
+}
+
+void SpeechBubbleWidget::showCodexBubble(const QString &text,
+    const QPoint &anchorScreenPos, const QString &title)
+{
+    Content content { title, text, Tone::CodexReady };
+    if (m_currentCodex || m_active) {
+        if (m_codexQueue.size() >= 8) {
+            m_codexQueue.dequeue();
+            APP_LOG_WARN("codex") << "Codex bubble queue full; dropped oldest pending notification"
+                << " pending_after_drop=" << m_codexQueue.size();
+        }
+        m_codexQueue.enqueue(content);
+        m_anchorScreenPos = anchorScreenPos;
+        return;
+    }
+    m_codexQueue.enqueue(content);
     m_anchorScreenPos = anchorScreenPos;
-
-    // Calculate bubble size based on text
-    QFont font;
-    font.setPixelSize(13);
-    QFontMetrics fm(font);
-
-    // Wrap text to a maximum width
-    int maxTextWidth = 200;
-    QRect textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
-        Qt::TextWordWrap | Qt::AlignLeft, m_text);
-
-    int bubbleWidth = textRect.width() + m_padding * 2 + 4;
-    int bubbleHeight = textRect.height() + m_padding * 2 + m_tailHeight + 4;
-
-    // Minimum size
-    if (bubbleWidth < 60) bubbleWidth = 60;
-    if (bubbleHeight < 40 + m_tailHeight) bubbleHeight = 40 + m_tailHeight;
-
-    setFixedSize(bubbleWidth, bubbleHeight);
-    updatePosition(anchorScreenPos);
-
-    show();
-    raise();
-
-    // Auto-hide after 3 seconds
-    m_hideTimer.start(3000);
+    showNextCodexBubble();
 }
 
 void SpeechBubbleWidget::hideBubble() {
     m_active = false;
+    m_currentCodex = false;
     m_hideTimer.stop();
     hide();
+}
+
+void SpeechBubbleWidget::showContent(Content const& content,
+    QPoint const& anchorScreenPos, int durationMs)
+{
+    m_hideTimer.stop();
+    m_content = content;
+    m_text = content.body;
+    m_currentCodex = content.tone != Tone::Normal;
+    m_active = true;
+    m_anchorScreenPos = anchorScreenPos;
+
+    QFont font = QGuiApplication::font();
+    if (font.pointSizeF() <= 0) {
+        font.setPixelSize(13);
+    }
+    QFontMetrics fm(font);
+    int maxTextWidth = m_currentCodex ? 320 : 200;
+    QString body = m_currentCodex
+        ? fitCodexText(m_text, font, maxTextWidth, 8)
+        : m_text;
+    m_content.body = body;
+    m_text = body;
+    QRect textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
+        Qt::TextWordWrap | Qt::AlignLeft, body);
+    int titleHeight = 0;
+    if (m_currentCodex && !m_content.title.isEmpty()) {
+        QFont titleFont = font;
+        titleFont.setBold(true);
+        titleHeight = QFontMetrics(titleFont).lineSpacing() + 4;
+    }
+
+    int bubbleWidth = textRect.width() + m_padding * 2 + 4;
+    int bubbleHeight = textRect.height() + titleHeight + m_padding * 2 +
+        m_tailHeight + 4;
+    if (m_currentCodex) {
+        bubbleWidth = qBound(60, bubbleWidth, 360);
+        bubbleHeight = qBound(40 + m_tailHeight, bubbleHeight, 240);
+    }
+    else {
+        // Keep the pre-existing random-bubble sizing behavior unchanged.
+        bubbleWidth = qMax(60, bubbleWidth);
+        bubbleHeight = qMax(40 + m_tailHeight, bubbleHeight);
+    }
+    setFixedSize(bubbleWidth, bubbleHeight);
+    updatePosition(anchorScreenPos);
+    show();
+    raise();
+    m_hideTimer.start(durationMs);
+}
+
+void SpeechBubbleWidget::showNextCodexBubble() {
+    if (m_codexQueue.isEmpty()) {
+        hideBubble();
+        return;
+    }
+    auto content = m_codexQueue.dequeue();
+    showContent(content, m_anchorScreenPos, 8000);
+}
+
+QString SpeechBubbleWidget::fitCodexText(QString const& text,
+    QFont const& font, int width, int maxLines)
+{
+    QString candidate = truncateCodexGraphemes(text, 4096);
+    QFontMetrics fm(font);
+    while (!candidate.isEmpty()) {
+        auto rect = fm.boundingRect(QRect(0, 0, width, 0),
+            Qt::TextWordWrap | Qt::AlignLeft, candidate);
+        if (rect.height() <= maxLines * fm.lineSpacing()) {
+            return candidate;
+        }
+        candidate = truncateCodexGraphemes(candidate,
+            qMax(1, candidate.size() - 8));
+        if (candidate.endsWith(QStringLiteral("…"))) {
+            candidate.chop(1);
+        }
+    }
+    return QStringLiteral("…");
 }
 
 void SpeechBubbleWidget::updatePosition(const QPoint &anchorScreenPos) {
@@ -105,8 +188,10 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    QFont font;
-    font.setPixelSize(13);
+    QFont font = QGuiApplication::font();
+    if (font.pointSizeF() <= 0) {
+        font.setPixelSize(13);
+    }
     painter.setFont(font);
 
     // Bubble body rect (above the tail)
@@ -134,15 +219,50 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
     painter.setBrush(QColor(30, 32, 36, 38));
     painter.drawPath(shadowPath);
 
-    // Fill and stroke
-    painter.setPen(QPen(QColor(255, 255, 255, 185), 1.2));
-    painter.setBrush(QColor(255, 255, 255, 205));
+    // Draw text using the current system palette so light/dark mode and high
+    // contrast themes remain legible without hard-coded white/black colors.
+    auto palette = QGuiApplication::palette();
+    QColor base = palette.color(QPalette::Base);
+    base.setAlpha(235);
+    QColor textColor = palette.color(QPalette::Text);
+    QColor border = palette.color(QPalette::Mid);
+    if (m_currentCodex) {
+        switch (m_content.tone) {
+            case Tone::CodexReady:
+                border = palette.color(QPalette::Highlight);
+                break;
+            case Tone::CodexRunning:
+                border = palette.color(QPalette::Link);
+                break;
+            case Tone::CodexNeedsInput:
+                border = palette.color(QPalette::BrightText);
+                break;
+            case Tone::CodexBlocked:
+                border = palette.color(QPalette::Dark);
+                break;
+            case Tone::Normal:
+                break;
+        }
+    }
+    border.setAlpha(200);
+    painter.setPen(QPen(border, 1.2));
+    painter.setBrush(base);
     painter.drawPath(fullPath);
 
-    // Draw text
     QRectF textRect = bodyRect.adjusted(m_padding, m_padding,
         -m_padding, -m_padding);
-    painter.setPen(QColor(40, 40, 40));
+    painter.setPen(textColor);
+    if (m_currentCodex && !m_content.title.isEmpty()) {
+        QFont titleFont = font;
+        titleFont.setBold(true);
+        painter.setFont(titleFont);
+        QRectF titleRect = textRect;
+        titleRect.setHeight(QFontMetrics(titleFont).lineSpacing());
+        painter.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+            m_content.title);
+        painter.setFont(font);
+        textRect.setTop(titleRect.bottom() + 3);
+    }
     painter.drawText(textRect, Qt::TextWordWrap | Qt::AlignCenter, m_text);
 }
 

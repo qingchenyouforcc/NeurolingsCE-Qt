@@ -19,6 +19,7 @@
 //
 
 #include "shijima-qt/MascotApi.hpp"
+#include "shijima-qt/CodexActivity.hpp"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -36,6 +37,7 @@ inline QString const kMascotIdKey = QStringLiteral("mascot_id");
 inline QString const kLabelKey = QStringLiteral("label");
 inline QString const kArchivePathKey = QStringLiteral("archive_path");
 inline QString const kMascotNameKey = QStringLiteral("mascot_name");
+inline QString const kPayloadKey = QStringLiteral("payload");
 
 inline QJsonObject invalidRequest(QString const& message) {
     QJsonObject object;
@@ -69,6 +71,36 @@ QJsonObject dispatchRequest(QJsonObject const& request, Service &service)
 
     if (command == QStringLiteral("ping")) {
         return pingInfoToJson(service.ping());
+    }
+
+    if (command == QStringLiteral("show_codex_notification")) {
+        auto payload = request.value(Detail::kPayloadKey);
+        if (!payload.isObject()) {
+            return Detail::invalidRequest(QStringLiteral("payload must be an object"));
+        }
+        CodexActivity activity;
+        QString parseError;
+        bool recognized = false;
+        if (!codexActivityFromJson(payload.toObject(), activity, &recognized,
+            &parseError))
+        {
+            return Detail::invalidRequest(parseError);
+        }
+        if (!recognized) {
+            return QJsonObject {
+                { QStringLiteral("handled"), false },
+                { QStringLiteral("event_type"), activity.type },
+            };
+        }
+        auto status = service.showCodexNotification(activity);
+        if (!status.ok()) {
+            return errorToJson(status);
+        }
+        return QJsonObject {
+            { QStringLiteral("handled"), true },
+            { QStringLiteral("event_type"), activity.type },
+            { QStringLiteral("state"), codexActivityStateName(activity.state) },
+        };
     }
 
     if (command == QStringLiteral("list_mascots")) {

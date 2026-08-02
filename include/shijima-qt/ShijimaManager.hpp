@@ -19,6 +19,7 @@
 // 
 
 #include <QString>
+#include "shijima-qt/CodexActivity.hpp"
 #include <QList>
 #include <QMap>
 #include <QSet>
@@ -66,6 +67,7 @@ public:
     void updateEnvironment(QScreen *);
     QString const& mascotsPath();
     ShijimaWidget *spawn(std::string const& name);
+    bool showCodexNotification(CodexActivity const& activity);
     void killAll();
     void killAll(QString const& name);
     void killAllButOne(ShijimaWidget *widget);

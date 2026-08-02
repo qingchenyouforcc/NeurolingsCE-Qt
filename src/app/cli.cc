@@ -21,12 +21,45 @@
 
 #include "cli/InternalCli.hpp"
 
+#include <QCoreApplication>
+
+#include <vector>
+
+namespace {
+
+CliParseResult parseUnicodeCliArguments(int argc, char **argv) {
+    QStringList arguments = QCoreApplication::arguments();
+    if (arguments.isEmpty()) {
+        return parseCliArguments(argc, argv);
+    }
+
+    // On Windows the CRT's narrow argv uses the active code page, while Qt
+    // reconstructs arguments from GetCommandLineW. Convert that Unicode list
+    // back to UTF-8 so the existing parser preserves Chinese, emoji, and other
+    // non-ASCII Codex notification content.
+    std::vector<QByteArray> utf8Arguments;
+    utf8Arguments.reserve(static_cast<size_t>(arguments.size()));
+    for (auto const& argument : arguments) {
+        utf8Arguments.push_back(argument.toUtf8());
+    }
+
+    std::vector<char *> argumentPointers;
+    argumentPointers.reserve(utf8Arguments.size());
+    for (auto &argument : utf8Arguments) {
+        argumentPointers.push_back(argument.data());
+    }
+    return parseCliArguments(static_cast<int>(argumentPointers.size()),
+        argumentPointers.data());
+}
+
+}
+
 bool shijimaShouldRunCli(int argc, char **argv) {
     return isCliInvocation(argc, argv);
 }
 
 int shijimaRunCli(int argc, char **argv) {
-    auto parsed = parseCliArguments(argc, argv);
+    auto parsed = parseUnicodeCliArguments(argc, argv);
     if (parsed.hasError) {
         APP_LOG_ERROR("cli") << parsed.error.error.toStdString();
         return writeCliError(parsed.global, parsed.error);

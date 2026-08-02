@@ -744,6 +744,78 @@
         <translation>气泡触发点击次数</translation>
     </message>
     <message>
+        <source>Codex</source>
+        <translation>Codex</translation>
+    </message>
+    <message>
+        <source>Show Codex completion messages through a dedicated mascot bubble. Codex approval requests are not handled by this integration.</source>
+        <translation>通过专属桌宠气泡显示 Codex 完成消息。本集成不处理 Codex 审批请求。</translation>
+    </message>
+    <message>
+        <source>Allow NeurolingsCE to update the Codex user configuration?\n\nPath: %1\nCommand: %2</source>
+        <translation>是否允许 NeurolingsCE 更新 Codex 用户配置？\n\n路径：%1\n命令：%2</translation>
+    </message>
+    <message>
+        <source>Enable Codex notifications</source>
+        <translation>启用 Codex 通知</translation>
+    </message>
+    <message>
+        <source>Codex notifications</source>
+        <translation>Codex 通知</translation>
+    </message>
+    <message>
+        <source>\n\nCopy this line into the configuration manually if desired:\n%1</source>
+        <translation>\n\n如需手动配置，请复制以下内容：\n%1</translation>
+    </message>
+    <message>
+        <source>Enable Codex message bubbles</source>
+        <translation>启用 Codex 消息气泡</translation>
+    </message>
+    <message>
+        <source>Install or remove only NeurolingsCE's managed notify block after confirmation.</source>
+        <translation>确认后仅安装或移除 NeurolingsCE 管理的 notify 配置块。</translation>
+    </message>
+    <message>
+        <source>Default Mascot</source>
+        <translation>默认桌宠</translation>
+    </message>
+    <message>
+        <source>Missing: %1 (will use Default Mascot)</source>
+        <translation>缺失：%1（将使用默认桌宠）</translation>
+    </message>
+    <message>
+        <source>Codex companion template</source>
+        <translation>Codex 专属桌宠模板</translation>
+    </message>
+    <message>
+        <source>Reuse the earliest running mascot of this template, or summon one when needed.</source>
+        <translation>优先复用此模板最早运行的桌宠，没有时自动召唤。</translation>
+    </message>
+    <message>
+        <source>Send test notification</source>
+        <translation>发送测试通知</translation>
+    </message>
+    <message>
+        <source>Enable Codex message bubbles first.</source>
+        <translation>请先启用 Codex 消息气泡。</translation>
+    </message>
+    <message>
+        <source>This is a Codex test notification.</source>
+        <translation>这是一条 Codex 测试通知。</translation>
+    </message>
+    <message>
+        <source>No mascot was available to display the test notification.</source>
+        <translation>没有可用于显示测试通知的桌宠。</translation>
+    </message>
+    <message>
+        <source>Test Codex message</source>
+        <translation>测试 Codex 消息</translation>
+    </message>
+    <message>
+        <source>Preview the title, excerpt, and eight-second queue behavior.</source>
+        <translation>预览标题、回复摘录以及八秒队列显示效果。</translation>
+    </message>
+    <message>
         <source>Interaction</source>
         <translation>交互</translation>
     </message>
