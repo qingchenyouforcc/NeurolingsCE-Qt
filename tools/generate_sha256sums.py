@@ -45,6 +45,10 @@ def _validate_asset_name(raw_name: Any, index: int) -> str:
         raise ChecksumManifestError(
             f"asset {index} name must not end with a dot or space: {raw_name!r}"
         )
+    if any(character.isspace() for character in raw_name):
+        raise ChecksumManifestError(
+            f"asset {index} name must not contain whitespace: {raw_name!r}"
+        )
     if any(character in UNSAFE_NAME_CHARACTERS for character in raw_name):
         raise ChecksumManifestError(f"asset {index} name is not a safe file name: {raw_name!r}")
     if any(ord(character) < 0x20 or ord(character) == 0x7F for character in raw_name):
