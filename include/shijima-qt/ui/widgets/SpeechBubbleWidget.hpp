@@ -60,8 +60,6 @@ private:
     void showContent(Content const& content, QPoint const& anchorScreenPos,
         int durationMs);
     void showNextCodexBubble();
-    static QString fitCodexText(QString const& text, QFont const& font,
-        int width, int maxLines);
 
     Content m_content;
     QQueue<Content> m_codexQueue;

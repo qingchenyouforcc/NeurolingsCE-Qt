@@ -408,6 +408,30 @@ void testCodexActivityParsing() {
     expect(truncateCodexGraphemes(QStringLiteral("😀áb"), 2) ==
         QStringLiteral("😀á…"), "Codex excerpts should preserve grapheme clusters");
 
+    expect(normalizeCodexBubbleText(QStringLiteral("  a\r\n\r\r\nb  ")) ==
+        QStringLiteral("a\n\nb"),
+        "Codex bubble text should normalize line endings and blank lines");
+    QString longText = QStringLiteral("BEGIN\n")
+        + QString(5000, QChar(0x4e2d))
+        + QStringLiteral("\nFINAL");
+    auto compact = compactCodexBubbleSource(longText);
+    expect(compact.truncated && compact.retainedGraphemes <= 4096,
+        "long Codex bubble sources should be bounded by grapheme budget");
+    expect(compact.text.contains(QStringLiteral("BEGIN")) &&
+        compact.text.contains(QStringLiteral("FINAL")) &&
+        compact.text.contains(QStringLiteral("\n…\n")),
+        "long Codex bubble sources should retain both ends with an ellipsis");
+    expect(compactCodexBubbleSource(QStringLiteral("abcdef"), 0).text.isEmpty(),
+        "zero Codex grapheme budget should produce an empty excerpt");
+    auto one = compactCodexBubbleSource(QStringLiteral("😀abcdef"), 1);
+    expect(one.truncated && one.retainedGraphemes == 1 &&
+        one.text.startsWith(QStringLiteral("😀")),
+        "one-grapheme Codex budget should preserve a complete first grapheme");
+    auto two = compactCodexBubbleSource(QStringLiteral("abcdef"), 2);
+    expect(two.truncated && two.retainedGraphemes == 2 &&
+        two.text.contains(QStringLiteral("…")),
+        "two-grapheme Codex budget should retain both sides safely");
+
     recognized = true;
     expect(codexActivityFromJson(QJsonObject {
         { QStringLiteral("type"), QStringLiteral("future-event") },

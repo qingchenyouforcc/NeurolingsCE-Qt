@@ -37,6 +37,17 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
 QJsonObject codexActivityToJson(CodexActivity const& activity,
     bool includePrivateFields = false);
 
+struct CodexTextExcerpt {
+    QString text;
+    int retainedGraphemes = 0;
+    bool truncated = false;
+};
+
+QString normalizeCodexBubbleText(QString const& text);
+
+CodexTextExcerpt compactCodexBubbleSource(QString const& text,
+    int maxRetainedGraphemes = 4096);
+
 // Keep excerpts bounded by Unicode grapheme clusters.  This avoids splitting
 // emoji, combining marks, or surrogate pairs while still keeping the UI small.
 QString truncateCodexGraphemes(QString const& text, int maxGraphemes);

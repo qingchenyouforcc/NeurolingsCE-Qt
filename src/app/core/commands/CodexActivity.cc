@@ -3,11 +3,32 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTextBoundaryFinder>
+#include <QVector>
 
 namespace {
 
 constexpr int kMaxMessages = 128;
 constexpr qsizetype kMaxStringBytes = 128 * 1024;
+
+QVector<int> graphemeBoundaries(QString const& text) {
+    QVector<int> boundaries { 0 };
+    if (text.isEmpty()) {
+        return boundaries;
+    }
+
+    QTextBoundaryFinder finder(QTextBoundaryFinder::Grapheme, text);
+    while (true) {
+        int boundary = finder.toNextBoundary();
+        if (boundary < 0 || boundary <= boundaries.constLast()) {
+            break;
+        }
+        boundaries.append(boundary);
+    }
+    if (boundaries.constLast() != text.size()) {
+        boundaries.append(text.size());
+    }
+    return boundaries;
+}
 
 bool readOptionalString(QJsonObject const& object, QString const& key,
     QString &target, QString *errorMessage)
@@ -160,21 +181,62 @@ QJsonObject codexActivityToJson(CodexActivity const& activity,
     return object;
 }
 
+QString normalizeCodexBubbleText(QString const& text) {
+    QString normalized = text;
+    normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    normalized.replace(QChar('\r'), QChar('\n'));
+    while (normalized.contains(QStringLiteral("\n\n\n"))) {
+        normalized.replace(QStringLiteral("\n\n\n"), QStringLiteral("\n\n"));
+    }
+    return normalized.trimmed();
+}
+
+CodexTextExcerpt compactCodexBubbleSource(QString const& text,
+    int maxRetainedGraphemes)
+{
+    CodexTextExcerpt result;
+    QString normalized = normalizeCodexBubbleText(text);
+    if (maxRetainedGraphemes <= 0 || normalized.isEmpty()) {
+        return result;
+    }
+
+    auto boundaries = graphemeBoundaries(normalized);
+    int graphemeCount = boundaries.size() - 1;
+    if (graphemeCount <= maxRetainedGraphemes) {
+        result.text = normalized;
+        result.retainedGraphemes = graphemeCount;
+        return result;
+    }
+
+    if (maxRetainedGraphemes == 1) {
+        result.text = normalized.left(boundaries.at(1)) + QStringLiteral("…");
+        result.retainedGraphemes = 1;
+        result.truncated = true;
+        return result;
+    }
+
+    int headCount = qMax(1, static_cast<int>(
+        (static_cast<qint64>(maxRetainedGraphemes) * 4 + 6) / 7));
+    headCount = qMin(headCount, maxRetainedGraphemes - 1);
+    int tailCount = maxRetainedGraphemes - headCount;
+    tailCount = qMin(tailCount, graphemeCount - headCount);
+    headCount = qMin(headCount, graphemeCount - tailCount);
+
+    QString head = normalized.left(boundaries.at(headCount)).trimmed();
+    QString tail = normalized.mid(boundaries.at(graphemeCount - tailCount)).trimmed();
+    result.text = head + QStringLiteral("\n…\n") + tail;
+    result.retainedGraphemes = headCount + tailCount;
+    result.truncated = true;
+    return result;
+}
+
 QString truncateCodexGraphemes(QString const& text, int maxGraphemes) {
     if (maxGraphemes <= 0 || text.isEmpty()) {
         return {};
     }
-    QTextBoundaryFinder finder(QTextBoundaryFinder::Grapheme, text);
-    int count = 0;
-    int previousBoundary = 0;
-    int end = 0;
-    while ((end = finder.toNextBoundary()) >= 0) {
-        ++count;
-        if (count > maxGraphemes) {
-            QString result = text.left(previousBoundary);
-            return result.trimmed() + QStringLiteral("…");
-        }
-        previousBoundary = end;
+    auto boundaries = graphemeBoundaries(text);
+    if (boundaries.size() - 1 <= maxGraphemes) {
+        return text;
     }
-    return text;
+    return text.left(boundaries.at(maxGraphemes)).trimmed() + QStringLiteral("…");
 }

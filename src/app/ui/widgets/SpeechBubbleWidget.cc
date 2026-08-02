@@ -18,8 +18,9 @@
 
 #include "shijima-qt/ui/widgets/SpeechBubbleWidget.hpp"
 
+#include "CodexBubbleFormatter.hpp"
+
 #include "shijima-qt/AppLog.hpp"
-#include "shijima-qt/CodexActivity.hpp"
 
 #include <QFontMetrics>
 #include <QGuiApplication>
@@ -27,6 +28,16 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
+
+namespace {
+
+constexpr int kCodexMaxBubbleWidth = 360;
+constexpr int kCodexMaxBubbleHeight = 240;
+constexpr int kCodexMaxTextWidth = 320;
+constexpr int kCodexMaxBodyLines = 8;
+constexpr int kCodexBaseDurationMs = 8000;
+
+}
 
 SpeechBubbleWidget::SpeechBubbleWidget(QWidget *parent)
     : QWidget(parent, Qt::ToolTip | Qt::FramelessWindowHint
@@ -94,27 +105,47 @@ void SpeechBubbleWidget::showContent(Content const& content,
         font.setPixelSize(13);
     }
     QFontMetrics fm(font);
-    int maxTextWidth = m_currentCodex ? 320 : 200;
-    QString body = m_currentCodex
-        ? fitCodexText(m_text, font, maxTextWidth, 8)
-        : m_text;
-    m_content.body = body;
-    m_text = body;
-    QRect textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
-        Qt::TextWordWrap | Qt::AlignLeft, body);
+    int maxTextWidth = m_currentCodex ? kCodexMaxTextWidth : 200;
     int titleHeight = 0;
+    int titleWidth = 0;
     if (m_currentCodex && !m_content.title.isEmpty()) {
         QFont titleFont = font;
         titleFont.setBold(true);
-        titleHeight = QFontMetrics(titleFont).lineSpacing() + 4;
+        QFontMetrics titleMetrics(titleFont);
+        titleHeight = titleMetrics.lineSpacing() + 4;
+        titleWidth = titleMetrics.horizontalAdvance(m_content.title);
     }
 
-    int bubbleWidth = textRect.width() + m_padding * 2 + 4;
+    QString body = m_text;
+    int effectiveDurationMs = durationMs;
+    if (m_currentCodex) {
+        int maxTextHeight = kCodexMaxBubbleHeight
+            - titleHeight
+            - m_padding * 2
+            - m_tailHeight
+            - 4;
+        auto excerpt = formatCodexBubbleExcerpt(m_text, font, maxTextWidth,
+            maxTextHeight, kCodexMaxBodyLines);
+        body = excerpt.text;
+        effectiveDurationMs = codexBubbleDisplayDurationMs(
+            excerpt.retainedGraphemes);
+    }
+    m_content.body = body;
+    m_text = body;
+    QRect textRect = fm.boundingRect(QRect(0, 0, maxTextWidth, 0),
+        Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, body);
+
+    int contentWidth = textRect.width();
+    if (m_currentCodex) {
+        contentWidth = qMax(contentWidth, titleWidth);
+    }
+    int bubbleWidth = contentWidth + m_padding * 2 + 4;
     int bubbleHeight = textRect.height() + titleHeight + m_padding * 2 +
         m_tailHeight + 4;
     if (m_currentCodex) {
-        bubbleWidth = qBound(60, bubbleWidth, 360);
-        bubbleHeight = qBound(40 + m_tailHeight, bubbleHeight, 240);
+        bubbleWidth = qBound(60, bubbleWidth, kCodexMaxBubbleWidth);
+        bubbleHeight = qBound(40 + m_tailHeight, bubbleHeight,
+            kCodexMaxBubbleHeight);
     }
     else {
         // Keep the pre-existing random-bubble sizing behavior unchanged.
@@ -125,7 +156,8 @@ void SpeechBubbleWidget::showContent(Content const& content,
     updatePosition(anchorScreenPos);
     show();
     raise();
-    m_hideTimer.start(durationMs);
+    m_hideTimer.start(m_currentCodex ? qMax(kCodexBaseDurationMs,
+        effectiveDurationMs) : effectiveDurationMs);
 }
 
 void SpeechBubbleWidget::showNextCodexBubble() {
@@ -134,27 +166,7 @@ void SpeechBubbleWidget::showNextCodexBubble() {
         return;
     }
     auto content = m_codexQueue.dequeue();
-    showContent(content, m_anchorScreenPos, 8000);
-}
-
-QString SpeechBubbleWidget::fitCodexText(QString const& text,
-    QFont const& font, int width, int maxLines)
-{
-    QString candidate = truncateCodexGraphemes(text, 4096);
-    QFontMetrics fm(font);
-    while (!candidate.isEmpty()) {
-        auto rect = fm.boundingRect(QRect(0, 0, width, 0),
-            Qt::TextWordWrap | Qt::AlignLeft, candidate);
-        if (rect.height() <= maxLines * fm.lineSpacing()) {
-            return candidate;
-        }
-        candidate = truncateCodexGraphemes(candidate,
-            qMax(1, candidate.size() - 8));
-        if (candidate.endsWith(QStringLiteral("…"))) {
-            candidate.chop(1);
-        }
-    }
-    return QStringLiteral("…");
+    showContent(content, m_anchorScreenPos, kCodexBaseDurationMs);
 }
 
 void SpeechBubbleWidget::updatePosition(const QPoint &anchorScreenPos) {
@@ -263,7 +275,11 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
         painter.setFont(font);
         textRect.setTop(titleRect.bottom() + 3);
     }
-    painter.drawText(textRect, Qt::TextWordWrap | Qt::AlignCenter, m_text);
+    int bodyFlags = Qt::TextWordWrap;
+    bodyFlags |= m_currentCodex
+        ? Qt::AlignLeft | Qt::AlignTop
+        : Qt::AlignCenter;
+    painter.drawText(textRect, bodyFlags, m_text);
 }
 
 #include "SpeechBubbleWidget.moc"

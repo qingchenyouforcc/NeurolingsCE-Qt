@@ -222,6 +222,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/cli/CommandLineParser.cc
   src/app/cli/CommandExecutor.cc
   src/app/cli/OutputFormatter.cc
+  src/app/ui/widgets/CodexBubbleFormatter.cc
   src/app/ui/widgets/SpeechBubbleWidget.cc
   src/app/ui/widgets/SpeechBubbleTextCatalog.cc
   src/resources/resources.qrc
@@ -474,6 +475,39 @@ if(WIN32)
   target_compile_definitions(NeurolingsCETests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 add_test(NAME NeurolingsCETests COMMAND NeurolingsCETests)
+
+add_executable(NeurolingsCEBubbleTests
+  src/app/tests/CodexBubbleFormatterTests.cc
+  src/app/core/commands/CodexActivity.cc
+  src/app/ui/widgets/CodexBubbleFormatter.cc
+)
+target_include_directories(NeurolingsCEBubbleTests PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app
+)
+target_link_libraries(NeurolingsCEBubbleTests PRIVATE
+  Qt6::Core
+  Qt6::Gui
+)
+if(MSVC)
+  set_property(TARGET NeurolingsCEBubbleTests PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
+endif()
+if(WIN32)
+  target_compile_definitions(NeurolingsCEBubbleTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+add_test(NAME NeurolingsCEBubbleTests COMMAND NeurolingsCEBubbleTests)
+set(_codex_bubble_test_environment "QT_QPA_PLATFORM=offscreen")
+get_filename_component(_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
+set(_qt_platform_plugin_dir "${_qt_prefix}/plugins/platforms")
+if(EXISTS "${_qt_platform_plugin_dir}")
+  list(APPEND _codex_bubble_test_environment
+    "QT_QPA_PLATFORM_PLUGIN_PATH=${_qt_platform_plugin_dir}")
+endif()
+set_tests_properties(NeurolingsCEBubbleTests PROPERTIES
+  ENVIRONMENT "${_codex_bubble_test_environment}"
+  TIMEOUT 10
+)
 
 if(WIN32)
   target_compile_definitions(NeurolingsCE PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)

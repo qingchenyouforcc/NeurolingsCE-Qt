@@ -609,8 +609,8 @@ bool ShijimaManager::showCodexNotification(CodexActivity const& activity) {
     }
     // The content is used only for this in-memory bubble and is never written
     // to settings or logs.  Bound it before entering the UI queue.
-    message = truncateCodexGraphemes(message, 512);
-    target->showCodexNotification(message);
+    auto excerpt = compactCodexBubbleSource(message);
+    target->showCodexNotification(excerpt.text);
     APP_LOG_INFO("codex") << "Codex notification displayed state=\""
         << codexActivityStateName(activity.state).toStdString()
         << " template=\"" << target->mascotName().toStdString() << "\"";
