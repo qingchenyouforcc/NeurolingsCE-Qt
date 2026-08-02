@@ -17,7 +17,10 @@
 //
 
 #include "../core/commands/MascotCommandDispatcher.hpp"
+#include "../cli/InternalCli.hpp"
 #include "shijima-qt/MascotApi.hpp"
+#include "shijima-qt/CodexActivity.hpp"
+#include "shijima-qt/CodexConfigManager.hpp"
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/SafePath.hpp"
 #include "shijima-qt/SecurityLimits.hpp"
@@ -283,6 +286,10 @@ struct FakeMascotService {
         return MascotCommandStatus::success();
     }
 
+    MascotCommandStatus showCodexNotification(CodexActivity const&) {
+        return MascotCommandStatus::success();
+    }
+
     MascotCommandStatus getLoadedMascot(int, LoadedMascotInfo &) {
         return MascotCommandStatus::success();
     }
@@ -379,6 +386,258 @@ void testMascotPackageNames() {
         "Windows reserved device names should be rejected");
     expect(!MascotPackage::isValidPackageName(QString(201, QLatin1Char('a'))),
         "overlong package names should be rejected");
+}
+
+void testCodexActivityParsing() {
+    CodexActivity activity;
+    bool recognized = false;
+    QString error;
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("agent-turn-complete") },
+        { QStringLiteral("thread-id"), QStringLiteral("thread") },
+        { QStringLiteral("turn-id"), QStringLiteral("turn") },
+        { QStringLiteral("cwd"), QStringLiteral("C:/work") },
+        { QStringLiteral("input-messages"), QJsonArray {
+            QStringLiteral("user input") } },
+        { QStringLiteral("last-assistant-message"), QStringLiteral("😀 done") },
+    }, activity, &recognized, &error), "Codex completion should parse");
+    expect(recognized && activity.state == CodexActivityState::Ready,
+        "Codex completion should map to Ready");
+    expect(activity.lastAssistantMessage == QStringLiteral("😀 done"),
+        "Codex parser should keep only the final assistant message for display");
+    expect(truncateCodexGraphemes(QStringLiteral("😀áb"), 2) ==
+        QStringLiteral("😀á…"), "Codex excerpts should preserve grapheme clusters");
+
+    recognized = true;
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("future-event") },
+    }, activity, &recognized, &error) && !recognized,
+        "Unknown Codex events should be accepted and ignored");
+    expect(!codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("agent-turn-complete") },
+        { QStringLiteral("last-assistant-message"), 42 },
+    }, activity, &recognized, &error),
+        "Malformed Codex completion fields should be rejected");
+}
+
+void testCodexCliParsing() {
+    char argv0[] = "NeurolingsCE-cli";
+    char option[] = "--codex-notify";
+    QByteArray validPayload = QByteArrayLiteral(
+        "{\"type\":\"agent-turn-complete\",\"last-assistant-message\":\"done\"}");
+    char *validArgv[] = { argv0, option, validPayload.data() };
+    expect(isCliInvocation(3, validArgv),
+        "CLI invocation detection should recognize --codex-notify");
+    auto valid = parseCliArguments(3, validArgv);
+    expect(!valid.hasError && valid.hasCommand &&
+        valid.command.kind == CliCommandKind::CodexNotify,
+        "CLI should parse a Codex completion payload");
+    expect(valid.command.codexNotifyPayload == QString::fromUtf8(validPayload),
+        "CLI should preserve the Codex payload for dispatch");
+
+    char jsonOption[] = "--json";
+    char *jsonArgv[] = { argv0, option, validPayload.data(), jsonOption };
+    auto json = parseCliArguments(4, jsonArgv);
+    expect(!json.hasError && json.global.json,
+        "CLI Codex notifications should accept --json");
+
+    char *missingArgv[] = { argv0, option };
+    auto missing = parseCliArguments(2, missingArgv);
+    expect(missing.hasError && missing.error.error.contains(QStringLiteral("Missing")),
+        "CLI should reject a missing Codex payload");
+
+    char malformedPayload[] = "{broken";
+    char *malformedArgv[] = { argv0, option, malformedPayload };
+    auto malformed = parseCliArguments(3, malformedArgv);
+    expect(malformed.hasError,
+        "CLI should reject malformed Codex JSON");
+
+    char unknownPayload[] = "{\"type\":\"future-event\"}";
+    char *unknownArgv[] = { argv0, option, unknownPayload };
+    auto unknown = parseCliArguments(3, unknownArgv);
+    expect(!unknown.hasError && unknown.command.codexNotifyPayload ==
+        QString::fromUtf8(unknownPayload),
+        "CLI should accept unknown Codex event types for silent compatibility");
+
+    QByteArray oversizedPayload(kCodexNotifyMaxBytes + 1, 'x');
+    char *oversizedArgv[] = { argv0, option, oversizedPayload.data() };
+    auto oversized = parseCliArguments(3, oversizedArgv);
+    expect(oversized.hasError && oversized.error.error.contains(QStringLiteral("maximum size")),
+        "CLI should reject oversized Codex payloads before parsing");
+
+    char *multipleArgv[] = { argv0, option, validPayload.data(), malformedPayload };
+    auto multiple = parseCliArguments(4, multipleArgv);
+    expect(multiple.hasError,
+        "CLI should reject multiple Codex payload arguments");
+}
+
+void testCodexConfigManagement() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "Codex config test root should be valid");
+    QString path = QDir(temp.path()).absoluteFilePath(QStringLiteral("config.toml"));
+    QString executable = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("NeurolingsCE-cli.exe"));
+    QFile executableFile(executable);
+    expect(executableFile.open(QFile::WriteOnly),
+        "Codex CLI fixture should be writable");
+    executableFile.close();
+    QFile initial(path);
+    expect(initial.open(QFile::WriteOnly | QFile::Text),
+        "Codex config fixture should be writable");
+    initial.write("model = \"gpt\"\n\n");
+    initial.close();
+
+    auto enabled = enableCodexNotify(path, executable);
+    expect(enabled.ok && enabled.changed, "Codex config should install managed block");
+    QFile readBack(path);
+    readBack.open(QFile::ReadOnly | QFile::Text);
+    QString content = QString::fromUtf8(readBack.readAll());
+    readBack.close();
+    expect(content.contains(QStringLiteral("BEGIN NeurolingsCE Codex notify")) &&
+        content.contains(QStringLiteral("--codex-notify")),
+        "Codex managed block should contain the absolute CLI command");
+    QString escapedExecutable = executable;
+    escapedExecutable.replace(QStringLiteral("\\"), QStringLiteral("\\\\"));
+    expect(content.contains(escapedExecutable),
+        "Codex managed block should escape Windows path separators for TOML");
+    expect(!enabled.backupPath.isEmpty() && QFile::exists(enabled.backupPath),
+        "Codex config changes should create a timestamped backup");
+
+    auto idempotent = enableCodexNotify(path, executable);
+    expect(idempotent.ok && !idempotent.changed,
+        "re-enabling an unchanged Codex config should be idempotent");
+
+    QString conflictPath = QDir(temp.path()).absoluteFilePath(QStringLiteral("conflict.toml"));
+    QFile conflict(conflictPath);
+    conflict.open(QFile::WriteOnly | QFile::Text);
+    conflict.write("notify = [\"other\", \"--event\"]\n");
+    conflict.close();
+    auto rejected = enableCodexNotify(conflictPath, executable);
+    expect(!rejected.ok && rejected.conflict,
+        "Codex config should refuse to overwrite an unmanaged notify setting");
+
+    QString computerUsePath = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("computer-use.toml"));
+    QString computerUseLine = QStringLiteral(
+        "notify = [ \"C:\\\\Users\\\\tester\\\\AppData\\\\Local\\\\OpenAI\\\\Codex\\\\"
+        "runtimes\\\\cua_node\\\\runtime\\\\bin\\\\codex-computer-use.exe\", "
+        "\"turn-ended\" ]\n");
+    QString computerUseOriginal = QStringLiteral("model = \"gpt\"\n") +
+        computerUseLine + QStringLiteral("approval_policy = \"never\"\n");
+    QFile computerUseConfig(computerUsePath);
+    computerUseConfig.open(QFile::WriteOnly | QFile::Text);
+    computerUseConfig.write(computerUseOriginal.toUtf8());
+    computerUseConfig.close();
+
+    auto bridged = enableCodexNotify(computerUsePath, executable);
+    expect(bridged.ok && bridged.changed && bridged.bridgedExistingNotify,
+        "Codex Desktop computer-use notify should be bridged safely");
+    QFile bridgedRead(computerUsePath);
+    bridgedRead.open(QFile::ReadOnly | QFile::Text);
+    QString bridgedContent = QString::fromUtf8(bridgedRead.readAll());
+    bridgedRead.close();
+    expect(bridgedContent.count(QStringLiteral("notify =")) == 1 &&
+        bridgedContent.contains(QStringLiteral("previous-notify-base64")) &&
+        bridgedContent.contains(QStringLiteral("--codex-notify")),
+        "bridging should preserve one active notify and encoded restore metadata");
+
+    QStringList forwardCommand;
+    QString forwardError;
+    expect(loadCodexForwardNotifyCommand(computerUsePath, forwardCommand,
+        &forwardError),
+        "bridged computer-use command should be readable");
+    expect(forwardCommand.size() == 2 &&
+        forwardCommand.value(0).endsWith(
+            QStringLiteral("codex-computer-use.exe"), Qt::CaseInsensitive) &&
+        forwardCommand.value(1) == QStringLiteral("turn-ended"),
+        "bridged command should preserve the original executable and argument");
+
+    auto bridgeIdempotent = enableCodexNotify(computerUsePath, executable);
+    expect(bridgeIdempotent.ok && !bridgeIdempotent.changed,
+        "re-enabling a computer-use bridge should be idempotent");
+    auto bridgeDisabled = disableCodexNotify(computerUsePath);
+    expect(bridgeDisabled.ok && bridgeDisabled.changed,
+        "disabling a computer-use bridge should restore the original callback");
+    QFile bridgeAfterDisable(computerUsePath);
+    bridgeAfterDisable.open(QFile::ReadOnly | QFile::Text);
+    expect(QString::fromUtf8(bridgeAfterDisable.readAll()) == computerUseOriginal,
+        "disabling should restore the computer-use notify line byte-for-byte");
+
+    QString duplicatePath = QDir(temp.path()).absoluteFilePath(QStringLiteral("duplicate.toml"));
+    QFile duplicate(duplicatePath);
+    duplicate.open(QFile::WriteOnly | QFile::Text);
+    duplicate.write((content + QStringLiteral(
+        "notify = [\"D:/old/NeurolingsCE-cli.exe\", \"--codex-notify\"]\n")).toUtf8());
+    duplicate.close();
+    auto normalized = enableCodexNotify(duplicatePath, executable);
+    expect(normalized.ok && normalized.changed,
+        "a duplicate legacy NeurolingsCE notify should be removed beside its managed block");
+    QFile normalizedRead(duplicatePath);
+    normalizedRead.open(QFile::ReadOnly | QFile::Text);
+    QString normalizedContent = QString::fromUtf8(normalizedRead.readAll());
+    normalizedRead.close();
+    expect(normalizedContent.count(QStringLiteral("notify =")) == 1 &&
+        !normalizedContent.contains(QStringLiteral("D:/old/NeurolingsCE-cli.exe")),
+        "normalizing a duplicate should leave one current managed command");
+
+    QString legacyPath = QDir(temp.path()).absoluteFilePath(QStringLiteral("legacy.toml"));
+    QFile legacy(legacyPath);
+    legacy.open(QFile::WriteOnly | QFile::Text);
+    legacy.write("model = \"gpt\"\n"
+        "notify = [\"D:/CPP_project/NeurolingsCE/out/build/x64-Release/bin/"
+        "NeurolingsCE-cli.exe\", \"--codex-notify\"]\n"
+        "approval_policy = \"never\"\n");
+    legacy.close();
+    auto migrated = enableCodexNotify(legacyPath, executable);
+    expect(migrated.ok && migrated.changed && !migrated.conflict,
+        "an unmarked legacy NeurolingsCE notify should be migrated");
+    QFile migratedRead(legacyPath);
+    migratedRead.open(QFile::ReadOnly | QFile::Text);
+    QString migratedContent = QString::fromUtf8(migratedRead.readAll());
+    migratedRead.close();
+    expect(migratedContent.count(QStringLiteral("notify =")) == 1 &&
+        migratedContent.contains(QStringLiteral("BEGIN NeurolingsCE Codex notify")) &&
+        migratedContent.contains(QStringLiteral("approval_policy = \"never\"")),
+        "legacy migration should replace only the NeurolingsCE notify line");
+    auto migratedDisabled = disableCodexNotify(legacyPath);
+    expect(migratedDisabled.ok && migratedDisabled.changed,
+        "a migrated legacy notify should be removable");
+    QFile migratedAfterDisable(legacyPath);
+    migratedAfterDisable.open(QFile::ReadOnly | QFile::Text);
+    expect(QString::fromUtf8(migratedAfterDisable.readAll()) ==
+        QStringLiteral("model = \"gpt\"\napproval_policy = \"never\"\n"),
+        "removing a migrated legacy notify should preserve adjacent settings");
+
+    auto disabled = disableCodexNotify(path);
+    expect(disabled.ok && disabled.changed, "Codex config should remove only its managed block");
+    QFile afterDisable(path);
+    afterDisable.open(QFile::ReadOnly | QFile::Text);
+    QString remaining = QString::fromUtf8(afterDisable.readAll());
+    expect(remaining == QStringLiteral("model = \"gpt\"\n\n"),
+        "disabling Codex should preserve unrelated settings byte-for-byte");
+
+    QString noFinalNewlinePath = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("no-final-newline.toml"));
+    QFile noFinalNewline(noFinalNewlinePath);
+    noFinalNewline.open(QFile::WriteOnly | QFile::Text);
+    noFinalNewline.write("model = \"gpt\"");
+    noFinalNewline.close();
+    expect(enableCodexNotify(noFinalNewlinePath, executable).ok,
+        "Codex config should support files without a final newline");
+    expect(disableCodexNotify(noFinalNewlinePath).ok,
+        "Codex config without a final newline should be removable");
+    QFile noFinalNewlineRead(noFinalNewlinePath);
+    noFinalNewlineRead.open(QFile::ReadOnly | QFile::Text);
+    expect(QString::fromUtf8(noFinalNewlineRead.readAll()) ==
+        QStringLiteral("model = \"gpt\""),
+        "Codex uninstall should restore a file without a final newline");
+
+    auto missingExecutable = enableCodexNotify(
+        QDir(temp.path()).absoluteFilePath(QStringLiteral("missing-cli.toml")),
+        QDir(temp.path()).absoluteFilePath(QStringLiteral("missing-cli.exe")));
+    expect(!missingExecutable.ok &&
+        missingExecutable.error.contains(QStringLiteral("was not found")),
+        "Codex config should not install a callback to a missing CLI executable");
 }
 
 void testLegacyArchiveAnalysisAndConversion() {
@@ -683,6 +942,16 @@ void testCommandDispatcher() {
         .value(QStringLiteral("anchor")).toObject()
         .value(QStringLiteral("x")).toDouble() == 5.0,
         "dispatcher should parse spawn request");
+
+    auto codex = MascotCommandDispatcher::dispatchRequest(QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("show_codex_notification") },
+        { QStringLiteral("payload"), QJsonObject {
+            { QStringLiteral("type"), QStringLiteral("agent-turn-complete") },
+            { QStringLiteral("last-assistant-message"), QStringLiteral("done") },
+        } },
+    }, service);
+    expect(codex.value(QStringLiteral("handled")).toBool(false),
+        "dispatcher should route Codex completion notifications");
 }
 
 void testSafeChildPath() {
@@ -745,6 +1014,9 @@ int main() {
     testMascotPatchParsing();
     testJsonRoundTrips();
     testStatusJson();
+    testCodexActivityParsing();
+    testCodexCliParsing();
+    testCodexConfigManagement();
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
     testPackageInspectionRejectsOversizedPngHeader();

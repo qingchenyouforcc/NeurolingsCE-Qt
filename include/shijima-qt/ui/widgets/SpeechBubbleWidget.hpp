@@ -19,6 +19,7 @@
 // 
 
 #include <QMap>
+#include <QQueue>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -28,8 +29,23 @@ class SpeechBubbleWidget : public QWidget
 {
     Q_OBJECT
 public:
+    enum class Tone {
+        Normal,
+        CodexReady,
+        CodexRunning,
+        CodexNeedsInput,
+        CodexBlocked,
+    };
+    struct Content {
+        QString title;
+        QString body;
+        Tone tone = Tone::Normal;
+    };
+
     explicit SpeechBubbleWidget(QWidget *parent = nullptr);
     void showBubble(const QString &text, const QPoint &anchorScreenPos);
+    void showCodexBubble(const QString &text, const QPoint &anchorScreenPos,
+        const QString &title = QStringLiteral("Codex · 已完成"));
     void hideBubble();
     void updatePosition(const QPoint &anchorScreenPos);
     bool isActive() const { return m_active; }
@@ -41,10 +57,19 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    void showContent(Content const& content, QPoint const& anchorScreenPos,
+        int durationMs);
+    void showNextCodexBubble();
+    static QString fitCodexText(QString const& text, QFont const& font,
+        int width, int maxLines);
+
+    Content m_content;
+    QQueue<Content> m_codexQueue;
     QString m_text;
     QTimer m_hideTimer;
     QPoint m_anchorScreenPos;
     bool m_active = false;
+    bool m_currentCodex = false;
     int m_tailHeight = 12;
     int m_cornerRadius = 12;
     int m_padding = 12;

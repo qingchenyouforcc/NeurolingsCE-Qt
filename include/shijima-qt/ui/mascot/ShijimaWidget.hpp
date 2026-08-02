@@ -60,7 +60,9 @@ public:
     bool pointInside(QPoint const& point);
     int mascotId() { return m_mascotId; }
     void showInspector();
+    void showCodexNotification(QString const& message);
     void markForDeletion() { m_markedForDeletion = true; }
+    bool markedForDeletion() const { return m_markedForDeletion; }
     bool inspectorVisible();
     bool paused() const { return m_paused || m_contextMenuVisible; }
     shijima::mascot::manager &mascot() {

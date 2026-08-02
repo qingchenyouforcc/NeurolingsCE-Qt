@@ -185,6 +185,8 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/assets/SafePath.cc
   src/app/core/assets/AssetLoader.cc
   src/app/core/commands/MascotApi.cc
+  src/app/core/commands/CodexActivity.cc
+  src/app/core/codex/CodexConfigManager.cc
   src/app/core/commands/MascotCommandService.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
   src/app/core/localipc/ShijimaLocalApi.cc
@@ -248,6 +250,8 @@ target_sources(NeurolingsCECli PRIVATE
   src/app/core/assets/MascotPackage.cc
   src/app/core/assets/SafePath.cc
   src/app/core/commands/MascotApi.cc
+  src/app/core/commands/CodexActivity.cc
+  src/app/core/codex/CodexConfigManager.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
 )
 
@@ -438,10 +442,13 @@ endif()
 
 add_executable(NeurolingsCETests
   src/app/tests/AppCoreTests.cc
+  src/app/cli/CommandLineParser.cc
   src/app/core/AppLog.cc
   src/app/core/assets/MascotPackage.cc
   src/app/core/assets/SafePath.cc
   src/app/core/commands/MascotApi.cc
+  src/app/core/commands/CodexActivity.cc
+  src/app/core/codex/CodexConfigManager.cc
 )
 target_include_directories(NeurolingsCETests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}

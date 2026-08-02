@@ -19,6 +19,7 @@
 //
 
 #include "shijima-qt/MascotApi.hpp"
+#include "shijima-qt/CodexActivity.hpp"
 
 #include <QByteArray>
 #include <QList>
@@ -50,6 +51,7 @@ public:
     MascotCommandStatus removeMascotTemplate(QString const& mascotName) const;
     MascotCommandStatus stopRuntime() const;
     MascotCommandStatus showManagerWindow() const;
+    MascotCommandStatus showCodexNotification(CodexActivity const& activity) const;
     MascotCommandStatus getLoadedMascot(int mascotId,
         LoadedMascotInfo &out) const;
     MascotCommandStatus getLoadedMascotPreviewPng(int mascotId,

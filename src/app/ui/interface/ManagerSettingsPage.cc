@@ -17,6 +17,8 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
+#include "shijima-qt/CodexActivity.hpp"
+#include "shijima-qt/CodexConfigManager.hpp"
 #include "../../core/update/GitHubUpdateManager.hpp"
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
@@ -28,11 +30,13 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QFrame>
 #include <QFormLayout>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -297,6 +301,27 @@ QString startupRunCommand()
         QStringLiteral(" --neurolingsce-startup");
 }
 
+QString codexCliExecutablePath()
+{
+    QString name = QStringLiteral("NeurolingsCE-cli");
+#ifdef _WIN32
+    name += QStringLiteral(".exe");
+#endif
+    return QFileInfo(QCoreApplication::applicationDirPath() +
+        QDir::separator() + name).absoluteFilePath();
+}
+
+QString codexTemplateLabel(QString const& name)
+{
+    return name == QStringLiteral("@")
+        ? settingsTr("Default Mascot") : name;
+}
+
+QString codexDefaultTemplateName()
+{
+    return QStringLiteral("@");
+}
+
 bool startupLaunchAtLoginEnabled()
 {
 #ifdef _WIN32
@@ -505,6 +530,125 @@ void ShijimaManager::setupSettingsPage() {
             tr("Speech Bubble Click Count"),
             tr("Choose how many clicks are needed before a bubble appears."),
             spinBox));
+    }
+
+    addSettingsSection(settingsLayout, settingsContent,
+        tr("Codex"),
+        tr("Show Codex completion messages through a dedicated mascot bubble. "
+            "Codex approval requests are not handled by this integration."));
+
+    {
+        bool initial = m_settings->value(QStringLiteral("codex/enabled"), false).toBool();
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, this,
+            [this, toggle](bool checked) {
+                QString configPath = codexConfigPath();
+                QString executable = codexCliExecutablePath();
+                if (checked) {
+                    QString prompt = tr(
+                        "Allow NeurolingsCE to update the Codex user configuration?\n\n"
+                        "Path: %1\nCommand: %2")
+                        .arg(configPath, codexNotifyCommand(executable));
+                    if (QMessageBox::question(this, tr("Enable Codex notifications"),
+                        prompt, QMessageBox::Yes | QMessageBox::No,
+                        QMessageBox::Yes) != QMessageBox::Yes)
+                    {
+                        toggle->blockSignals(true);
+                        toggle->setIsToggled(false);
+                        toggle->blockSignals(false);
+                        return;
+                    }
+                    auto result = enableCodexNotify(configPath, executable);
+                    if (!result.ok) {
+                        toggle->blockSignals(true);
+                        toggle->setIsToggled(false);
+                        toggle->blockSignals(false);
+                        QString message = result.error;
+                        if (result.conflict) {
+                            message += tr("\n\nCopy this line into the configuration manually if desired:\n%1")
+                                .arg(result.snippet);
+                        }
+                        QMessageBox::warning(this, tr("Codex notifications"), message);
+                        return;
+                    }
+                    m_settings->setValue(QStringLiteral("codex/enabled"), true);
+                    return;
+                }
+
+                auto result = disableCodexNotify(configPath);
+                if (!result.ok) {
+                    toggle->blockSignals(true);
+                    toggle->setIsToggled(true);
+                    toggle->blockSignals(false);
+                    QMessageBox::warning(this, tr("Codex notifications"), result.error);
+                    return;
+                }
+                m_settings->setValue(QStringLiteral("codex/enabled"), false);
+            });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Enable Codex message bubbles"),
+            tr("Install or remove only NeurolingsCE's managed notify block after confirmation."),
+            toggle));
+    }
+
+    {
+        auto *combo = new QComboBox(settingsContent);
+        QString configured = m_settings->value(
+            QStringLiteral("codex/companionTemplate"), codexDefaultTemplateName())
+            .toString();
+        for (auto const& name : m_runtime->templates.loadedMascots().keys()) {
+            combo->addItem(codexTemplateLabel(name), name);
+        }
+        if (combo->findData(configured) < 0 && !configured.isEmpty()) {
+            combo->addItem(tr("Missing: %1 (will use Default Mascot)").arg(configured),
+                configured);
+        }
+        int configuredIndex = combo->findData(configured);
+        if (configuredIndex < 0 && combo->count() > 0) {
+            configuredIndex = combo->findData(codexDefaultTemplateName());
+        }
+        if (configuredIndex >= 0) {
+            combo->setCurrentIndex(configuredIndex);
+        }
+        combo->setMinimumWidth(180);
+        connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            [this, combo](int index) {
+                if (index >= 0) {
+                    m_settings->setValue(QStringLiteral("codex/companionTemplate"),
+                        combo->itemData(index).toString());
+                }
+            });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Codex companion template"),
+            tr("Reuse the earliest running mascot of this template, or summon one when needed."),
+            combo));
+    }
+
+    {
+        auto *button = new SettingsPushButton(tr("Send test notification"), settingsContent);
+        int textWidth = button->fontMetrics().horizontalAdvance(button->text());
+        button->setMinimumWidth(qMax(160, textWidth + 40));
+        button->setMinimumHeight(qMax(36, button->sizeHint().height()));
+        connect(button, &ElaPushButton::clicked, this, [this]() {
+            if (!m_settings->value(QStringLiteral("codex/enabled"), false).toBool()) {
+                QMessageBox::information(this, tr("Codex notifications"),
+                    tr("Enable Codex message bubbles first."));
+                return;
+            }
+            CodexActivity activity;
+            activity.type = QStringLiteral("agent-turn-complete");
+            activity.state = CodexActivityState::Ready;
+            activity.lastAssistantMessage = tr("This is a Codex test notification.");
+            if (!showCodexNotification(activity)) {
+                QMessageBox::warning(this, tr("Codex notifications"),
+                    tr("No mascot was available to display the test notification."));
+            }
+        });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Test Codex message"),
+            tr("Preview the title, excerpt, and eight-second queue behavior."),
+            button));
     }
 
     {
