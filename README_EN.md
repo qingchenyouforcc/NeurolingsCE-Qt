@@ -2,6 +2,9 @@
 
 **English | [中文](README.md)**
 
+> [!NOTE]
+**All versions 0.x.x of this application are beta! Please report any bugs in the Issue section!**
+
 A cross-platform desktop mascot (Shimeji) application, extensively modified from [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt).
 
 Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
