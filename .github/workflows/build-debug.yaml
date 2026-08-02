@@ -105,7 +105,8 @@ jobs:
         shell: bash
         run: |
           export PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}/bin:$PATH"
-          cmake --build build --parallel --config Debug --target NeurolingsCETests
+          cmake --build build --parallel --config Debug \
+            --target NeurolingsCETests NeurolingsCEBubbleTests
           ctest --test-dir build -C Debug --output-on-failure
 
       - name: Package macOS .app
