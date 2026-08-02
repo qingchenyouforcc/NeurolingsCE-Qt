@@ -961,10 +961,6 @@
         <translation>项目</translation>
     </message>
     <message>
-        <source>Feedback QQ</source>
-        <translation>反馈QQ群</translation>
-    </message>
-    <message>
         <source>Chat QQ</source>
         <translation>交流QQ群</translation>
     </message>

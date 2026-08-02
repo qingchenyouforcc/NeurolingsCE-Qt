@@ -214,15 +214,12 @@ void ShijimaManager::showAboutDialog()
         "<td><a href='https://github.com/qingchenyouforcc/NeurolingsCE' "
         "style='color: %2; text-decoration: none;'>GitHub</a></td></tr>"
         "<tr><td style='color: %2; font-weight: bold;'>%7</td>"
-        "<td>423902950</td></tr>"
-        "<tr><td style='color: %2; font-weight: bold;'>%8</td>"
         "<td>125081756</td></tr>"
         "</table>")
         .arg(colors.text, colors.primary,
              tr("Author"), authorName,
              tr("Based on"),
              tr("Project"),
-             tr("Feedback QQ"),
              tr("Chat QQ"));
     QLabel *infoLabel = new QLabel(infoHtml);
     infoLabel->setOpenExternalLinks(true);
