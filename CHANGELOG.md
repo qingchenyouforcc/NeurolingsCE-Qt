@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-08-02
+
+### ✨ Added / 新增功能
+
+- **Continuous Head Patting** - Holding the left mouse button over a mascot now continuously triggers head pats, while a single click triggers one pat only / 长按左键可连续摸头，单击只摸一次
+
+---
+
 ## [0.4.1] - 2026-06-23
 
 ### 🔧 Changed / 改进与优化
@@ -297,6 +305,9 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.5.0]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Continuous head-patting interaction / 连续摸头交互
+
 ### [0.4.1]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Release metadata refresh / 发布元数据整理
 
@@ -326,6 +337,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.5.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.2...0.3.3
