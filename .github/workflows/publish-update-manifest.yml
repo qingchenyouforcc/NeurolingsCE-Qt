@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -54,6 +54,66 @@ jobs:
         run: |
           mkdir -p build
           gh api "repos/$REPO/releases/tags/$TAG" > build/release.json
+
+      - name: Generate SHA256SUMS
+        shell: bash
+        run: |
+          python3 tools/generate_sha256sums.py \
+            --release-json build/release.json \
+            --output build/SHA256SUMS.txt
+
+      - name: Upload SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        shell: bash
+        run: |
+          gh release upload "$TAG" build/SHA256SUMS.txt \
+            --repo "$REPO" \
+            --clobber
+
+      - name: Refresh and validate release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        shell: bash
+        run: |
+          gh api "repos/$REPO/releases/tags/$TAG" > build/release.json
+          python3 - build/release.json <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          release = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assets = release.get("assets")
+          if not isinstance(assets, list):
+              raise SystemExit("release assets must be a JSON array")
+
+          sums = [
+              asset for asset in assets
+              if isinstance(asset, dict)
+              and isinstance(asset.get("name"), str)
+              and asset["name"].lower() in {"sha256sums", "sha256sums.txt"}
+          ]
+          if len(sums) != 1:
+              raise SystemExit(f"expected exactly one SHA256SUMS asset, found {len(sums)}")
+
+          digest = sums[0].get("digest")
+          if not isinstance(digest, str) or re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) is None:
+              raise SystemExit("SHA256SUMS asset does not have a valid GitHub SHA-256 digest")
+          local_digest = hashlib.sha256(Path("build/SHA256SUMS.txt").read_bytes()).hexdigest()
+          if digest[7:].lower() != local_digest:
+              raise SystemExit("GitHub SHA-256 digest does not match the generated SHA256SUMS.txt")
+          PY
+
+          python3 tools/generate_sha256sums.py \
+            --release-json build/release.json \
+            --output build/SHA256SUMS.expected.txt
+          cmp --silent build/SHA256SUMS.txt build/SHA256SUMS.expected.txt
 
       - name: Generate latest.json
         shell: bash

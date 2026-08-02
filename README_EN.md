@@ -71,7 +71,13 @@ https://blog.qingchenyou.asia/NeurolingsCE/update/latest.json
 
 GitHub Actions generates and deploys the manifest to GitHub Pages after a Release is published. Clients no longer call `api.github.com/repos/.../releases/latest`, so shared-IP GitHub REST API rate limits no longer break update checks. Downloaded installers are verified with the manifest `sha256` value or `SHA256SUMS.txt` before installation is allowed.
 
-For maintainers, keep GitHub Pages set to the GitHub Actions source and run the `Publish update manifest` workflow after publishing a release. If release assets are uploaded after the release event, rerun the workflow manually.
+For maintainers, keep GitHub Pages set to the GitHub Actions source and run the `Publish update manifest` workflow after publishing a release. The workflow builds a deterministic `SHA256SUMS.txt` from the official GitHub asset digests, uploads it, refreshes the Release metadata, and only then deploys `latest.json`. The checksum file covers every custom asset except `SHA256SUMS.txt` itself (including the mascot pack) and excludes GitHub-generated source archives. If release assets are uploaded after the release event, rerun the workflow to synchronize the manifest.
+
+The SUMS generator and offline tests live in `tools/generate_sha256sums.py` and `tools/tests/`; run them with:
+
+```powershell
+python -m unittest discover -s tools/tests -p "test_*.py"
+```
 
 ## Logging And Debugging
 

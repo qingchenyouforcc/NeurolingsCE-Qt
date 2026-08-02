@@ -72,7 +72,13 @@ https://blog.qingchenyou.asia/NeurolingsCE/update/latest.json
 
 这个清单由 GitHub Actions 在发布 Release 后生成并部署到 GitHub Pages。客户端不再请求 `api.github.com/repos/.../releases/latest`，因此不会再因为共享出口 IP 触发 GitHub REST API 未认证限流。下载到本地的安装包会通过清单中的 `sha256` 或 `SHA256SUMS.txt` 校验后才允许安装。
 
-维护者发布新版本时，请确认仓库 Pages 来源为 GitHub Actions，并运行 `Publish update manifest` workflow；如果 Release assets 是发布后才补传的，也需要手动重跑该 workflow。
+维护者发布新版本时，请确认仓库 Pages 来源为 GitHub Actions，并运行 `Publish update manifest` workflow；该 workflow 会从 GitHub Release 的官方 digest 生成确定性的 `SHA256SUMS.txt`，补传后重新读取 Release 元数据，再部署 `latest.json`。清单包含所有非 `SHA256SUMS.txt` 的自定义资产（包括 mascot pack），不包含 GitHub 自动生成的 source archive。如果 Release assets 是发布后才补传的，重新运行该 workflow 即可同步校验清单。
+
+SUMS 生成器和离线测试位于 `tools/generate_sha256sums.py` 与 `tools/tests/`，可用下面的命令运行测试：
+
+```powershell
+python -m unittest discover -s tools/tests -p "test_*.py"
+```
 
 ## 日志与调试
 
