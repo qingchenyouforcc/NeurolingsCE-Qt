@@ -217,7 +217,12 @@ bool isCodexComputerUseNotify(QStringList const& arguments) {
     {
         return false;
     }
-    QString fileName = QFileInfo(arguments.front()).fileName();
+    // Codex Desktop writes a Windows executable path into config.toml. Keep
+    // recognition deterministic when this parser is exercised on Linux or
+    // macOS, where QFileInfo does not treat backslashes as separators.
+    QString executablePath = arguments.front();
+    executablePath.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    QString fileName = QFileInfo(executablePath).fileName();
     return fileName.compare(QStringLiteral("codex-computer-use.exe"),
         Qt::CaseInsensitive) == 0 ||
         fileName.compare(QStringLiteral("codex-computer-use"),

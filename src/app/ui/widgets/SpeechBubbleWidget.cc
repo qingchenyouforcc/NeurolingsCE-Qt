@@ -150,7 +150,7 @@ QString SpeechBubbleWidget::fitCodexText(QString const& text,
         }
         candidate = truncateCodexGraphemes(candidate,
             qMax(1, candidate.size() - 8));
-        if (candidate.endsWith(QLatin1Char('…'))) {
+        if (candidate.endsWith(QStringLiteral("…"))) {
             candidate.chop(1);
         }
     }
