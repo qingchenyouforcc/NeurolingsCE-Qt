@@ -128,6 +128,7 @@ QString documentHelpText(char const *argv0) {
         "\n"
         "Transport notes:\n"
         "  Runtime commands auto-start a local runtime when needed.\n"
+        "  --codex-notify never auto-starts the runtime; closed-app callbacks are ignored.\n"
         "  Commands use local IPC and do not use HTTP.\n"
         "  --host and --port are no longer supported.\n"
         "\n"

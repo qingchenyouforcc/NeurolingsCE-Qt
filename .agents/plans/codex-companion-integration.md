@@ -42,6 +42,10 @@ CLI 与桌宠运行时通过本地 IPC server
 }
 ```
 
+Codex notify 是后台回调，采用 best-effort 投递：只有 NeurolingsCE runtime
+已经在运行时才发送 `show_codex_notification`。如果用户关闭了应用，CLI
+会静默忽略后续回调，不自动启动 runtime，也不会为了通知召唤桌宠。
+
 `MascotCommandService` 只在 GUI 线程中调用管理器。它读取
 `codex/enabled` 与 `codex/companionTemplate`：优先选择 session list 中最早
 仍在运行且模板匹配的实例，没有实例时召唤；缺失模板回退到 bundled `Default`

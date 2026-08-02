@@ -87,6 +87,7 @@ QString helpText() {
         "  - Labels are kept in memory only for the current %1 process.\n"
         "  - --mascot template management works standalone without a running %1 instance.\n"
         "  - Runtime commands auto-start %1 when no local runtime is ready.\n"
+        "  - --codex-notify never auto-starts %1; callbacks are ignored when it is closed.\n"
         "  - --host and --port are no longer supported.\n"
         "\n"
         "Legacy commands remain supported:\n"

@@ -223,7 +223,8 @@ bool ensureRuntimeStarted(CliCommand const& command, CliError &error) {
 }
 
 bool sendRequest(CliCommand const& command, QJsonObject const& requestObject,
-    QJsonObject &responseObject, CliError &error)
+    QJsonObject &responseObject, CliError &error,
+    bool allowRuntimeStart = true)
 {
     QString transportError;
     QString commandName = requestCommandName(requestObject);
@@ -238,6 +239,13 @@ bool sendRequest(CliCommand const& command, QJsonObject const& requestObject,
             << commandName.toStdString() << "\" error=\""
             << transportError.toStdString() << "\"";
         if (!shijimaLocalApiPing(localApiOptions(command.global))) {
+            if (!allowRuntimeStart) {
+                error = makeError(QStringLiteral("runtime_not_running"),
+                    QStringLiteral("NeurolingsCE runtime is not running"));
+                APP_LOG_DEBUG("cli") << "Skipping runtime start for command="
+                    << commandName.toStdString();
+                return false;
+            }
             if (!ensureRuntimeStarted(command, error)) {
                 return false;
             }
@@ -741,7 +749,17 @@ CliExecutionResult executeCodexNotify(CliCommand const& command,
     if (!sendRequest(command, QJsonObject {
         { QStringLiteral("command"), QStringLiteral("show_codex_notification") },
         { QStringLiteral("payload"), document.object() },
-    }, response, error)) {
+    }, response, error, false)) {
+        // Codex notifications are best-effort.  In particular, a callback
+        // arriving after the user closed NeurolingsCE must not resurrect the
+        // runtime just to display a bubble.
+        if (error.code == QStringLiteral("runtime_not_running") ||
+            error.code == QStringLiteral("transport_error"))
+        {
+            APP_LOG_DEBUG("cli") << "Ignoring Codex notification because the"
+                << " NeurolingsCE runtime is unavailable";
+            return result;
+        }
         return failExecution(result, error);
     }
     result.codexHandled = response.value(QStringLiteral("handled")).toBool(true);

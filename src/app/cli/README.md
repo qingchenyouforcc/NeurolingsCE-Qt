@@ -8,6 +8,9 @@ CommandLineParser → CliCommand → CommandExecutor → 本地 JSONL IPC / 独�
 
 命令执行前会确认 runtime 可用；若没有 GUI 进程，则寻找 NeurolingsCE.exe 或 NeurolingsCE-cli.exe 相关候选并以静默 runtime 启动。独立模式下模板库、loaded mascot 和 CLI 标签仍需保持与 GUI 协议相同的语义。
 
+Codex notify 回调采用 best-effort 投递：只有 runtime 已经运行时才发送通知。
+应用关闭后收到的回调会静默忽略，不会为了显示 Codex 气泡重新启动 runtime。
+
 ## 文件说明
 
 | 文件 | 作用 |
