@@ -18,6 +18,8 @@
 
 #include "../Platform.hpp"
 #include <QWidget>
+#include <algorithm>
+#include <cmath>
 #include <windows.h>
 
 namespace Platform {
@@ -50,6 +52,58 @@ void refreshTopmost(QWidget *widget) {
 
 bool useWindowMasks() {
     return false;
+}
+
+bool supportsWindowPushing() {
+    return true;
+}
+
+bool pushWindow(ActiveWindow const& activeWindow, double dx, double dy) {
+    if (!activeWindow.available || activeWindow.nativeHandle == 0 ||
+        !std::isfinite(dx) || !std::isfinite(dy))
+    {
+        return false;
+    }
+
+    // Keep package-provided action values bounded before they reach the Win32
+    // API.  The default action uses a small impulse; a larger value is almost
+    // certainly malformed mascot data rather than a useful user action.
+    dx = std::clamp(dx, -2000.0, 2000.0);
+    dy = std::clamp(dy, -2000.0, 2000.0);
+
+    HWND window = reinterpret_cast<HWND>(activeWindow.nativeHandle);
+    if (!IsWindow(window) || !IsWindowVisible(window) || IsIconic(window) ||
+        GetForegroundWindow() != window)
+    {
+        return false;
+    }
+
+    DWORD pid = 0;
+    if (GetWindowThreadProcessId(window, &pid) == 0 ||
+        pid == GetCurrentProcessId())
+    {
+        return false;
+    }
+
+    RECT rect;
+    if (!GetWindowRect(window, &rect)) {
+        return false;
+    }
+
+    UINT dpi = GetDpiForWindow(window);
+    if (dpi == 0) {
+        dpi = 96;
+    }
+    double physicalScale = static_cast<double>(dpi) / 96.0;
+    int offsetX = static_cast<int>(std::lround(dx * physicalScale));
+    int offsetY = static_cast<int>(std::lround(dy * physicalScale));
+    if (offsetX == 0 && offsetY == 0) {
+        return false;
+    }
+
+    return SetWindowPos(window, nullptr,
+        rect.left + offsetX, rect.top + offsetY, 0, 0,
+        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER) != 0;
 }
 
 }

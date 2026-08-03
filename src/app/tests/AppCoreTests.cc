@@ -410,6 +410,55 @@ void testCodexActivityParsing() {
         "Codex completion should map to Ready");
     expect(activity.lastAssistantMessage == QStringLiteral("😀 done"),
         "Codex parser should keep only the final assistant message for display");
+
+    recognized = false;
+    error.clear();
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("session-title-updated") },
+        { QStringLiteral("thread-id"), QStringLiteral("new-thread") },
+        { QStringLiteral("title"), QStringLiteral("Markdown bubble support") },
+        { QStringLiteral("description"), QStringLiteral("The new session is ready.") },
+    }, activity, &recognized, &error),
+        "Codex new-session title notifications should parse");
+    expect(recognized && activity.isNewSession &&
+        activity.sessionTitle == QStringLiteral("Markdown bubble support") &&
+        activity.sessionDescription == QStringLiteral("The new session is ready."),
+        "Codex new-session notifications should retain title and description");
+
+    recognized = false;
+    error.clear();
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("thread/name/updated") },
+        { QStringLiteral("params"), QJsonObject {
+            { QStringLiteral("threadName"), QStringLiteral("Nested title") },
+            { QStringLiteral("description"), QStringLiteral("Nested description") },
+        } },
+    }, activity, &recognized, &error) && recognized && activity.isNewSession &&
+        activity.sessionTitle == QStringLiteral("Nested title"),
+        "Codex title updates should accept app-server-shaped nested fields");
+
+    recognized = false;
+    error.clear();
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("method"), QStringLiteral("thread/name/updated") },
+        { QStringLiteral("params"), QJsonObject {
+            { QStringLiteral("threadName"), QStringLiteral("JSON-RPC title") },
+        } },
+    }, activity, &recognized, &error) && recognized && activity.isNewSession &&
+        activity.sessionTitle == QStringLiteral("JSON-RPC title"),
+        "Codex title updates should accept JSON-RPC method notifications");
+
+    auto titleJson = codexActivityToJson(activity);
+    expect(titleJson.value(QStringLiteral("title")).toString() ==
+        QStringLiteral("JSON-RPC title"),
+        "Codex activity serialization should retain a new-session title");
+
+    expect(!codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("session-title-updated") },
+        { QStringLiteral("title"), 42 },
+    }, activity, &recognized, &error),
+        "Malformed Codex title notifications should be rejected");
+
     expect(truncateCodexGraphemes(QStringLiteral("😀áb"), 2) ==
         QStringLiteral("😀á…"), "Codex excerpts should preserve grapheme clusters");
 
@@ -1034,6 +1083,17 @@ void testCommandDispatcher() {
     }, service);
     expect(codex.value(QStringLiteral("handled")).toBool(false),
         "dispatcher should route Codex completion notifications");
+
+    auto newSession = MascotCommandDispatcher::dispatchRequest(QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("show_codex_notification") },
+        { QStringLiteral("payload"), QJsonObject {
+            { QStringLiteral("type"), QStringLiteral("session-title-updated") },
+            { QStringLiteral("title"), QStringLiteral("New session") },
+            { QStringLiteral("description"), QStringLiteral("Ready") },
+        } },
+    }, service);
+    expect(newSession.value(QStringLiteral("handled")).toBool(false),
+        "dispatcher should route Codex new-session title notifications");
 }
 
 void testSafeChildPath() {
@@ -1216,6 +1276,78 @@ void testHotspotBehaviorRepeatsAcrossActionCompletion() {
         "releasing a held pat should restore the natural StandUp successor");
 }
 
+void testWindowPushBehaviorGate() {
+    std::string const actions = R"xml(
+        <Mascot>
+          <ActionList>
+            <Action Name="Idle" Type="Stay">
+              <Animation>
+                <Pose Image="/idle.png" ImageAnchor="0,0" Velocity="0,0" Duration="5" />
+              </Animation>
+            </Action>
+            <Action Name="Fall" Type="Stay">
+              <Animation>
+                <Pose Image="/fall.png" ImageAnchor="0,0" Velocity="0,0" Duration="5" />
+              </Animation>
+            </Action>
+            <Action Name="Throw" Type="Embedded"
+                Class="com.group_finity.mascot.action.ThrowIE"
+                BorderType="Floor" InitialVX="32" InitialVY="-10">
+              <Animation>
+                <Pose Image="/throw.png" ImageAnchor="0,0" Velocity="0,0" Duration="5" />
+              </Animation>
+            </Action>
+          </ActionList>
+        </Mascot>
+    )xml";
+    std::string const behaviors = R"xml(
+        <Mascot>
+          <BehaviorList>
+            <Behavior Name="Throw" Frequency="1"
+                Condition="#{mascot.environment.allowsWindowPushing &amp;&amp; mascot.environment.activeIE.visible}" />
+            <Behavior Name="Idle" Frequency="1" />
+            <Behavior Name="Fall" Frequency="0" />
+          </BehaviorList>
+        </Mascot>
+    )xml";
+
+    shijima::mascot::manager mascot(actions, behaviors,
+        { { 0, 100 }, "", false });
+    auto env = std::make_shared<shijima::mascot::environment>();
+    env->floor = { 100, 0, 100 };
+    env->ceiling = { 0, 0, 100 };
+    env->screen = { 0, 100, 100, 0 };
+    env->work_area = env->screen;
+    env->active_ie = { 0, 100, 100, 0 };
+    env->subtick_count = 1;
+    int pushes = 0;
+    env->window_push_callback = [&pushes](double dx, double dy) {
+        ++pushes;
+        return dx > 0 && dy == 0;
+    };
+    mascot.state->env = env;
+
+    // The default policy is off, so a ThrowIE behavior must not even be
+    // selected and no platform callback may run.
+    mascot.tick();
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "Idle" && pushes == 0,
+        "window pushing should be disabled by default at behavior selection");
+
+    env->allows_window_pushing = true;
+    expect(env->request_window_push(32, 0) && pushes == 1,
+        "an enabled environment with an active window should request one push");
+
+    env->allows_window_pushing = false;
+    expect(!env->request_window_push(32, 0) && pushes == 1,
+        "disabling window pushing should prevent subsequent platform requests");
+
+    env->allows_window_pushing = true;
+    env->active_ie = { -50, -50, -50, -50 };
+    expect(!env->request_window_push(32, 0) && pushes == 1,
+        "an unavailable active window should never receive a push request");
+}
+
 void testMascotHoldGestureBoundaries() {
     using Gesture = shijima::ui::MascotHoldGesture;
 
@@ -1280,6 +1412,7 @@ int main() {
     testBroadcastTargetsNearbyMascots();
     testBehaviorPreferenceRestoration();
     testHotspotBehaviorRepeatsAcrossActionCompletion();
+    testWindowPushBehaviorGate();
     testMascotHoldGestureBoundaries();
 
     if (g_failures > 0) {

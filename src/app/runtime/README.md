@@ -18,7 +18,7 @@ ManagerEnvironmentSync 更新环境 → MascotSessionStore 反向遍历 ShijimaW
 | ManagerRuntimeState.hpp | 保存运行时组合状态：环境控制器、timer、路径、模板/会话 store、刷新集合、计数器和关闭/CLI 标志。 |
 | ManagerRuntimeHelpers.hpp | 提供引擎 subtick 常量（4）和把回调切到 GUI 线程的通用辅助函数。 |
 | ManagerEnvironmentController.hpp | 声明每屏幕 shijima::mascot::environment 的创建、更新、尺度、拖离阈值、繁殖和活动窗口设置。 |
-| ManagerEnvironmentController.cc | 实现屏幕几何、工作区/地板/天花板/光标、active window、detach、scale 和多屏环境更新。 |
+| ManagerEnvironmentController.cc | 实现屏幕几何、工作区/地板/天花板/光标、active window、窗口推动策略、detach、scale 和多屏环境更新。 |
 | ManagerEnvironmentSync.cc | Manager 层包装；增删屏幕、切换 windowed sandbox、重建 mascot widget、恢复 inspector 与位置。 |
 | MascotTemplateStore.hpp | 模板所有权、名称/id 兼容索引及引擎 factory 注册接口。 |
 | MascotTemplateStore.cc | 同步注册/注销 factory、加载/替换模板、维护 native package 与默认 @ 模板。 |
@@ -39,5 +39,6 @@ ManagerEnvironmentSync 更新环境 → MascotSessionStore 反向遍历 ShijimaW
 
 - “加载/导入/删除包”：先看 MascotTemplateStore、ManagerMascotRuntime，再看 core/assets 和 ManagerImportWorkflow。
 - “屏幕/窗口/拖离”：先看 ManagerEnvironmentController，再看 EnvironmentSync 和 ui/mascot。
+- 窗口推动必须同时通过设置策略、有效 active window 和引擎动作边缘检查；平台回调只在 GUI tick 中执行。
 - “启动/关闭/单实例”：看 ManagerLifecycle 与 ui/ManagerWindowSetup。
 - “CLI/HTTP 改 mascot”：看 core/commands，确认最终调用的是本目录的 GUI 线程路径。

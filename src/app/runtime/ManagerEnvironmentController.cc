@@ -22,6 +22,7 @@
 #include "ManagerRuntimeHelpers.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
+#include "Platform/Platform.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -69,6 +70,23 @@ void ManagerEnvironmentController::setAllowsBreeding(bool allowsBreeding) {
     }
 }
 
+void ManagerEnvironmentController::setAllowsWindowPushing(
+    bool allowsWindowPushing)
+{
+    m_allowsWindowPushing = allowsWindowPushing;
+    bool effective = allowsWindowPushing && Platform::supportsWindowPushing();
+    for (auto &env : m_env) {
+        env->allows_window_pushing = effective;
+        env->window_push_callback = [this](double dx, double dy) {
+            return Platform::pushWindow(m_currentWindow, dx, dy);
+        };
+    }
+}
+
+bool ManagerEnvironmentController::allowsWindowPushing() const {
+    return m_allowsWindowPushing;
+}
+
 void ManagerEnvironmentController::screenAdded(QScreen *screen) {
     if (m_env.contains(screen)) {
         return;
@@ -79,6 +97,11 @@ void ManagerEnvironmentController::screenAdded(QScreen *screen) {
     auto env = std::make_shared<shijima::mascot::environment>();
     m_env[screen] = env;
     m_reverseEnv[env.get()] = screen;
+    env->allows_window_pushing = m_allowsWindowPushing &&
+        Platform::supportsWindowPushing();
+    env->window_push_callback = [this](double dx, double dy) {
+        return Platform::pushWindow(m_currentWindow, dx, dy);
+    };
     auto primary = QGuiApplication::primaryScreen();
     if (screen != primary && m_env.contains(primary)) {
         m_env[screen]->allows_breeding = m_env[primary]->allows_breeding;

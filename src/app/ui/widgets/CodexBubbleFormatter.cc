@@ -22,6 +22,7 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QFontMetrics>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QPalette>
 #include <QRegularExpression>
@@ -91,6 +92,56 @@ QString wrapCodexInlineReference(QString const& label) {
 QString escapeRawHtml(QString const& text);
 QString flattenCodexReferenceLabel(QString const& label);
 
+bool markdownFenceAt(QString const& text, int position) {
+    bool fenced = false;
+    QChar marker;
+    int fenceLength = 0;
+    int lineStart = 0;
+    while (lineStart <= text.size()) {
+        int lineEnd = text.indexOf(QChar('\n'), lineStart);
+        if (lineEnd < 0) {
+            lineEnd = text.size();
+        }
+        int offset = lineStart;
+        while (offset < lineEnd && offset - lineStart < 3 &&
+            text.at(offset) == QChar(' ')) {
+            ++offset;
+        }
+        int count = 0;
+        QChar lineMarker;
+        if (offset < lineEnd &&
+            (text.at(offset) == QChar('`') ||
+                text.at(offset) == QChar('~')))
+        {
+            lineMarker = text.at(offset);
+            while (offset + count < lineEnd &&
+                text.at(offset + count) == lineMarker) {
+                ++count;
+            }
+        }
+        if (count >= 3) {
+            if (!fenced) {
+                fenced = true;
+                marker = lineMarker;
+                fenceLength = count;
+            }
+            else if (marker == lineMarker && count >= fenceLength) {
+                fenced = false;
+                marker = QChar();
+                fenceLength = 0;
+            }
+        }
+        if (position <= lineEnd) {
+            return fenced;
+        }
+        if (lineEnd >= text.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
+    }
+    return fenced;
+}
+
 QString stripMarkdownLinkDestinationsImpl(QString text,
     bool wrapLocalReference) {
     // Markdown links are not useful in a transient notification and their
@@ -105,6 +156,25 @@ QString stripMarkdownLinkDestinationsImpl(QString text,
         if (open < 0) {
             result += text.mid(cursor);
             break;
+        }
+
+        // Link-looking text inside a fenced block is source code, not a
+        // Markdown link. Preserve the complete line so sanitization does not
+        // rewrite URLs or bracket expressions in the code sample.
+        if (markdownFenceAt(text, open)) {
+            int lineEnd = text.indexOf(QChar('\n'), open);
+            if (lineEnd < 0) {
+                lineEnd = text.size();
+            }
+            result += text.mid(cursor, lineEnd - cursor);
+            if (lineEnd < text.size()) {
+                result += QChar('\n');
+                cursor = lineEnd + 1;
+            }
+            else {
+                cursor = text.size();
+            }
+            continue;
         }
 
         int labelStart = open + 1;
@@ -564,6 +634,17 @@ QString makePrefixCandidate(QString const& text,
     if (prefix.isEmpty()) {
         return QStringLiteral("…");
     }
+
+    // A repaired fenced block must end at a Markdown line boundary.  Appending
+    // the marker directly after the closing fence (for example `````…) makes
+    // that fence invalid on Qt's Unix Markdown parser, which then treats the
+    // marker as code and drops it from toPlainText().  Keep the terminal
+    // ellipsis visible and outside the code block on every platform.
+    static QRegularExpression const fenceOnlyLine(
+        QStringLiteral("(?:^|\\n) {0,3}(?:`{3,}|~{3,})[ \\t]*$"));
+    if (fenceOnlyLine.match(prefix).hasMatch()) {
+        prefix += QChar('\n');
+    }
     return prefix + QStringLiteral("…");
 }
 
@@ -641,10 +722,21 @@ void styleCodexInlineCode(QTextDocument &document) {
     // inline-code spans and fenced code with a fixed-pitch format; using that
     // semantic marker keeps the visual treatment independent of the user's
     // light/dark/high-contrast theme and never relies on link blue.
-    QVector<QPair<int, int>> codeRanges;
+    struct CodeRange {
+        int position = 0;
+        int length = 0;
+        bool fenced = false;
+    };
+    QVector<CodeRange> codeRanges;
     for (QTextBlock block = document.begin(); block != document.end();
         block = block.next())
     {
+        auto blockFormat = block.blockFormat();
+        // Qt records fenced blocks in the block format, while inline code
+        // spans carry FontFixedPitch on their fragments.  Do not rely on a
+        // font-family string alone: that varies by platform and theme.
+        bool fenced = blockFormat.hasProperty(QTextFormat::BlockCodeFence) ||
+            blockFormat.hasProperty(QTextFormat::BlockCodeLanguage);
         for (QTextBlock::Iterator iterator = block.begin();
             iterator != block.end(); ++iterator)
         {
@@ -653,19 +745,25 @@ void styleCodexInlineCode(QTextDocument &document) {
                 continue;
             }
             QTextCharFormat format = fragment.charFormat();
-            if (format.fontFixedPitch()) {
-                codeRanges.append(qMakePair(fragment.position(),
-                    fragment.length()));
+            if (fenced || format.fontFixedPitch()) {
+                codeRanges.append(CodeRange { fragment.position(),
+                    fragment.length(), fenced });
             }
         }
     }
 
     for (auto const& range : codeRanges) {
         QTextCursor cursor(&document);
-        cursor.setPosition(range.first);
-        cursor.setPosition(range.first + range.second,
+        cursor.setPosition(range.position);
+        cursor.setPosition(range.position + range.length,
             QTextCursor::KeepAnchor);
         QTextCharFormat format = cursor.charFormat();
+        if (range.fenced) {
+            auto fixedFont = QFontDatabase::systemFont(
+                QFontDatabase::FixedFont);
+            format.setFontFixedPitch(true);
+            format.setFontFamily(fixedFont.family());
+        }
         format.setBackground(background);
         format.setForeground(foreground);
         format.setUnderlineStyle(QTextCharFormat::NoUnderline);

@@ -13,7 +13,7 @@ CodexActivity/普通 action 文本 → CodexBubbleFormatter 或 SpeechBubbleText
 | SpeechBubbleWidget.cc | 绘制气泡、排队/丢弃消息、普通与 Codex 时长/尺寸上限、屏幕边界定位和主题调色。 |
 | SpeechBubbleTextCatalog.cc | 按 mascot bubble_context.txt、用户 app-data bubbles.txt、资源和 fallback 的优先级读取/缓存/随机选择普通文本。 |
 | CodexBubbleFormatter.hpp | 声明安全 Markdown 清洗、QTextDocument 配置、字体测量、文本适配和显示时长计算接口。 |
-| CodexBubbleFormatter.cc | 用 Qt QTextDocument 渲染受限 Markdown；清除原始 HTML/链接目的地和锚点，把本地/相对文件标签转换为 palette-aware 的非交互行内引用，按 grapheme 安全地二分查找 prefix 截断并修复未闭合 Markdown，计算不超过 UI 上限的时长。 |
+| CodexBubbleFormatter.cc | 用 Qt QTextDocument 渲染受限 Markdown（包括带语言提示的围栏代码块）；清除原始 HTML/链接目的地和锚点，把本地/相对文件标签转换为 palette-aware 的非交互行内引用，按 grapheme 安全地二分查找 prefix 截断并修复未闭合 Markdown，计算不超过 UI 上限的时长。 |
 
 ## Agent 注意点
 

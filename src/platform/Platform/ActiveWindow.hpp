@@ -20,6 +20,7 @@
 
 #include <cstdbool>
 #include <QString>
+#include <QtGlobal>
 
 namespace Platform {
 
@@ -30,10 +31,13 @@ public:
     long pid;
     double x, y, width, height;
     ActiveWindow(QString const& uid, long pid, double x, double y,
-        double width, double height):
+        double width, double height, quintptr nativeHandle = 0):
         available(true), uid(uid), pid(pid), x(x), y(y), width(width),
-        height(height) {}
-    ActiveWindow(): available(false) {}
+        height(height), nativeHandle(nativeHandle) {}
+    // Platform-specific window handle.  It is intentionally opaque to the
+    // runtime so non-Windows backends can keep this at zero.
+    quintptr nativeHandle = 0;
+    ActiveWindow(): available(false), nativeHandle(0) {}
 };
 
 }

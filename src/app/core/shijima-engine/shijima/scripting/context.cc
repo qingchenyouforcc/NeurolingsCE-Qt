@@ -498,6 +498,11 @@ duk_idx_t context::build_environment() {
     build_area([this]() -> mascot::environment::area& { return this->state->env->active_ie; });
     put_prop(-2, "activeIE");
 
+    // Pushing an external window is a user-controlled capability. Expose it
+    // to behavior conditions so disabled pushes are not selected.
+    register_boolean_property("allowsWindowPushing",
+        [this]() { return this->state->env->allows_window_pushing; }, nullptr);
+
     // environment.cursor
     build_dvec2([this]() -> mascot::environment::dvec2 { return this->state->get_cursor(); });
     put_prop(-2, "cursor");

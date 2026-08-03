@@ -14,7 +14,7 @@ base → instant、reference、sequence、select 等控制动作；
 |---|---|
 | action.hpp | action 类型的统一入口和公共声明。 |
 | base.hpp / base.cc | 所有动作的基类生命周期：init、tick、subtick、finalize，以及变量、脚本和 broadcast 访问。 |
-| animation.hpp / animation.cc | 共享 pose 动画、持续时间、速度、边界、拖拽、完成条件和当前帧 hotspot 查询的基础实现。 |
+| animation.hpp / animation.cc | 共享 pose 动画、持续时间、速度、边界、拖拽、完成条件、当前帧 hotspot 查询，以及 ThrowIE 窗口推动动作的双重门控。 |
 | animate.hpp / animate.cc | 使用动画序列推进 pose 的具体动作变体。 |
 | breed.hpp / breed.cc | 发起繁殖请求并等待 runtime/factory 处理。 |
 | dragged.hpp / dragged.cc | 在用户拖拽期间跟随外部位置，处理拖拽结束后的恢复。 |

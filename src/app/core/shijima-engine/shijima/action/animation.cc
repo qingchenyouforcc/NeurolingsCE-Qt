@@ -18,6 +18,7 @@
 
 #include "animation.hpp"
 #include "shijima/hotspot.hpp"
+#include <cmath>
 #include <stdexcept>
 
 namespace shijima {
@@ -25,6 +26,16 @@ namespace action {
 
 bool animation::requests_broadcast() {
     return true;
+}
+
+bool animation::is_window_push_action() const {
+    auto const cls = init_attr.find("Class");
+    if (cls != init_attr.end() && cls->second.find("ThrowIE") != std::string::npos) {
+        return true;
+    }
+    auto const name = init_attr.find("Name");
+    return name != init_attr.end() &&
+        (name->second == "ThrowIE" || name->second == "ThrowIe");
 }
 
 math::vec2 animation::get_velocity() {
@@ -40,6 +51,7 @@ void animation::init(mascot::tick &ctx) {
     base::init(ctx);
     anim_idx = -1;
     current_anim_time = -1;
+    window_push_requested = false;
     if (vars.has("FixedVelocity")) {
         has_fixed_velocity = true;
         fixed_velocity = vars.get_string("FixedVelocity");
@@ -64,6 +76,45 @@ bool animation::tick() {
     if (!handle_dragging()) {
         return false;
     }
+
+    if (is_window_push_action()) {
+        auto &env = *mascot->env;
+        // A behavior can outlive its target window by a tick.  Abort the
+        // external interaction immediately rather than animating a push into
+        // empty space.
+        if (!env.allows_window_pushing || !env.active_ie.visible()) {
+            mascot->queued_behavior = "Fall";
+            return false;
+        }
+        if (!window_push_requested) {
+            window_push_requested = true;
+            auto const& anchor = mascot->anchor;
+            if (env.active_ie.is_on(anchor)) {
+                double initialVx = vars.get_num("InitialVX", 0);
+                double initialVy = vars.get_num("InitialVY", 0);
+                if (std::isfinite(initialVx) && std::isfinite(initialVy)) {
+                    double pushDx = 0;
+                    double pushDy = 0;
+                    if (env.active_ie.left_border().is_on(anchor)) {
+                        pushDx = std::abs(initialVx);
+                    }
+                    else if (env.active_ie.right_border().is_on(anchor)) {
+                        pushDx = -std::abs(initialVx);
+                    }
+                    else if (env.active_ie.top_border().is_on(anchor)) {
+                        pushDy = std::abs(initialVy);
+                    }
+                    else if (env.active_ie.bottom_border().is_on(anchor)) {
+                        pushDy = -std::abs(initialVy);
+                    }
+                    if (pushDx != 0 || pushDy != 0) {
+                        env.request_window_push(pushDx, pushDy);
+                    }
+                }
+            }
+        }
+    }
+
     auto velocity = get_velocity();
     mascot->anchor.x += dx(velocity.x);
     mascot->anchor.y += dy(velocity.y);

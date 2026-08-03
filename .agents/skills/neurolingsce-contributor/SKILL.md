@@ -92,3 +92,29 @@ metadata in `CMakeLists.txt`/`cmake/`.
 - Settings: independent toggle, confirmation, keyboard navigation, template
   selection, test notification, light/dark/high-DPI layout, and no silent
   startup/installer configuration writes.
+
+## Cross-platform CI regressions
+
+Do not treat a green Windows build as sufficient evidence for Qt rich-text or
+Markdown changes. Qt versions, platform text engines, and installed fonts can
+interpret malformed or ambiguous Markdown differently. A concrete failure in
+this repository appended a truncation ellipsis on the same line as a generated
+closing code fence: Windows kept the ellipsis in plain text, while Linux and
+macOS parsed it as part of the fenced block and failed the bubble test.
+
+- Keep Markdown structural delimiters unambiguous. Closing fences must occupy
+  their own line; suffixes such as an ellipsis belong on the following line.
+- Assert semantic output (including `codexMarkdownPlainText()`) and delimiter
+  boundaries. Avoid exact pixel, font-metric, or platform-specific wrapping
+  assertions unless the behavior itself is platform-specific.
+- Build both `NeurolingsCETests` and `NeurolingsCEBubbleTests`, then run CTest
+  with `--output-on-failure`. Keep explicit workflow targets aligned with the
+  targets registered through CTest; never hide failures with skipped tests or
+  `continue-on-error`.
+- For a matrix-only regression, find the first failing commit and compare it
+  with the latest all-platform green run before changing workflow setup. Use
+  the failing test and its output as evidence rather than assuming a runner or
+  dependency problem.
+- Validate Qt/Markdown and rendering changes on the Linux, macOS, and Windows
+  matrix. When local access covers only one platform, add deterministic tests
+  for the cross-platform semantic boundary and let the full matrix prove it.

@@ -166,4 +166,14 @@ bool useWindowMasks() {
     return windowMasksEnabled;
 }
 
+bool supportsWindowPushing() {
+    return false;
+}
+
+bool pushWindow(ActiveWindow const&, double, double) {
+    // Wayland and the supported desktop helpers do not expose a portable,
+    // focus-safe window move API.  Keep this opt-in feature inert here.
+    return false;
+}
+
 }

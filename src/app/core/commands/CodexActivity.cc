@@ -5,10 +5,104 @@
 #include <QTextBoundaryFinder>
 #include <QVector>
 
+#include <initializer_list>
+
 namespace {
 
 constexpr int kMaxMessages = 128;
 constexpr qsizetype kMaxStringBytes = 128 * 1024;
+
+QString normalizedEventType(QString type) {
+    type = type.trimmed().toLower();
+    type.replace(QChar('_'), QChar('-'));
+    return type;
+}
+
+bool isNewSessionEvent(QString const& type) {
+    auto normalized = normalizedEventType(type);
+    return normalized == QStringLiteral("session-title-updated") ||
+        normalized == QStringLiteral("session-title-generated") ||
+        normalized == QStringLiteral("session-title-changed") ||
+        normalized == QStringLiteral("session/title/updated") ||
+        normalized == QStringLiteral("session/title/changed") ||
+        normalized == QStringLiteral("session/titlechanged") ||
+        normalized == QStringLiteral("session-name-updated") ||
+        normalized == QStringLiteral("session-name-changed") ||
+        normalized == QStringLiteral("session/name/updated") ||
+        normalized == QStringLiteral("session/name/changed") ||
+        normalized == QStringLiteral("thread-title-updated") ||
+        normalized == QStringLiteral("thread-title-changed") ||
+        normalized == QStringLiteral("thread/title/updated") ||
+        normalized == QStringLiteral("thread/title/changed") ||
+        normalized == QStringLiteral("thread-name-updated") ||
+        normalized == QStringLiteral("thread-name-changed") ||
+        normalized == QStringLiteral("thread-name/updated") ||
+        normalized == QStringLiteral("thread/name/changed") ||
+        normalized == QStringLiteral("thread/name/updated") ||
+        normalized == QStringLiteral("new-session") ||
+        normalized == QStringLiteral("session-started");
+}
+
+QJsonValue findValue(QJsonObject const& object,
+    std::initializer_list<QString> keys)
+{
+    for (auto const& key : keys) {
+        auto value = object.value(key);
+        if (!value.isUndefined() && !value.isNull()) {
+            return value;
+        }
+    }
+    // App-server shaped notifications sometimes wrap the update in params or
+    // a thread/session object.  Only inspect known object containers; this
+    // keeps parsing deterministic and avoids recursively walking untrusted
+    // payloads.
+    for (auto const& containerKey : { QStringLiteral("params"),
+        QStringLiteral("session"), QStringLiteral("thread"),
+        QStringLiteral("data") })
+    {
+        auto container = object.value(containerKey);
+        if (!container.isObject()) {
+            continue;
+        }
+        auto nested = container.toObject();
+        for (auto const& key : keys) {
+            auto value = nested.value(key);
+            if (!value.isUndefined() && !value.isNull()) {
+                return value;
+            }
+        }
+    }
+    return {};
+}
+
+bool readAliasedOptionalString(QJsonObject const& object,
+    std::initializer_list<QString> keys, QString &target,
+    QString *errorMessage)
+{
+    for (auto const& key : keys) {
+        auto value = findValue(object, { key });
+        if (value.isUndefined() || value.isNull()) {
+            continue;
+        }
+        if (!value.isString()) {
+            if (errorMessage != nullptr) {
+                *errorMessage = QStringLiteral("%1 must be a string")
+                    .arg(key);
+            }
+            return false;
+        }
+        target = value.toString();
+        if (target.toUtf8().size() > kMaxStringBytes) {
+            if (errorMessage != nullptr) {
+                *errorMessage = QStringLiteral("%1 is too large").arg(key);
+            }
+            return false;
+        }
+        return true;
+    }
+    target.clear();
+    return true;
+}
 
 QVector<int> graphemeBoundaries(QString const& text) {
     QVector<int> boundaries { 0 };
@@ -88,6 +182,15 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
     }
 
     auto typeValue = object.value(QStringLiteral("type"));
+    // JSON-RPC/app-server notifications call this field `method`; the
+    // legacy Codex notify hook uses `type`. Accept both without recursively
+    // walking arbitrary payload data.
+    if (!typeValue.isString()) {
+        auto methodValue = object.value(QStringLiteral("method"));
+        if (methodValue.isString()) {
+            typeValue = methodValue;
+        }
+    }
     if (!typeValue.isString() || typeValue.toString().trimmed().isEmpty()) {
         if (errorMessage != nullptr) {
             *errorMessage = QStringLiteral("type must be a non-empty string");
@@ -98,7 +201,10 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
 
     // Codex may add event types over time.  They are deliberately ignored so
     // installing a newer notify callback never breaks an older companion.
-    if (activity.type != QStringLiteral("agent-turn-complete")) {
+    bool const newSession = isNewSessionEvent(activity.type);
+    if (activity.type != QStringLiteral("agent-turn-complete") &&
+        !newSession)
+    {
         return true;
     }
     if (recognized != nullptr) {
@@ -115,6 +221,68 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
             activity.lastAssistantMessage, errorMessage))
     {
         return false;
+    }
+
+    if (newSession) {
+        if (!readAliasedOptionalString(object,
+            { QStringLiteral("title"), QStringLiteral("session-title"),
+                QStringLiteral("sessionTitle"), QStringLiteral("thread-title"),
+                QStringLiteral("threadTitle"), QStringLiteral("thread-name"),
+                QStringLiteral("threadName"), QStringLiteral("session-name"),
+                QStringLiteral("sessionName"), QStringLiteral("name") },
+            activity.sessionTitle, errorMessage) ||
+            activity.sessionTitle.trimmed().isEmpty())
+        {
+            if (errorMessage != nullptr && errorMessage->isEmpty()) {
+                *errorMessage = QStringLiteral(
+                    "new session notification requires a title");
+            }
+            return false;
+        }
+        if (!readAliasedOptionalString(object,
+            { QStringLiteral("description"), QStringLiteral("summary"),
+                QStringLiteral("session-description"),
+                QStringLiteral("sessionDescription"),
+                QStringLiteral("preview"), QStringLiteral("message"),
+                QStringLiteral("body"), QStringLiteral("content") },
+            activity.sessionDescription, errorMessage))
+        {
+            return false;
+        }
+        activity.isNewSession = true;
+        // A few Codex builds send the description in the completion field.
+        if (activity.sessionDescription.isEmpty()) {
+            activity.sessionDescription = activity.lastAssistantMessage;
+        }
+    }
+    else if (activity.type == QStringLiteral("agent-turn-complete")) {
+        // Be tolerant of desktop builds that attach title metadata to the
+        // completion event instead of sending a separate event.  Only treat
+        // it as a new-session event when a non-empty title is present.
+        QString title;
+        if (!readAliasedOptionalString(object,
+            { QStringLiteral("title"), QStringLiteral("session-title"),
+                QStringLiteral("sessionTitle"), QStringLiteral("thread-title"),
+                QStringLiteral("threadTitle"), QStringLiteral("thread-name"),
+                QStringLiteral("threadName") }, title, errorMessage))
+        {
+            return false;
+        }
+        if (!title.trimmed().isEmpty()) {
+            activity.sessionTitle = title;
+            if (!readAliasedOptionalString(object,
+                { QStringLiteral("description"), QStringLiteral("summary"),
+                    QStringLiteral("preview"), QStringLiteral("message"),
+                    QStringLiteral("body"), QStringLiteral("content") },
+                activity.sessionDescription, errorMessage))
+            {
+                return false;
+            }
+            if (activity.sessionDescription.isEmpty()) {
+                activity.sessionDescription = activity.lastAssistantMessage;
+            }
+            activity.isNewSession = true;
+        }
     }
 
     auto messagesValue = object.value(QStringLiteral("input-messages"));
@@ -152,6 +320,12 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
             }
         }
     }
+    if (activity.isNewSession && activity.sessionDescription.isEmpty() &&
+        !activity.inputMessages.isEmpty())
+    {
+        activity.sessionDescription = activity.inputMessages.join(
+            QStringLiteral("\n"));
+    }
     activity.state = CodexActivityState::Ready;
     return true;
 }
@@ -163,6 +337,12 @@ QJsonObject codexActivityToJson(CodexActivity const& activity,
         { QStringLiteral("type"), activity.type },
         { QStringLiteral("state"), codexActivityStateName(activity.state) },
     };
+    if (!activity.sessionTitle.isEmpty()) {
+        object.insert(QStringLiteral("title"), activity.sessionTitle);
+    }
+    if (!activity.sessionDescription.isEmpty()) {
+        object.insert(QStringLiteral("description"), activity.sessionDescription);
+    }
     if (!activity.lastAssistantMessage.isEmpty()) {
         object.insert(QStringLiteral("last-assistant-message"),
             activity.lastAssistantMessage);

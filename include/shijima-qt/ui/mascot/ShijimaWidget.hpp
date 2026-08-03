@@ -61,7 +61,8 @@ public:
     bool pointInside(QPoint const& point);
     int mascotId() { return m_mascotId; }
     void showInspector();
-    void showCodexNotification(QString const& message);
+    void showCodexNotification(QString const& message,
+        QString const& title = QString());
     void markForDeletion() { m_markedForDeletion = true; }
     bool markedForDeletion() const { return m_markedForDeletion; }
     bool inspectorVisible();

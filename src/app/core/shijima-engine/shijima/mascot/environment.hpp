@@ -21,6 +21,7 @@
 #include <shijima/broadcast/manager.hpp>
 #include <shijima/math.hpp>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <random>
 
@@ -251,9 +252,22 @@ public:
     dvec2 cursor;
     bool allows_breeding = true;
     bool allows_hotspots = true;
+    // Window pushing is an explicit user opt-in.  The callback is supplied by
+    // the platform/runtime layer and remains empty on unsupported platforms.
+    bool allows_window_pushing = false;
+    std::function<bool(double, double)> window_push_callback;
     long mascot_count = 0;
     bool sticky_ie = true;
     int subtick_count = 1;
+
+    bool request_window_push(double dx, double dy) {
+        if (!allows_window_pushing || !active_ie.visible() ||
+            window_push_callback == nullptr)
+        {
+            return false;
+        }
+        return window_push_callback(dx, dy);
+    }
 
     // [0.0, 1.0)
     double random() {

@@ -39,6 +39,8 @@ public:
     void setUserScale(double scale);
     void setDetachThreshold(double threshold);
     void setAllowsBreeding(bool allowsBreeding);
+    void setAllowsWindowPushing(bool allowsWindowPushing);
+    bool allowsWindowPushing() const;
 
     void screenAdded(QScreen *screen);
     void screenRemoved(QScreen *screen, QScreen *primaryScreen,
@@ -59,6 +61,7 @@ private:
     Platform::ActiveWindowObserver m_windowObserver;
     double m_userScale = 1.0;
     double m_detachThreshold = 30.0;
+    bool m_allowsWindowPushing = false;
     QMap<QScreen *, std::shared_ptr<shijima::mascot::environment>> m_env;
     QMap<shijima::mascot::environment *, QScreen *> m_reverseEnv;
 };

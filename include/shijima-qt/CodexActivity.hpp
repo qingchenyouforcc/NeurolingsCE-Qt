@@ -22,6 +22,13 @@ struct CodexActivity {
     QString cwd;
     QStringList inputMessages;
     QString lastAssistantMessage;
+    // Codex desktop can emit a separate notification while it generates the
+    // title for a newly-created session.  Keep the title/description in the
+    // same bounded, transient model as completion messages so the service can
+    // render the event without exposing thread metadata.
+    QString sessionTitle;
+    QString sessionDescription;
+    bool isNewSession = false;
     CodexActivityState state = CodexActivityState::Ready;
 };
 

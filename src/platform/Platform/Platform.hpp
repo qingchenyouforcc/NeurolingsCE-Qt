@@ -29,5 +29,9 @@ void initialize(int argc, char **argv);
 void showOnAllDesktops(QWidget *widget);
 void refreshTopmost(QWidget *widget);
 bool useWindowMasks();
+// Whether this backend can safely move a tracked foreground window in
+// response to a mascot's push action.
+bool supportsWindowPushing();
+bool pushWindow(ActiveWindow const& window, double dx, double dy);
 
 }

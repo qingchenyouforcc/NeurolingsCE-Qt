@@ -816,6 +816,14 @@
         <translation>预览标题、回复摘录以及八秒队列显示效果。</translation>
     </message>
     <message>
+        <source>New session has no content to display.</source>
+        <translation>新会话没有可显示的内容。</translation>
+    </message>
+    <message>
+        <source>The task completed without a reply to display.</source>
+        <translation>任务已完成，没有可显示的回复。</translation>
+    </message>
+    <message>
         <source>Interaction</source>
         <translation>交互</translation>
     </message>
@@ -826,6 +834,14 @@
     <message>
         <source>Allow mascots to create additional companions.</source>
         <translation>允许桌宠继续生成分身。</translation>
+    </message>
+    <message>
+        <source>Allow Mascots to Push Windows</source>
+        <translation>允许桌宠推动窗口</translation>
+    </message>
+    <message>
+        <source>Let mascots move a detected window when they reach its edge. Disabled by default.</source>
+        <translation>当桌宠到达检测到的窗口边缘时允许其移动窗口。默认关闭。</translation>
     </message>
     <message>
         <source>Show mascot dialogue bubbles when interactions trigger them.</source>
@@ -1355,6 +1371,17 @@
     <message>
         <source>Custom proxy</source>
         <translation>自定义代理</translation>
+    </message>
+</context>
+<context>
+    <name>SpeechBubbleWidget</name>
+    <message>
+        <source>Codex · Completed</source>
+        <translation>Codex · 已完成</translation>
+    </message>
+    <message>
+        <source>Codex · New session</source>
+        <translation>Codex · 新会话</translation>
     </message>
 </context>
 <context>

@@ -32,6 +32,7 @@
 #include <stdexcept>
 #include <QDir>
 #include <QDirIterator>
+#include <QCoreApplication>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -603,14 +604,35 @@ bool ShijimaManager::showCodexNotification(CodexActivity const& activity) {
         return false;
     }
 
-    QString message = activity.lastAssistantMessage.trimmed();
-    if (message.isEmpty()) {
-        message = QStringLiteral("任务已完成，没有可显示的回复。");
+    QString message;
+    QString title;
+    if (activity.isNewSession) {
+        title = QCoreApplication::translate("SpeechBubbleWidget",
+            "Codex · New session");
+        message = activity.sessionTitle.trimmed();
+        QString description = activity.sessionDescription.trimmed();
+        if (!description.isEmpty()) {
+            if (!message.isEmpty()) {
+                message += QStringLiteral("\n\n");
+            }
+            message += description;
+        }
+        if (message.isEmpty()) {
+            message = QCoreApplication::translate("ShijimaManager",
+                "New session has no content to display.");
+        }
+    }
+    else {
+        message = activity.lastAssistantMessage.trimmed();
+        if (message.isEmpty()) {
+            message = QCoreApplication::translate("ShijimaManager",
+                "The task completed without a reply to display.");
+        }
     }
     // The content is used only for this in-memory bubble and is never written
     // to settings or logs.  Bound it before entering the UI queue.
     auto excerpt = compactCodexBubbleSource(message);
-    target->showCodexNotification(excerpt.text);
+    target->showCodexNotification(excerpt.text, title);
     APP_LOG_INFO("codex") << "Codex notification displayed state=\""
         << codexActivityStateName(activity.state).toStdString()
         << " template=\"" << target->mascotName().toStdString() << "\"";

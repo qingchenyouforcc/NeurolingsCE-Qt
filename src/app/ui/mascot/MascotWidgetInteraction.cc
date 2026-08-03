@@ -349,10 +349,12 @@ void ShijimaWidget::showSpeechBubble() {
     m_speechBubble->showBubble(text, anchorPos);
 }
 
-void ShijimaWidget::showCodexNotification(QString const& message) {
+void ShijimaWidget::showCodexNotification(QString const& message,
+    QString const& title)
+{
     if (m_speechBubble == nullptr) {
         m_speechBubble = new SpeechBubbleWidget();
     }
     QPoint anchorPos = mapToGlobal(QPoint(width() / 2, 0));
-    m_speechBubble->showCodexBubble(message, anchorPos);
+    m_speechBubble->showCodexBubble(message, anchorPos, title);
 }

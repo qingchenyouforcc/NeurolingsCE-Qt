@@ -169,6 +169,53 @@ void testMarkdownRenderingAndSafety(QFont const& font) {
         "formatted Codex Markdown should use document layout for fit checks");
 }
 
+void testFencedCodeBlocks(QFont const& font) {
+    QString source = QStringLiteral(
+        "前置说明\n\n```cpp\n"
+        "const QString message = QStringLiteral(\"你好\");\n"
+        "const char *url = \"https://example.invalid/[x]\";\n"
+        "qDebug() << message;\n"
+        "```\n\n后置说明");
+    auto sanitized = sanitizeCodexMarkdown(source);
+    expect(sanitized.contains(QStringLiteral("```cpp")) &&
+        sanitized.contains(QStringLiteral("qDebug()")),
+        "Codex Markdown sanitization should preserve fenced code blocks");
+
+    QTextDocument document;
+    configureCodexMarkdownDocument(document, source, font, 320);
+    expect(document.toPlainText().contains(QStringLiteral("const QString message")) &&
+        document.toPlainText().contains(QStringLiteral("qDebug()")) &&
+        document.toPlainText().contains(QStringLiteral("https://example.invalid/[x]")),
+        "fenced Codex code should remain visible in the document");
+    bool sawFixedPitch = false;
+    bool sawCodeBackground = false;
+    QColor expectedBackground = QGuiApplication::palette().color(
+        QPalette::AlternateBase);
+    for (QTextBlock block = document.begin(); block != document.end();
+        block = block.next())
+    {
+        for (QTextBlock::Iterator iterator = block.begin();
+            iterator != block.end(); ++iterator)
+        {
+            auto fragment = iterator.fragment();
+            if (!fragment.isValid() ||
+                !fragment.text().contains(QStringLiteral("const QString"))) {
+                continue;
+            }
+            auto format = fragment.charFormat();
+            sawFixedPitch = format.fontFixedPitch();
+            sawCodeBackground = format.background().style() != Qt::NoBrush &&
+                format.background().color() == expectedBackground;
+        }
+    }
+    expect(sawFixedPitch,
+        "fenced Codex code should use a fixed-pitch text format");
+    expect(sawCodeBackground,
+        "fenced Codex code should use the palette-aware code background");
+    expect(codexMarkdownFits(source, font, 320, 220, 8),
+        "a short fenced Codex block should fit the bubble budget");
+}
+
 void testCodexFileReferenceRendering(QFont const& font) {
     QString source = QStringLiteral(
         "这是一个本地引用：[项目说明 README.md](D:/repo/README.md)\n"
@@ -293,6 +340,26 @@ void testMarkdownPrefixClosesStructure(QFont const& font) {
         "Markdown prefix excerpt should fit the line and height budget");
 }
 
+void testFenceClosureKeepsEllipsisOnOwnLine(QFont const& font) {
+    // Keep the code lines short and the width generous so this checks the
+    // Markdown fence boundary rather than a platform's glyph widths. The
+    // prefix budget must cut inside the block and synthesize its closing
+    // fence before appending the truncation marker.
+    QString source = QStringLiteral("```text\n")
+        + QStringLiteral("line\n").repeated(40)
+        + QStringLiteral("```");
+    QFontMetrics metrics(font);
+    int maxHeight = 6 * metrics.lineSpacing();
+    auto result = formatCodexBubbleExcerpt(source, font, 2000, maxHeight, 6);
+    expect(result.truncated,
+        "long fenced Markdown should produce a bounded excerpt");
+    expect(result.text.contains(QStringLiteral("```\n…")),
+        "the fenced-code closing delimiter and ellipsis should be separate lines");
+    expect(codexMarkdownPlainText(result.text).trimmed().endsWith(
+        QStringLiteral("…")),
+        "the fence-closed excerpt should retain a visible terminal ellipsis");
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -309,10 +376,12 @@ int main(int argc, char **argv) {
     testMultilineAndLargeFont(font);
     testDurations();
     testMarkdownRenderingAndSafety(font);
+    testFencedCodeBlocks(font);
     testCodexFileReferenceRendering(font);
     testMalformedAndNestedLinksStaySafe();
     testReferencePrefixTruncation(font);
     testMarkdownPrefixClosesStructure(font);
+    testFenceClosureKeepsEllipsisOnOwnLine(font);
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

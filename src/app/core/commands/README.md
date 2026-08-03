@@ -13,7 +13,7 @@ commands 是 CLI、QLocalSocket、HTTP 和 GUI 共用的协议边界。MascotApi
 | MascotApi.cc | MascotInfo、LoadedMascotInfo、MascotPatch、SpawnMascotRequest 等请求/响应的 JSON 序列化、解析和 anchor 校验。 |
 | MascotCommandDispatcher.hpp | header-only 的命令路由；覆盖 ping、列表、加载、spawn、label、alter、dismiss、import/remove、stop、show manager 和 Codex 通知，并生成 bad request。 |
 | MascotCommandService.cc | Manager 业务适配层；实现模板/会话查询、选择器、CLI 标签、生成/关闭/修改 mascot、导入删除、预览和 Codex 通知。 |
-| CodexActivity.cc | 对受限 JSON 做事件识别、输入消息提取、换行规范化、grapheme 安全的 prefix-first 摘要和长度截断；未知事件可被安全忽略。 |
+| CodexActivity.cc | 对受限 JSON 做事件识别（完成回合和新会话标题）、标题/描述提取、换行规范化、grapheme 安全的 prefix-first 摘要和长度截断；未知事件可被安全忽略。 |
 
 ## 安全与线程
 

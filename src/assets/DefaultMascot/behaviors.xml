@@ -159,13 +159,13 @@
 			<Behavior Name="JumpOnIERightWall" Frequency="50" Condition="#{mascot.anchor.x &gt; mascot.environment.activeIE.right &amp;&amp;
 				Math.abs(mascot.environment.activeIE.bottom-mascot.anchor.y) &lt;mascot.environment.activeIE.height/4}" Hidden="true" />
 				
-			<Behavior Name="ThrowIEFromLeft" Frequency="20" Condition="#{mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
+			<Behavior Name="ThrowIEFromLeft" Frequency="20" Condition="#{mascot.environment.allowsWindowPushing &amp;&amp; mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
 				mascot.anchor.x &lt; mascot.environment.activeIE.left}" />
-			<Behavior Name="ThrowIEFromRight" Frequency="20" Condition="#{mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
+			<Behavior Name="ThrowIEFromRight" Frequency="20" Condition="#{mascot.environment.allowsWindowPushing &amp;&amp; mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
 				mascot.anchor.x &gt; mascot.environment.activeIE.right}" />
-			<Behavior Name="WalkAndThrowIEFromRight" Frequency="20" Condition="#{mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
+			<Behavior Name="WalkAndThrowIEFromRight" Frequency="20" Condition="#{mascot.environment.allowsWindowPushing &amp;&amp; mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
 				mascot.anchor.x &lt; mascot.environment.activeIE.left}" />
-			<Behavior Name="WalkAndThrowIEFromLeft" Frequency="20" Condition="#{mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
+			<Behavior Name="WalkAndThrowIEFromLeft" Frequency="20" Condition="#{mascot.environment.allowsWindowPushing &amp;&amp; mascot.environment.activeIE.bottom &lt; mascot.anchor.y-64 &amp;&amp;
 				mascot.anchor.x &gt; mascot.environment.activeIE.right}" />
 		</Condition>
 

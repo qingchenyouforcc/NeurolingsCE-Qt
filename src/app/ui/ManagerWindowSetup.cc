@@ -187,6 +187,8 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         QVariant::fromValue(30.0)).toDouble());
     m_runtime->environment.setUserScale(m_settings->value("userScale",
         QVariant::fromValue(1.0)).toDouble());
+    m_runtime->environment.setAllowsWindowPushing(
+        m_settings->value("windowPushingEnabled", false).toBool());
 
     if (!m_runtime->cliRuntimeMode) {
         setupNavigation();

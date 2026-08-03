@@ -499,6 +499,24 @@ void ShijimaManager::setupSettingsPage() {
     }
 
     {
+        static const QString key = "windowPushingEnabled";
+        bool initial = m_settings->value(key, false).toBool();
+        m_runtime->environment.setAllowsWindowPushing(initial);
+
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
+            m_runtime->environment.setAllowsWindowPushing(checked);
+            m_settings->setValue("windowPushingEnabled", checked);
+        });
+
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Allow Mascots to Push Windows"),
+            tr("Let mascots move a detected window when they reach its edge. Disabled by default."),
+            toggle));
+    }
+
+    {
         static const QString key = "speechBubbleEnabled";
         bool initial = m_settings->value(key, QVariant::fromValue(true)).toBool();
 

@@ -38,4 +38,12 @@ bool useWindowMasks() {
     return false;
 }
 
+bool supportsWindowPushing() {
+    return false;
+}
+
+bool pushWindow(ActiveWindow const&, double, double) {
+    return false;
+}
+
 }

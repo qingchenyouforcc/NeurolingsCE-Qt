@@ -497,7 +497,9 @@ MascotCommandStatus MascotCommandService::showManagerWindow() const {
 MascotCommandStatus MascotCommandService::showCodexNotification(
     CodexActivity const& activity) const
 {
-    if (activity.type != QStringLiteral("agent-turn-complete")) {
+    if (activity.type != QStringLiteral("agent-turn-complete") &&
+        !activity.isNewSession)
+    {
         return MascotCommandStatus::success();
     }
     bool delivered = false;

@@ -23,6 +23,7 @@
 #include "shijima-qt/AppLog.hpp"
 
 #include <QAbstractTextDocumentLayout>
+#include <QCoreApplication>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QPalette>
@@ -68,7 +69,12 @@ void SpeechBubbleWidget::showBubble(const QString &text, const QPoint &anchorScr
 void SpeechBubbleWidget::showCodexBubble(const QString &text,
     const QPoint &anchorScreenPos, const QString &title)
 {
-    Content content { title, text, Tone::CodexReady };
+    QString effectiveTitle = title;
+    if (effectiveTitle.isEmpty()) {
+        effectiveTitle = QCoreApplication::translate("SpeechBubbleWidget",
+            "Codex · Completed");
+    }
+    Content content { effectiveTitle, text, Tone::CodexReady };
     if (m_currentCodex || m_active) {
         if (m_codexQueue.size() >= 8) {
             m_codexQueue.dequeue();

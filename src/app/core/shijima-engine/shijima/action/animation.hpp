@@ -45,6 +45,9 @@ public:
     virtual void init(mascot::tick &ctx) override;
     virtual bool tick() override;
     virtual void finalize() override;
+protected:
+    bool window_push_requested = false;
+    bool is_window_push_action() const;
 };
 
 }

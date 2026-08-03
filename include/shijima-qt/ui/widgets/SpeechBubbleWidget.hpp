@@ -46,7 +46,7 @@ public:
     explicit SpeechBubbleWidget(QWidget *parent = nullptr);
     void showBubble(const QString &text, const QPoint &anchorScreenPos);
     void showCodexBubble(const QString &text, const QPoint &anchorScreenPos,
-        const QString &title = QStringLiteral("Codex · 已完成"));
+        const QString &title = QString());
     void hideBubble();
     void updatePosition(const QPoint &anchorScreenPos);
     bool isActive() const { return m_active; }
