@@ -932,6 +932,56 @@ void testPackageInspectionRejectsMalformedPng() {
         "malformed PNG rejection should explain the invalid format");
 }
 
+void testImportArchiveSupportsLegacyTemplateDirectory() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+
+    QDir tempDir(temp.path());
+    QString storagePath = tempDir.absoluteFilePath(QStringLiteral("storage"));
+    expect(QDir().mkpath(storagePath), "storage directory should be creatable");
+
+    QString templatePath = tempDir.absoluteFilePath(QStringLiteral("LegacyTemplate"));
+    expect(QDir().mkpath(QDir(templatePath).absoluteFilePath(QStringLiteral("img"))),
+        "legacy template image directory should be creatable");
+
+    QFile actionsFile(QDir(templatePath).absoluteFilePath(QStringLiteral("actions.xml")));
+    bool actionsOpened = actionsFile.open(QFile::WriteOnly | QFile::Truncate);
+    expect(actionsOpened, "legacy template actions.xml should be writable");
+    if (actionsOpened) {
+        actionsFile.write(minimalActionsXml());
+        actionsFile.close();
+    }
+
+    QFile behaviorsFile(QDir(templatePath).absoluteFilePath(
+        QStringLiteral("behaviors.xml")));
+    bool behaviorsOpened = behaviorsFile.open(QFile::WriteOnly | QFile::Truncate);
+    expect(behaviorsOpened, "legacy template behaviors.xml should be writable");
+    if (behaviorsOpened) {
+        behaviorsFile.write(minimalBehaviorsXml());
+        behaviorsFile.close();
+    }
+
+    QFile imageFile(QDir(templatePath).absoluteFilePath(QStringLiteral("img/shime1.png")));
+    bool imageOpened = imageFile.open(QFile::WriteOnly | QFile::Truncate);
+    expect(imageOpened, "legacy template shime1.png should be writable");
+    if (imageOpened) {
+        imageFile.write(minimalPngBytes());
+        imageFile.close();
+    }
+
+    auto imported = MascotPackage::importArchive(templatePath, storagePath);
+    expect(imported.size() == 1,
+        "legacy template directory import should register one mascot package");
+    if (imported.size() == 1) {
+        QString importedName = QString::fromStdString(*imported.begin());
+        expect(!importedName.isEmpty(),
+            "legacy template directory import should return an installed package name");
+        expect(QFile::exists(QDir(storagePath).absoluteFilePath(
+            importedName + QStringLiteral(".mascot"))),
+            "legacy template directory import should write a mascot package to storage");
+    }
+}
+
 void testCommandDispatcher() {
     FakeMascotService service;
 
@@ -1221,6 +1271,7 @@ int main() {
     testCodexConfigManagement();
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
+    testImportArchiveSupportsLegacyTemplateDirectory();
     testPackageInspectionRejectsOversizedPngHeader();
     testPackageInspectionRejectsMalformedPng();
     testCommandDispatcher();

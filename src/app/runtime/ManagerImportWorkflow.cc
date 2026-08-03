@@ -129,13 +129,25 @@ void ShijimaManager::dragEnterEvent(QDragEnterEvent *event) {
         APP_LOG_DEBUG("import") << "Drag enter accepted for URL payload";
         event->acceptProposedAction();
     }
+    else {
+        event->ignore();
+    }
 }
 
 void ShijimaManager::dropEvent(QDropEvent *event) {
     QList<QString> paths;
     for (auto &url : event->mimeData()->urls()) {
-        paths.append(url.toLocalFile());
+        QString localPath = url.toLocalFile();
+        if (!localPath.isEmpty()) {
+            paths.append(localPath);
+        }
+    }
+    if (paths.isEmpty()) {
+        APP_LOG_WARN("import") << "Ignored drag-and-drop import request without local files";
+        event->ignore();
+        return;
     }
     APP_LOG_INFO("import") << "Received drag-and-drop import request with files=" << paths.size();
+    event->acceptProposedAction();
     importWithDialog(paths);
 }

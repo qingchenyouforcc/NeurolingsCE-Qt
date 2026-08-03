@@ -1714,7 +1714,30 @@ std::set<std::string> importArchive(QString const& archivePath,
     std::set<std::string> imported;
     QFileInfo archiveInfo(archivePath);
     QString error;
-    if (!archiveInfo.exists() || !archiveInfo.isFile() ||
+    if (!archiveInfo.exists()) {
+        APP_LOG_WARN("import") << "Archive rejected because path does not exist path=\""
+            << archivePath.toStdString() << "\"";
+        return imported;
+    }
+
+    if (archiveInfo.isDir()) {
+        QString installedName;
+        if (packageLegacyDirectory(archiveInfo.absoluteFilePath(), storagePath,
+            archiveInfo.fileName(), installedName, error))
+        {
+            imported.insert(installedName.toStdString());
+            APP_LOG_INFO("import") << "Imported mascot template directory name=\""
+                << installedName.toStdString() << "\"";
+        }
+        else {
+            APP_LOG_WARN("import") << "Template directory import failed path=\""
+                << archiveInfo.absoluteFilePath().toStdString() << "\": "
+                << error.toStdString();
+        }
+        return imported;
+    }
+
+    if (!archiveInfo.isFile() ||
         archiveInfo.size() < 0 ||
         static_cast<std::uint64_t>(archiveInfo.size()) >
             SecurityLimits::kMascotPackageMaxBytes)

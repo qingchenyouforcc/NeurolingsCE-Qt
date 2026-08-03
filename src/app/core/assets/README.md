@@ -15,7 +15,7 @@
 | Asset.cc | 读取一张图并计算 alpha 非透明边界、原始尺寸、裁剪偏移和镜像缓存；Linux 下还维护窗口 mask 所需信息。 |
 | AssetLoader.cc | 资产单例缓存；加载默认内置 @ 资源或包目录 PNG，执行大小/像素限制，失败时返回透明占位图，并支持按 imageRoot 卸载。 |
 | MascotData.cc | 解包/定位单个 mascot，解析 actions.xml 与 behaviors.xml，选择预览图并暴露名称、路径、元数据和有效性。 |
-| MascotPackage.cc | 包名清洗、归档检查、受限解压/打包、安装、legacy archive 分析、候选转换和旧目录迁移。 |
+| MascotPackage.cc | 包名清洗、归档检查、受限解压/打包、安装、拖入文件/模板目录或 legacy archive 导入、候选转换和旧目录迁移。 |
 | SafePath.cc | 拒绝绝对路径、盘符、. / ..、分隔符和符号链接逃逸，并检查 canonical path 是否仍在允许根目录内。 |
 
 ## Agent 注意点

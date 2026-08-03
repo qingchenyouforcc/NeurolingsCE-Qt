@@ -6,7 +6,7 @@
 
 | 文件 | 作用 |
 |---|---|
-| AppCoreTests.cc | 测试 API JSON/status、CodexActivity 与配置托管、Codex 摘要的 grapheme-safe prefix-first 预压缩、包名/legacy archive/路径安全、命令 dispatcher、脚本超时、广播、mascot 长按判定、失焦/丢失抓取时的左键生命周期策略、临时行为预选恢复以及贴近真实 Cerber 的 hotspot → action → behavior 连续重启动作链等核心行为。测试中会生成受控 ZIP fixture。 |
+| AppCoreTests.cc | 测试 API JSON/status、CodexActivity 与配置托管、Codex 摘要的 grapheme-safe prefix-first 预压缩、包名/legacy archive/模板目录/路径安全、命令 dispatcher、脚本超时、广播、mascot 长按判定、失焦/丢失抓取时的左键生命周期策略、临时行为预选恢复以及贴近真实 Cerber 的 hotspot → action → behavior 连续重启动作链等核心行为。测试中会生成受控 ZIP fixture。 |
 | CodexBubbleFormatterTests.cc | 使用 offscreen QGuiApplication 检查短/长文本、emoji、多行、超大字体、prefix 截断拟合和显示时长，并验证 Codex Markdown 的强调/列表/代码渲染、本地/相对/file URL 引用的非交互行内视觉、图片 alt 降级、原始 HTML 转义与链接锚点清除。 |
 
 ## 阅读和扩展方式

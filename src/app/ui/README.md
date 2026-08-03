@@ -16,7 +16,7 @@ ui 把 Manager 和 Shijima 引擎状态呈现为 Qt 窗口、页面、托盘、�
 
 | 文件 | 作用 |
 |---|---|
-| ManagerWindowSetup.cc | 装配 Manager UI/runtime、读取设置、建立屏幕环境、加载模板、启动 timer、tray、IPC/HTTP 和更新检查。 |
+| ManagerWindowSetup.cc | 装配 Manager UI/runtime、读取设置、建立屏幕环境、加载模板、启动 timer、处理列表拖放、tray、IPC/HTTP 和更新检查。 |
 | ManagerUiState.hpp | 保存 Manager 的 QWidget、页面、列表、设置控件和 UI 状态指针。 |
 | ManagerUiHelpers.hpp | UI action 使用的颜色、主题、列表和主线程辅助函数声明。 |
 | ManagerUiActions.cc | 导入/删除/退出、sandbox、语言切换、显示/隐藏、主题、关闭动画和重新翻译等交互。 |

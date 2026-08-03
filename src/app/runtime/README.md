@@ -25,7 +25,7 @@ ManagerEnvironmentSync 更新环境 → MascotSessionStore 反向遍历 ShijimaW
 | MascotSessionStore.hpp | 稳定的 mascot widget 列表、id 映射、待删除标记、CLI label 和临时 label 生命周期。 |
 | MascotSessionStore.cc | 创建/查询/删除/遍历会话，按 id/name/label 解析目标，并在 tick 后提交延迟销毁。 |
 | ManagerMascotRuntime.cc | 加载/刷新/删除模板，spawn、随机 spawn、Codex 通知、主 tick、繁殖请求和兼容 facade。 |
-| ManagerImportWorkflow.cc | 同步或 QtConcurrent 异步导入 mascot/legacy archive，进度对话框、主线程回调和首次显示延迟导入。 |
+| ManagerImportWorkflow.cc | 同步或 QtConcurrent 异步导入 mascot 文件、模板目录和 legacy archive，处理窗口拖放、进度对话框、主线程回调和首次显示延迟导入。 |
 | ManagerLifecycle.cc | singleton 构造/终止、timer、tray/API 关闭、保存组合、顶层 mascot 清理和 GUI 线程同步入口。 |
 
 ## 生命周期与线程边界
