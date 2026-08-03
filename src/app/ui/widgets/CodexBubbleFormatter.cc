@@ -31,8 +31,6 @@
 #include <QStringList>
 #include <QVector>
 
-#include <utility>
-
 namespace {
 
 constexpr int kBaseDurationMs = 8000;
@@ -191,67 +189,256 @@ QVector<int> graphemeBoundaries(QString const& text) {
     return boundaries;
 }
 
-QString makeHeadTailCandidate(QString const& text,
-    QVector<int> const& boundaries, int retainedGraphemes,
-    bool separateMarker)
-{
-    int totalGraphemes = boundaries.size() - 1;
-    if (retainedGraphemes <= 0 || totalGraphemes <= 0) {
-        return {};
-    }
-    if (retainedGraphemes >= totalGraphemes) {
-        return text;
-    }
-
-    if (retainedGraphemes == 1) {
-        return text.left(boundaries.at(1)) + QStringLiteral("…");
-    }
-
-    int headCount = qMax(1, static_cast<int>(
-        (static_cast<qint64>(retainedGraphemes) * 4 + 6) / 7));
-    headCount = qMin(headCount, retainedGraphemes - 1);
-    int tailCount = retainedGraphemes - headCount;
-    tailCount = qMin(tailCount, totalGraphemes - headCount);
-    headCount = qMin(headCount, totalGraphemes - tailCount);
-
-    QString head = text.left(boundaries.at(headCount)).trimmed();
-    QString tail = text.mid(boundaries.at(totalGraphemes - tailCount)).trimmed();
-    if (tail.isEmpty()) {
-        return head + QStringLiteral("…");
-    }
-    return separateMarker
-        ? head + QStringLiteral("\n…\n") + tail
-        : head + QStringLiteral("…") + tail;
-}
-
 struct SearchResult {
     QString text;
     int retainedGraphemes = 0;
 };
 
-SearchResult findBestCandidate(QString const& text,
-    QVector<int> const& boundaries, QFont const& font,
-    int width, int maxHeight, int maxLines, bool separateMarker)
-{
-    int totalGraphemes = boundaries.size() - 1;
-    int low = separateMarker ? 2 : 1;
-    int high = qMax(1, totalGraphemes - 1);
-    SearchResult best;
+QString closeOpenMarkdown(QString text) {
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return text;
+    }
 
-    while (low <= high) {
-        int candidateBudget = low + (high - low) / 2;
-        QString candidate = makeHeadTailCandidate(text, boundaries,
-            candidateBudget, separateMarker);
-        if (codexMarkdownFits(candidate, font, width, maxHeight, maxLines)) {
-            best.text = std::move(candidate);
-            best.retainedGraphemes = candidateBudget;
-            low = candidateBudget + 1;
+    // Do not leave an escape marker or an empty list item at the cut point.
+    // Both are common when a grapheme budget lands in the middle of a line and
+    // otherwise produce a visible, context-free punctuation fragment.
+    int trailingBackslashes = 0;
+    for (int i = text.size() - 1; i >= 0 &&
+        text.at(i) == QChar('\\'); --i) {
+        ++trailingBackslashes;
+    }
+    if ((trailingBackslashes & 1) != 0) {
+        text.chop(1);
+        text = text.trimmed();
+    }
+    int lineStart = text.lastIndexOf(QChar('\n')) + 1;
+    QString lastLine = text.mid(lineStart).trimmed();
+    static QRegularExpression const emptyBlockMarker(
+        QStringLiteral("^(?:[-+*]|\\d+[.)]|#{1,6})\\s*$"));
+    if (emptyBlockMarker.match(lastLine).hasMatch()) {
+        text.chop(text.size() - lineStart);
+        text = text.trimmed();
+    }
+
+    // A prefix can end after an opening link/image bracket.  Sanitization
+    // removes complete destinations before this point, but an incomplete
+    // label should not leave a dangling `[` as the last visible context.
+    int openBracket = -1;
+    bool escaped = false;
+    for (int i = 0; i < text.size(); ++i) {
+        QChar ch = text.at(i);
+        if (escaped) {
+            escaped = false;
+            continue;
         }
-        else {
-            high = candidateBudget - 1;
+        if (ch == QChar('\\')) {
+            escaped = true;
+        }
+        else if (ch == QChar('[')) {
+            openBracket = i;
+        }
+        else if (ch == QChar(']')) {
+            openBracket = -1;
         }
     }
-    return best;
+    if (openBracket >= 0) {
+        if (openBracket > 0 && text.at(openBracket - 1) == QChar('!')) {
+            --openBracket;
+        }
+        text.truncate(openBracket);
+        text = text.trimmed();
+        lineStart = text.lastIndexOf(QChar('\n')) + 1;
+        lastLine = text.mid(lineStart).trimmed();
+        if (emptyBlockMarker.match(lastLine).hasMatch()) {
+            text.chop(text.size() - lineStart);
+            text = text.trimmed();
+        }
+    }
+
+    // A previous coarse compaction (or the old head/tail formatter) may have
+    // left a standalone ellipsis line immediately before the omitted tail.
+    // Drop that generated marker so the new terminal ellipsis is the only
+    // truncation cue and no detached punctuation is shown.
+    static QRegularExpression const standaloneEllipsis(
+        QStringLiteral("^(?:…|\\.\\.\\.)$"));
+    QStringList cleanedLines;
+    for (QString const& line : text.split(QChar('\n'))) {
+        if (!standaloneEllipsis.match(line.trimmed()).hasMatch()) {
+            cleanedLines.append(line);
+        }
+    }
+    text = cleanedLines.join(QChar('\n')).trimmed();
+
+    // Close an unfinished fenced code block before placing the terminal
+    // ellipsis.  We only treat a fence at a Markdown line start as a block
+    // delimiter, so ordinary backticks in prose remain untouched.
+    QChar openFence;
+    int fenceLength = 0;
+    QStringList lines = text.split(QChar('\n'));
+    for (QString const& line : lines) {
+        int offset = 0;
+        while (offset < line.size() && offset < 3 &&
+            line.at(offset) == QChar(' ')) {
+            ++offset;
+        }
+        if (offset >= line.size()) {
+            continue;
+        }
+        QChar marker = line.at(offset);
+        if (marker != QChar('`') && marker != QChar('~')) {
+            continue;
+        }
+        int count = 0;
+        while (offset + count < line.size() &&
+            line.at(offset + count) == marker) {
+            ++count;
+        }
+        if (count < 3) {
+            continue;
+        }
+        if (openFence.isNull()) {
+            openFence = marker;
+            fenceLength = count;
+        }
+        else if (openFence == marker && count >= fenceLength) {
+            openFence = QChar();
+            fenceLength = 0;
+        }
+    }
+    if (!openFence.isNull()) {
+        text += QChar('\n');
+        text += QString(fenceLength, openFence);
+    }
+
+    // Inline code spans are paired by their backtick run length.  If the cut
+    // is inside a span, append the matching run so the ellipsis is outside the
+    // code formatting and remains the final visible character.
+    QVector<int> codeRuns;
+    bool inFence = false;
+    QChar fenceMarker;
+    int activeFenceLength = 0;
+    for (QString const& line : text.split(QChar('\n'))) {
+        int offset = 0;
+        while (offset < line.size() && offset < 3 &&
+            line.at(offset) == QChar(' ')) {
+            ++offset;
+        }
+        QChar lineFenceMarker;
+        int lineFenceLength = 0;
+        if (offset < line.size() &&
+            (line.at(offset) == QChar('`') ||
+                line.at(offset) == QChar('~'))) {
+            int count = 0;
+            while (offset + count < line.size() &&
+                line.at(offset + count) == line.at(offset)) {
+                ++count;
+            }
+            if (count >= 3) {
+                lineFenceMarker = line.at(offset);
+                lineFenceLength = count;
+            }
+        }
+        if (inFence) {
+            if (lineFenceMarker == fenceMarker &&
+                lineFenceLength >= activeFenceLength) {
+                inFence = false;
+            }
+            continue;
+        }
+        if (!lineFenceMarker.isNull()) {
+            inFence = true;
+            fenceMarker = lineFenceMarker;
+            activeFenceLength = lineFenceLength;
+            continue;
+        }
+
+        for (int i = 0; i < line.size();) {
+            if (line.at(i) == QChar('\\')) {
+                i += qMin(2, line.size() - i);
+                continue;
+            }
+            if (line.at(i) != QChar('`')) {
+                ++i;
+                continue;
+            }
+            int start = i;
+            while (i < line.size() && line.at(i) == QChar('`')) {
+                ++i;
+            }
+            int runLength = i - start;
+            if (runLength < 3) {
+                if (!codeRuns.isEmpty() && codeRuns.constLast() == runLength) {
+                    codeRuns.removeLast();
+                }
+                else {
+                    codeRuns.append(runLength);
+                }
+            }
+        }
+    }
+    for (auto iterator = codeRuns.crbegin(); iterator != codeRuns.crend();
+        ++iterator) {
+        text += QString(*iterator, QChar('`'));
+    }
+
+    // Strong emphasis is the only other delimiter we repair deliberately.
+    // Restricting this to paired runs avoids turning ordinary multiplication
+    // or identifier underscores into synthetic formatting.
+    int strongAsteriskRuns = 0;
+    int strongUnderscoreRuns = 0;
+    for (int i = 0; i + 1 < text.size();) {
+        if (text.at(i) == QChar('\\')) {
+            i += qMin(2, text.size() - i);
+            continue;
+        }
+        QChar marker = text.at(i);
+        if ((marker != QChar('*') && marker != QChar('_')) ||
+            text.at(i + 1) != marker) {
+            ++i;
+            continue;
+        }
+        int runLength = 0;
+        while (i + runLength < text.size() &&
+            text.at(i + runLength) == marker) {
+            ++runLength;
+        }
+        if (runLength == 2) {
+            if (marker == QChar('*')) {
+                ++strongAsteriskRuns;
+            }
+            else {
+                ++strongUnderscoreRuns;
+            }
+        }
+        i += runLength;
+    }
+    if ((strongAsteriskRuns & 1) != 0) {
+        text += QStringLiteral("**");
+    }
+    if ((strongUnderscoreRuns & 1) != 0) {
+        text += QStringLiteral("__");
+    }
+    return text.trimmed();
+}
+
+QString makePrefixCandidate(QString const& text,
+    QVector<int> const& boundaries, int retainedGraphemes)
+{
+    int totalGraphemes = boundaries.size() - 1;
+    if (retainedGraphemes <= 0 || totalGraphemes <= 0) {
+        return QStringLiteral("…");
+    }
+    int count = qMin(retainedGraphemes, totalGraphemes);
+    QString prefix = closeOpenMarkdown(text.left(boundaries.at(count)));
+    while (prefix.endsWith(QChar(0x2026))) {
+        prefix.chop(1);
+        prefix = prefix.trimmed();
+    }
+    if (prefix.isEmpty()) {
+        return QStringLiteral("…");
+    }
+    return prefix + QStringLiteral("…");
 }
 
 SearchResult findBestPrefix(QString const& text,
@@ -259,16 +446,16 @@ SearchResult findBestPrefix(QString const& text,
     int width, int maxHeight, int maxLines)
 {
     int totalGraphemes = boundaries.size() - 1;
-    int low = 1;
+    int low = 0;
     int high = qMax(1, totalGraphemes - 1);
     SearchResult best;
 
     while (low <= high) {
         int candidateBudget = low + (high - low) / 2;
-        QString candidate = text.left(boundaries.at(candidateBudget)).trimmed()
-            + QStringLiteral("…");
+        QString candidate = makePrefixCandidate(text, boundaries,
+            candidateBudget);
         if (codexMarkdownFits(candidate, font, width, maxHeight, maxLines)) {
-            best.text = std::move(candidate);
+            best.text = candidate;
             best.retainedGraphemes = candidateBudget;
             low = candidateBudget + 1;
         }
@@ -403,17 +590,13 @@ CodexBubbleExcerpt formatCodexBubbleExcerpt(QString const& source,
         return result;
     }
 
-    bool separateMarker = maxLines >= 3;
-    SearchResult best = findBestCandidate(normalized, boundaries, font,
-        textWidth, maxTextHeight, maxLines, separateMarker);
-    if (best.text.isEmpty() && separateMarker) {
-        best = findBestCandidate(normalized, boundaries, font,
-            textWidth, maxTextHeight, maxLines, false);
-    }
-    if (best.text.isEmpty()) {
-        best = findBestPrefix(normalized, boundaries, font, textWidth,
-            maxTextHeight, maxLines);
-    }
+    // Completion notifications are prefix-first.  A tail may contain an
+    // isolated tool annotation or path that only made sense in the omitted
+    // context, so never construct a head/tail candidate here.  The marker is
+    // appended after any repaired Markdown delimiters and therefore remains
+    // the final visible character.
+    SearchResult best = findBestPrefix(normalized, boundaries, font,
+        textWidth, maxTextHeight, maxLines);
     if (best.text.isEmpty()) {
         best.text = QStringLiteral("…");
     }

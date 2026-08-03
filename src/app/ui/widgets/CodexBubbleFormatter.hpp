@@ -23,9 +23,10 @@
 #include <QString>
 
 struct CodexBubbleExcerpt {
-    // The excerpt is a sanitized Markdown source string.  SpeechBubbleWidget
+    // The excerpt is a sanitized Markdown source string. SpeechBubbleWidget
     // renders it with QTextDocument; keeping the source here means that
-    // emphasis, lists and code spans survive the normal (non-truncated) path.
+    // emphasis, lists and code spans survive both the normal and prefix-
+    // truncated paths.
     QString text;
     int retainedGraphemes = 0;
     bool truncated = false;

@@ -208,24 +208,17 @@ CodexTextExcerpt compactCodexBubbleSource(QString const& text,
         return result;
     }
 
-    if (maxRetainedGraphemes == 1) {
-        result.text = normalized.left(boundaries.at(1)) + QStringLiteral("…");
-        result.retainedGraphemes = 1;
-        result.truncated = true;
-        return result;
-    }
-
-    int headCount = qMax(1, static_cast<int>(
-        (static_cast<qint64>(maxRetainedGraphemes) * 4 + 6) / 7));
-    headCount = qMin(headCount, maxRetainedGraphemes - 1);
-    int tailCount = maxRetainedGraphemes - headCount;
-    tailCount = qMin(tailCount, graphemeCount - headCount);
-    headCount = qMin(headCount, graphemeCount - tailCount);
-
-    QString head = normalized.left(boundaries.at(headCount)).trimmed();
-    QString tail = normalized.mid(boundaries.at(graphemeCount - tailCount)).trimmed();
-    result.text = head + QStringLiteral("\n…\n") + tail;
-    result.retainedGraphemes = headCount + tailCount;
+    // Codex notify text is a completion summary.  Preserve that summary from
+    // the beginning and make truncation a terminal marker; retaining a tail
+    // here can expose tool protocol fragments (for example `::git-push{...}`)
+    // without the surrounding context.  The UI formatter performs a second,
+    // Markdown-aware prefix fit, so this coarse grapheme bound must not
+    // re-introduce a head/tail excerpt.
+    int retained = qMax(1, maxRetainedGraphemes);
+    retained = qMin(retained, graphemeCount);
+    result.text = normalized.left(boundaries.at(retained)).trimmed()
+        + QStringLiteral("…");
+    result.retainedGraphemes = retained;
     result.truncated = true;
     return result;
 }

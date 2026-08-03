@@ -56,15 +56,19 @@ void testShortText(QFont const& font) {
 void testLongText(QFont const& font) {
     QString text = QStringLiteral("BEGIN\n")
         + QString(1200, QChar(0x4e2d))
-        + QStringLiteral("\nFINAL");
+        + QStringLiteral("\nFINAL\nobject\\NeurolingsCE }\n"
+            "::git-push{... branch=\"main\"}");
     QFontMetrics metrics(font);
     int maxHeight = 8 * metrics.lineSpacing();
     auto result = formatCodexBubbleExcerpt(text, font, 320, maxHeight, 8);
     expect(result.truncated, "long Codex text should be marked truncated");
+    QString plain = codexMarkdownPlainText(result.text).trimmed();
     expect(result.text.contains(QStringLiteral("BEGIN")) &&
-        result.text.contains(QStringLiteral("FINAL")) &&
-        result.text.contains(QStringLiteral("\n…\n")),
-        "long Codex text should retain its beginning and conclusion");
+        plain.endsWith(QStringLiteral("…")) &&
+        !plain.contains(QStringLiteral("FINAL")) &&
+        !plain.contains(QStringLiteral("object\\NeurolingsCE")) &&
+        !plain.contains(QStringLiteral("::git-push")),
+        "long Codex text should retain only the completion prefix");
     expect(measuredRect(result.text, font, 320).height() <= maxHeight,
         "formatted Codex text should fit its height budget");
 }
@@ -79,9 +83,9 @@ void testEmojiDoesNotLoop(QFont const& font) {
     expect(!result.text.isEmpty() && result.truncated,
         "emoji-heavy Codex text should return a bounded excerpt");
     expect(result.text.contains(QStringLiteral("BEGIN")) &&
-        result.text.contains(QStringLiteral("FINAL")) &&
-        result.text.contains(QStringLiteral("…")),
-        "emoji-heavy Codex text should preserve both ends");
+        codexMarkdownPlainText(result.text).trimmed().endsWith(
+            QStringLiteral("…")),
+        "emoji-heavy Codex text should preserve a complete prefix and ellipsis");
 }
 
 void testMultilineAndLargeFont(QFont font) {
@@ -164,6 +168,33 @@ void testMarkdownRenderingAndSafety(QFont const& font) {
         "formatted Codex Markdown should use document layout for fit checks");
 }
 
+void testMarkdownPrefixClosesStructure(QFont const& font) {
+    QString source = QStringLiteral("**完成摘要**\n\n"
+        "- 已更新桌宠通知\n"
+        "- 已运行 `NeurolingsCEBubbleTests`\n"
+        "…\n"
+        "```text\n"
+        "object\\NeurolingsCE }\n"
+        "::git-push{... branch=\"main\"}\n"
+        "```");
+    QFontMetrics metrics(font);
+    auto result = formatCodexBubbleExcerpt(source, font, 320,
+        4 * metrics.lineSpacing(), 4);
+    QString plain = codexMarkdownPlainText(result.text).trimmed();
+    expect(result.truncated, "long Markdown notification should be truncated");
+    expect(plain.startsWith(QStringLiteral("完成摘要")) &&
+        plain.endsWith(QStringLiteral("…")),
+        "Markdown prefix truncation should keep the summary and terminal ellipsis");
+    expect(!plain.contains(QStringLiteral("\n…\n")),
+        "Markdown prefix truncation should remove detached ellipsis lines");
+    expect(!plain.contains(QStringLiteral("::git-push")) &&
+        !plain.contains(QStringLiteral("object\\NeurolingsCE")),
+        "Markdown prefix truncation should drop tool/path tail fragments");
+    expect(codexMarkdownFits(result.text, font, 320,
+        4 * metrics.lineSpacing(), 4),
+        "Markdown prefix excerpt should fit the line and height budget");
+}
+
 }
 
 int main(int argc, char **argv) {
@@ -180,6 +211,7 @@ int main(int argc, char **argv) {
     testMultilineAndLargeFont(font);
     testDurations();
     testMarkdownRenderingAndSafety(font);
+    testMarkdownPrefixClosesStructure(font);
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

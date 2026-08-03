@@ -45,6 +45,9 @@ struct CodexTextExcerpt {
 
 QString normalizeCodexBubbleText(QString const& text);
 
+// Prefix-first compaction for the transient completion summary.  A truncated
+// result always ends in an ellipsis; it never appends an unrelated tail from
+// the source message.
 CodexTextExcerpt compactCodexBubbleSource(QString const& text,
     int maxRetainedGraphemes = 4096);
 

@@ -418,14 +418,17 @@ void testCodexActivityParsing() {
         "Codex bubble text should normalize line endings and blank lines");
     QString longText = QStringLiteral("BEGIN\n")
         + QString(5000, QChar(0x4e2d))
-        + QStringLiteral("\nFINAL");
+        + QStringLiteral("\nFINAL\nobject\\NeurolingsCE }\n"
+            "::git-push{... branch=\"main\"}");
     auto compact = compactCodexBubbleSource(longText);
     expect(compact.truncated && compact.retainedGraphemes <= 4096,
         "long Codex bubble sources should be bounded by grapheme budget");
-    expect(compact.text.contains(QStringLiteral("BEGIN")) &&
-        compact.text.contains(QStringLiteral("FINAL")) &&
-        compact.text.contains(QStringLiteral("\n…\n")),
-        "long Codex bubble sources should retain both ends with an ellipsis");
+    expect(compact.text.startsWith(QStringLiteral("BEGIN")) &&
+        compact.text.endsWith(QStringLiteral("…")) &&
+        !compact.text.contains(QStringLiteral("FINAL")) &&
+        !compact.text.contains(QStringLiteral("object\\NeurolingsCE")) &&
+        !compact.text.contains(QStringLiteral("::git-push")),
+        "long Codex bubble sources should retain only the beginning before an ellipsis");
     expect(compactCodexBubbleSource(QStringLiteral("abcdef"), 0).text.isEmpty(),
         "zero Codex grapheme budget should produce an empty excerpt");
     auto one = compactCodexBubbleSource(QStringLiteral("😀abcdef"), 1);
@@ -434,8 +437,8 @@ void testCodexActivityParsing() {
         "one-grapheme Codex budget should preserve a complete first grapheme");
     auto two = compactCodexBubbleSource(QStringLiteral("abcdef"), 2);
     expect(two.truncated && two.retainedGraphemes == 2 &&
-        two.text.contains(QStringLiteral("…")),
-        "two-grapheme Codex budget should retain both sides safely");
+        two.text == QStringLiteral("ab…"),
+        "two-grapheme Codex budget should retain a prefix safely");
 
     recognized = true;
     expect(codexActivityFromJson(QJsonObject {
