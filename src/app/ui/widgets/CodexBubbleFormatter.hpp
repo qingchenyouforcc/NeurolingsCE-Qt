@@ -33,9 +33,10 @@ struct CodexBubbleExcerpt {
 };
 
 // Escape raw HTML and remove Markdown link destinations before handing
-// untrusted Codex text to Qt's rich-text parser.  The operation is
-// intentionally idempotent so callers can safely pass an already-sanitized
-// excerpt back through the helper.
+// untrusted Codex text to Qt's rich-text parser. Local/file/relative targets
+// retain their labels as compact inline-code references; external targets
+// retain labels only. The operation is intentionally idempotent so callers
+// can safely pass an already-sanitized excerpt back through the helper.
 QString sanitizeCodexMarkdown(QString const& source);
 
 // Return the text that a sanitized Markdown document visibly contains.  This

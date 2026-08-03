@@ -17,6 +17,7 @@
 
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QPalette>
 #include <QRect>
 #include <QString>
 #include <QTextBlock>
@@ -168,6 +169,103 @@ void testMarkdownRenderingAndSafety(QFont const& font) {
         "formatted Codex Markdown should use document layout for fit checks");
 }
 
+void testCodexFileReferenceRendering(QFont const& font) {
+    QString source = QStringLiteral(
+        "这是一个本地引用：[项目说明 README.md](D:/repo/README.md)\n"
+        "相对路径：[源码](docs/src/main.cc)\n"
+        "file URL：[日志](file:///D:/repo/log.txt)\n"
+        "强调标签：[**README.md**](D:/repo/README.md)\n"
+        "外部链接：[文档](https://example.invalid/never-open)\n"
+        "图片语法：![预览](D:/repo/preview.png)");
+    QString sanitized = sanitizeCodexMarkdown(source);
+    expect(sanitized.contains(QStringLiteral("`项目说明 README.md`")) &&
+        sanitized.contains(QStringLiteral("`源码`")) &&
+        sanitized.contains(QStringLiteral("`日志`")) &&
+        sanitized.contains(QStringLiteral("`README.md`")) &&
+        sanitized.contains(QStringLiteral("`预览`")),
+        "local and relative Codex links should become inline references");
+    expect(sanitized.contains(QStringLiteral("文档")) &&
+        !sanitized.contains(QStringLiteral("https://example.invalid")) &&
+        !sanitized.contains(QStringLiteral("D:/repo")) &&
+        !sanitized.contains(QStringLiteral("file:///")),
+        "link destinations must not leak into sanitized Codex text");
+    expect(sanitizeCodexMarkdown(sanitized) == sanitized,
+        "Codex link sanitization should remain idempotent");
+
+    QTextDocument document;
+    configureCodexMarkdownDocument(document, source, font, 320);
+    expect(document.toPlainText().contains(QStringLiteral("项目说明 README.md")) &&
+        document.toPlainText().contains(QStringLiteral("文档")) &&
+        !document.toPlainText().contains(QStringLiteral("D:/repo")) &&
+        !document.toPlainText().contains(QStringLiteral("https://example.invalid")),
+        "configured Codex document should show labels but never destinations");
+
+    bool sawReferenceCode = false;
+    bool sawReferenceBackground = false;
+    bool sawAnchor = false;
+    QColor expectedBackground = QGuiApplication::palette().color(
+        QPalette::AlternateBase);
+    for (QTextBlock block = document.begin(); block != document.end();
+        block = block.next())
+    {
+        for (QTextBlock::Iterator iterator = block.begin();
+            iterator != block.end(); ++iterator)
+        {
+            auto fragment = iterator.fragment();
+            if (!fragment.isValid()) {
+                continue;
+            }
+            auto format = fragment.charFormat();
+            sawAnchor = sawAnchor || format.isAnchor() ||
+                format.hasProperty(QTextFormat::AnchorHref) ||
+                format.hasProperty(QTextFormat::AnchorName);
+            if (fragment.text().contains(QStringLiteral("项目说明"))) {
+                sawReferenceCode = format.fontFixedPitch();
+                sawReferenceBackground = format.background().style() !=
+                    Qt::NoBrush && format.background().color() ==
+                    expectedBackground;
+            }
+        }
+    }
+    expect(sawReferenceCode,
+        "local file labels should use a compact fixed-pitch reference style");
+    expect(sawReferenceBackground,
+        "reference style should use a palette-aware background");
+    expect(!sawAnchor,
+        "local and external Codex references must remain non-interactive");
+}
+
+void testMalformedAndNestedLinksStaySafe() {
+    QString malformed = QStringLiteral(
+        "[坏的本地标签](D:/secret/project\n"
+        "[外层 [内层](https://secret.invalid)](D:/secret/outer)\n"
+        "[转义\\]标签](../relative/file.txt)");
+    QString sanitized = sanitizeCodexMarkdown(malformed);
+    expect(!sanitized.contains(QStringLiteral("D:/secret")) &&
+        !sanitized.contains(QStringLiteral("https://secret.invalid")),
+        "malformed and nested link targets must be removed");
+    expect(sanitized.contains(QStringLiteral("坏的本地标签")) &&
+        sanitized.contains(QStringLiteral("外层 内层")) &&
+        sanitized.contains(QStringLiteral("`转义]标签`")),
+        "malformed and nested links should retain readable labels");
+}
+
+void testReferencePrefixTruncation(QFont const& font) {
+    QString source = QStringLiteral("完成摘要：") +
+        QString(140, QLatin1Char('x')) +
+        QStringLiteral(" [README.md](D:/repo/README.md:12) ") +
+        QString(600, QLatin1Char('y'));
+    QFontMetrics metrics(font);
+    int maxHeight = 4 * metrics.lineSpacing();
+    auto result = formatCodexBubbleExcerpt(source, font, 320, maxHeight, 4);
+    QString plain = codexMarkdownPlainText(result.text).trimmed();
+    expect(result.truncated && plain.endsWith(QStringLiteral("…")),
+        "prefix truncation near a local reference should keep a terminal ellipsis");
+    expect(!result.text.contains(QStringLiteral("D:/repo")) &&
+        codexMarkdownFits(result.text, font, 320, maxHeight, 4),
+        "truncated local references should remain safe and fit the bubble");
+}
+
 void testMarkdownPrefixClosesStructure(QFont const& font) {
     QString source = QStringLiteral("**完成摘要**\n\n"
         "- 已更新桌宠通知\n"
@@ -211,6 +309,9 @@ int main(int argc, char **argv) {
     testMultilineAndLargeFont(font);
     testDurations();
     testMarkdownRenderingAndSafety(font);
+    testCodexFileReferenceRendering(font);
+    testMalformedAndNestedLinksStaySafe();
+    testReferencePrefixTruncation(font);
     testMarkdownPrefixClosesStructure(font);
 
     if (g_failures > 0) {

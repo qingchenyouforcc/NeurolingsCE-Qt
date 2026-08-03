@@ -22,6 +22,8 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QFontMetrics>
+#include <QGuiApplication>
+#include <QPalette>
 #include <QRegularExpression>
 #include <QTextBlock>
 #include <QTextBoundaryFinder>
@@ -38,7 +40,59 @@ constexpr int kMaxDurationMs = 12000;
 constexpr int kDurationGraphemeThreshold = 80;
 constexpr int kDurationMsPerGrapheme = 25;
 
-QString stripMarkdownLinkDestinations(QString text) {
+bool isLocalCodexLinkDestination(QString const& destination) {
+    QString token = destination.trimmed();
+    if (token.isEmpty() || token.startsWith(QChar('#'))) {
+        return false;
+    }
+
+    QString lower = token.toLower();
+    if (lower.startsWith(QStringLiteral("file:"))) {
+        return true;
+    }
+    if (token.startsWith(QChar('/')) || token.startsWith(QChar('\\')) ||
+        token.startsWith(QStringLiteral("//"))) {
+        return true;
+    }
+    if (token.size() >= 3 && token.at(1) == QChar(':') &&
+        (token.at(2) == QChar('/') || token.at(2) == QChar('\\'))) {
+        return true;
+    }
+
+    // A destination without a URI scheme is a relative Markdown path.  Keep
+    // the user-facing label but render it as a compact, non-interactive
+    // reference.  Recognised schemes (including http(s), mailto and custom
+    // protocol links) remain ordinary labels with their targets removed.
+    static QRegularExpression const scheme(
+        QStringLiteral("^[A-Za-z][A-Za-z0-9+.-]*:"));
+    return !scheme.match(token).hasMatch();
+}
+
+QString wrapCodexInlineReference(QString const& label) {
+    // Markdown code spans can contain backticks when their delimiter run is
+    // longer than any run in the label.  This keeps escaped/malformed labels
+    // bounded and avoids producing a second parser-sensitive delimiter.
+    int longestRun = 0;
+    int currentRun = 0;
+    for (QChar const ch : label) {
+        if (ch == QChar('`')) {
+            ++currentRun;
+            longestRun = qMax(longestRun, currentRun);
+        }
+        else {
+            currentRun = 0;
+        }
+    }
+    int delimiterLength = qMax(1, longestRun + 1);
+    QString delimiter(delimiterLength, QChar('`'));
+    return delimiter + label + delimiter;
+}
+
+QString escapeRawHtml(QString const& text);
+QString flattenCodexReferenceLabel(QString const& label);
+
+QString stripMarkdownLinkDestinationsImpl(QString text,
+    bool wrapLocalReference) {
     // Markdown links are not useful in a transient notification and their
     // destinations are untrusted input. Keep the visible label while dropping
     // the destination. A scanner (rather than a broad regex) handles escaped
@@ -55,10 +109,11 @@ QString stripMarkdownLinkDestinations(QString text) {
 
         int labelStart = open + 1;
         bool image = open > 0 && text.at(open - 1) == QChar('!');
-        int close = labelStart;
+        int close = -1;
+        int labelDepth = 1;
         bool escaped = false;
-        for (; close < text.size(); ++close) {
-            QChar ch = text.at(close);
+        for (int index = labelStart; index < text.size(); ++index) {
+            QChar ch = text.at(index);
             if (escaped) {
                 escaped = false;
                 continue;
@@ -67,19 +122,26 @@ QString stripMarkdownLinkDestinations(QString text) {
                 escaped = true;
                 continue;
             }
-            if (ch == QChar(']')) {
-                break;
+            if (ch == QChar('[')) {
+                ++labelDepth;
             }
-            if (ch == QChar('\n') || ch == QChar('\r')) {
-                close = text.size();
+            else if (ch == QChar(']')) {
+                --labelDepth;
+                if (labelDepth == 0) {
+                    close = index;
+                    break;
+                }
+            }
+            else if (ch == QChar('\n') || ch == QChar('\r')) {
                 break;
             }
         }
-        if (close >= text.size() || close + 1 >= text.size() ||
+        if (close < 0 || close + 1 >= text.size() ||
             text.at(close + 1) != QChar('('))
         {
             // Not an inline link. Copy the opening bracket and keep scanning
-            // after it, so ordinary bracketed prose remains unchanged.
+            // after it, so ordinary bracketed prose remains unchanged while
+            // a valid nested link can still be found on a later pass.
             result += text.mid(cursor, open - cursor + 1);
             cursor = open + 1;
             continue;
@@ -108,22 +170,75 @@ QString stripMarkdownLinkDestinations(QString text) {
                 }
             }
             else if (ch == QChar('\n') || ch == QChar('\r')) {
-                end = text.size();
                 break;
             }
         }
-        if (end >= text.size() || depth != 0) {
-            result += text.mid(cursor, open - cursor + 1);
-            cursor = open + 1;
-            continue;
+
+        int destinationEnd = end;
+        bool completeDestination = end < text.size() && depth == 0;
+        if (!completeDestination) {
+            // An incomplete destination is still untrusted. Keep the label,
+            // discard the rest of that line's target, and resume after a
+            // newline so malformed input cannot leak a path or URL.
+            destinationEnd = text.indexOf(QChar('\n'), close + 2);
+            if (destinationEnd < 0) {
+                destinationEnd = text.size();
+            }
+        }
+
+        QString destination = text.mid(close + 2,
+            destinationEnd - close - 2);
+        QString destinationToken = destination.trimmed();
+        if (destinationToken.startsWith(QChar('<'))) {
+            int closingAngle = destinationToken.indexOf(QChar('>'), 1);
+            if (closingAngle > 0) {
+                destinationToken = destinationToken.mid(1,
+                    closingAngle - 1);
+            }
+        }
+        else {
+            int whitespace = -1;
+            for (int i = 0; i < destinationToken.size(); ++i) {
+                if (destinationToken.at(i).isSpace()) {
+                    whitespace = i;
+                    break;
+                }
+            }
+            if (whitespace >= 0) {
+                destinationToken.truncate(whitespace);
+            }
         }
 
         int prefixEnd = image && open > cursor ? open - 1 : open;
         result += text.mid(cursor, prefixEnd - cursor);
-        result += text.mid(labelStart, close - labelStart);
-        cursor = end + 1;
+        QString label = stripMarkdownLinkDestinationsImpl(
+            text.mid(labelStart, close - labelStart), false);
+        if (wrapLocalReference &&
+            isLocalCodexLinkDestination(destinationToken)) {
+            result += wrapCodexInlineReference(
+                flattenCodexReferenceLabel(label));
+        }
+        else {
+            result += label;
+        }
+        if (completeDestination) {
+            cursor = end + 1;
+        }
+        else {
+            if (destinationEnd < text.size()) {
+                result += QChar('\n');
+                cursor = destinationEnd + 1;
+            }
+            else {
+                cursor = text.size();
+            }
+        }
     }
     return result;
+}
+
+QString stripMarkdownLinkDestinations(QString text) {
+    return stripMarkdownLinkDestinationsImpl(text, true);
 }
 
 QString removeReferenceDefinitions(QString text) {
@@ -152,6 +267,17 @@ QString escapeRawHtml(QString const& text) {
         }
     }
     return result;
+}
+
+QString flattenCodexReferenceLabel(QString const& label) {
+    // A local reference is displayed as one compact code span. Parse the
+    // already-sanitized label once to preserve its visible text while
+    // discarding nested emphasis/backtick markers and Markdown escapes.
+    QTextDocument document;
+    document.setUndoRedoEnabled(false);
+    document.setMarkdown(escapeRawHtml(label),
+        QTextDocument::MarkdownDialectGitHub);
+    return document.toPlainText();
 }
 
 QString preserveMarkdownLineBreaks(QString text) {
@@ -502,6 +628,54 @@ void clearCodexAnchors(QTextDocument &document) {
     }
 }
 
+void styleCodexInlineCode(QTextDocument &document) {
+    QPalette palette;
+    if (QGuiApplication::instance() != nullptr) {
+        palette = QGuiApplication::palette();
+    }
+    QColor background = palette.color(QPalette::AlternateBase);
+    QColor foreground = palette.color(QPalette::Text);
+
+    // Capture ranges first because merging a format can split fragments while
+    // the document is being traversed.  Qt's Markdown parser marks both
+    // inline-code spans and fenced code with a fixed-pitch format; using that
+    // semantic marker keeps the visual treatment independent of the user's
+    // light/dark/high-contrast theme and never relies on link blue.
+    QVector<QPair<int, int>> codeRanges;
+    for (QTextBlock block = document.begin(); block != document.end();
+        block = block.next())
+    {
+        for (QTextBlock::Iterator iterator = block.begin();
+            iterator != block.end(); ++iterator)
+        {
+            QTextFragment fragment = iterator.fragment();
+            if (!fragment.isValid()) {
+                continue;
+            }
+            QTextCharFormat format = fragment.charFormat();
+            if (format.fontFixedPitch()) {
+                codeRanges.append(qMakePair(fragment.position(),
+                    fragment.length()));
+            }
+        }
+    }
+
+    for (auto const& range : codeRanges) {
+        QTextCursor cursor(&document);
+        cursor.setPosition(range.first);
+        cursor.setPosition(range.first + range.second,
+            QTextCursor::KeepAnchor);
+        QTextCharFormat format = cursor.charFormat();
+        format.setBackground(background);
+        format.setForeground(foreground);
+        format.setUnderlineStyle(QTextCharFormat::NoUnderline);
+        format.clearProperty(QTextFormat::AnchorHref);
+        format.clearProperty(QTextFormat::AnchorName);
+        format.setAnchor(false);
+        cursor.mergeCharFormat(format);
+    }
+}
+
 int documentLineCount(QTextDocument const& document) {
     int lines = 0;
     for (QTextBlock block = document.begin(); block != document.end();
@@ -536,6 +710,7 @@ void configureCodexMarkdownDocument(QTextDocument &document,
     document.setDocumentMargin(0);
     document.setTextWidth(qMax(1, textWidth));
     clearCodexAnchors(document);
+    styleCodexInlineCode(document);
 }
 
 QString codexMarkdownPlainText(QString const& markdown) {
