@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Mascot xmlns="http://www.group-finity.com/Mascot" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.group-finity.com/Mascot Mascot.xsd">
+
+    <ActionList>
+        <Action Name="Look" Type="Embedded" Class="com.group_finity.mascot.action.Look"/>
+        <Action Name="Offset" Type="Embedded" Class="com.group_finity.mascot.action.Offset"/>
+
+        <!-- Core poses -->
+        <Action Name="Stand" Type="Stay" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="80"/>
+                <Pose Image="/stand2.png" ImageAnchor="64,125" Velocity="0,0" Duration="80"/>
+                <Pose Image="/stand3.png" ImageAnchor="64,125" Velocity="0,0" Duration="80"/>
+                <Pose Image="/stand2.png" ImageAnchor="64,125" Velocity="0,0" Duration="80"/>
+                <Pose Image="/stand3.png" ImageAnchor="64,125" Velocity="0,0" Duration="80"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Walk" Type="Move" BorderType="Floor">
+            <Animation>
+                <Pose Image="/walk1.png" ImageAnchor="64,124" Velocity="-2,0" Duration="8"/>
+                <Pose Image="/walk2.png" ImageAnchor="64,124" Velocity="-2,0" Duration="8"/>
+                <Pose Image="/walk1.png" ImageAnchor="64,124" Velocity="-2,0" Duration="8"/>
+                <Pose Image="/walk2.png" ImageAnchor="64,124" Velocity="-2,0" Duration="8"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Run" Type="Move" BorderType="Floor">
+            <Animation>
+                <Pose Image="/run1.png" ImageAnchor="64,121" Velocity="-5,0" Duration="6"/>
+                <Pose Image="/run2.png" ImageAnchor="64,124" Velocity="-5,0" Duration="6"/>
+                <Pose Image="/run3.png" ImageAnchor="64,121" Velocity="-5,0" Duration="6"/>
+                <Pose Image="/run4.png" ImageAnchor="64,124" Velocity="-5,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Dash" Type="Move" BorderType="Floor">
+            <Animation>
+                <Pose Image="/run1.png" ImageAnchor="64,121" Velocity="-8,0" Duration="4"/>
+                <Pose Image="/run2.png" ImageAnchor="64,124" Velocity="-8,0" Duration="4"/>
+                <Pose Image="/run3.png" ImageAnchor="64,121" Velocity="-8,0" Duration="4"/>
+                <Pose Image="/run4.png" ImageAnchor="64,124" Velocity="-8,0" Duration="4"/>
+            </Animation>
+        </Action>
+
+        <Action Name="StandSwayAction" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="12"/>
+                <Pose Image="/standsway1.png" ImageAnchor="64,126" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway2.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway3.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway2.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway1.png" ImageAnchor="64,126" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway2.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway3.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway2.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/standsway1.png" ImageAnchor="64,126" Velocity="0,0" Duration="10"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="10"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="HeartAction" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="6"/>
+                <Pose Image="/heart1.png" ImageAnchor="64,124" Velocity="0,0" Duration="18"/>
+                <Pose Image="/heart2.png" ImageAnchor="64,123" Velocity="0,0" Duration="20"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="PatAction" Type="Stay" BorderType="Floor" Draggable="false">
+            <Animation>
+                <Pose Image="/pat2.png" ImageAnchor="64,125" Velocity="0,0" Duration="250"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="JumpPose" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="4"/>
+                <Pose Image="/jump1.png" ImageAnchor="64,121" Velocity="0,0" Duration="8"/>
+                <Pose Image="/jump2.png" ImageAnchor="64,115" Velocity="0,0" Duration="8"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <Action Name="WindowPushAction" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/window1.png" ImageAnchor="64,123" Velocity="0,0" Duration="16"/>
+                <Pose Image="/window2.png" ImageAnchor="64,122" Velocity="0,0" Duration="10"/>
+                <Pose Image="/window3.png" ImageAnchor="64,122" Velocity="0,0" Duration="10"/>
+                <Pose Image="/window2.png" ImageAnchor="64,122" Velocity="0,0" Duration="10"/>
+                <Pose Image="/window3.png" ImageAnchor="64,122" Velocity="0,0" Duration="10"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+            </Animation>
+        </Action>
+
+        <Action Name="WindowShakeAction" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/shake1.png" ImageAnchor="64,97" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake2.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake3.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake4.png" ImageAnchor="64,95" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake5.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake6.png" ImageAnchor="64,98" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake1.png" ImageAnchor="64,97" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake2.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake3.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake4.png" ImageAnchor="64,95" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake5.png" ImageAnchor="64,96" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake6.png" ImageAnchor="64,98" Velocity="0,0" Duration="5"/>
+                <Pose Image="/shake1.png" ImageAnchor="64,97" Velocity="0,0" Duration="6"/>
+                <Pose Image="/shake2.png" ImageAnchor="64,96" Velocity="0,0" Duration="6"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Hotspot Shape="Ellipse" Origin="26,0" Size="60,32" Behavior="Pat"/>
+            </Animation>
+        </Action>
+
+        <Action Name="FrisbeeRunStart" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="4"/>
+                <Pose Image="/fri_crawl1.png" ImageAnchor="64,110" Velocity="0,0" Duration="8"/>
+                <Pose Image="/fri_getup1.png" ImageAnchor="64,126" Velocity="0,0" Duration="8"/>
+            </Animation>
+        </Action>
+
+        <Action Name="FrisbeeRunMove" Type="Move" BorderType="Floor">
+            <Animation>
+                <Pose Image="/frirun1.png" ImageAnchor="64,121" Velocity="-6,0" Duration="6"/>
+                <Pose Image="/frirun2.png" ImageAnchor="64,125" Velocity="-6,0" Duration="6"/>
+                <Pose Image="/frirun3.png" ImageAnchor="64,121" Velocity="-6,0" Duration="6"/>
+                <Pose Image="/frirun4.png" ImageAnchor="64,125" Velocity="-6,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <Action Name="FrisbeeRunEnd" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/frirun5.png" ImageAnchor="64,122" Velocity="0,0" Duration="8"/>
+                <Pose Image="/frirun6.png" ImageAnchor="64,124" Velocity="0,0" Duration="8"/>
+                <Pose Image="/frirun7.png" ImageAnchor="64,124" Velocity="0,0" Duration="8"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+            </Animation>
+        </Action>
+
+        <!-- Ground crawl -->
+        <Action Name="Crawl" Type="Move" BorderType="Floor">
+            <Animation>
+                <Pose Image="/crawl1.png" ImageAnchor="64,108" Velocity="-1,0" Duration="14"/>
+                <Pose Image="/crawl2.png" ImageAnchor="64,107" Velocity="-1,0" Duration="14"/>
+                <Pose Image="/crawl1.png" ImageAnchor="64,108" Velocity="-1,0" Duration="14"/>
+                <Pose Image="/crawl2.png" ImageAnchor="64,107" Velocity="-1,0" Duration="14"/>
+            </Animation>
+        </Action>
+
+        <Action Name="GetUp" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/getup1.png" ImageAnchor="64,126" Velocity="0,0" Duration="10"/>
+                <Pose Image="/getup2.png" ImageAnchor="64,126" Velocity="0,0" Duration="10"/>
+                <Pose Image="/getup1.png" ImageAnchor="64,126" Velocity="0,0" Duration="10"/>
+                <Pose Image="/getup2.png" ImageAnchor="64,126" Velocity="0,0" Duration="10"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+            </Animation>
+        </Action>
+
+        <!-- Ceiling -->
+        <Action Name="GrabCeiling" Type="Stay" BorderType="Ceiling">
+            <Animation>
+                <Pose Image="/ceriling1.png" ImageAnchor="64,48" Velocity="0,0" Duration="120"/>
+            </Animation>
+        </Action>
+
+        <Action Name="ClimbCeiling" Type="Move" BorderType="Ceiling">
+            <Animation>
+                <Pose Image="/ceriling1.png" ImageAnchor="64,48" Velocity="0,0" Duration="14"/>
+                <Pose Image="/ceriling2.png" ImageAnchor="64,48" Velocity="-1,0" Duration="8"/>
+                <Pose Image="/ceriling3.png" ImageAnchor="64,48" Velocity="-1,0" Duration="8"/>
+                <Pose Image="/ceriling4.png" ImageAnchor="64,48" Velocity="-1,0" Duration="8"/>
+                <Pose Image="/ceriling3.png" ImageAnchor="64,48" Velocity="-1,0" Duration="8"/>
+                <Pose Image="/ceriling2.png" ImageAnchor="64,48" Velocity="-1,0" Duration="8"/>
+                <Pose Image="/ceriling1.png" ImageAnchor="64,48" Velocity="0,0" Duration="14"/>
+            </Animation>
+        </Action>
+
+        <!-- Wall -->
+        <Action Name="GrabWall" Type="Stay" BorderType="Wall">
+            <Animation>
+                <Pose Image="/climb3.png" ImageAnchor="64,128" Velocity="0,0" Duration="120"/>
+            </Animation>
+        </Action>
+
+        <Action Name="ClimbWall" Type="Move" BorderType="Wall">
+            <Animation Condition="#{TargetY &lt; mascot.anchor.y}">
+                <Pose Image="/climb1.png" ImageAnchor="64,128" Velocity="0,-2" Duration="10"/>
+                <Pose Image="/climb2.png" ImageAnchor="64,128" Velocity="0,-2" Duration="10"/>
+                <Pose Image="/climb1.png" ImageAnchor="64,128" Velocity="0,-2" Duration="10"/>
+                <Pose Image="/climb2.png" ImageAnchor="64,128" Velocity="0,-2" Duration="10"/>
+                <Pose Image="/climb3.png" ImageAnchor="64,128" Velocity="0,0" Duration="12"/>
+                <Pose Image="/climb4.png" ImageAnchor="64,128" Velocity="0,0" Duration="12"/>
+            </Animation>
+            <Animation Condition="#{TargetY &gt;= mascot.anchor.y}">
+                <Pose Image="/climb1.png" ImageAnchor="64,128" Velocity="0,2" Duration="10"/>
+                <Pose Image="/climb2.png" ImageAnchor="64,128" Velocity="0,2" Duration="10"/>
+                <Pose Image="/climb1.png" ImageAnchor="64,128" Velocity="0,2" Duration="10"/>
+                <Pose Image="/climb2.png" ImageAnchor="64,128" Velocity="0,2" Duration="10"/>
+                <Pose Image="/climb3.png" ImageAnchor="64,128" Velocity="0,0" Duration="12"/>
+                <Pose Image="/climb4.png" ImageAnchor="64,128" Velocity="0,0" Duration="12"/>
+            </Animation>
+        </Action>
+
+        <!-- Falling -->
+        <Action Name="Jumping" Type="Embedded" Class="com.group_finity.mascot.action.Jump" VelocityParam="20">
+            <Animation>
+                <Pose Image="/jump2.png" ImageAnchor="64,115" Velocity="0,0" Duration="80"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Falling" Type="Embedded" Class="com.group_finity.mascot.action.Fall"
+                RegistanceX="0.05" RegistanceY="0.1" Gravity="2">
+            <Animation>
+                <Pose Image="/fall1.png" ImageAnchor="64,112" Velocity="0,0" Duration="250"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Bouncing" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/fall2.png" ImageAnchor="64,110" Velocity="0,0" Duration="6"/>
+                <Pose Image="/crawl1.png" ImageAnchor="64,108" Velocity="0,0" Duration="6"/>
+                <Pose Image="/getup1.png" ImageAnchor="64,125" Velocity="0,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <!-- Dragging -->
+        <Action Name="Pinched" Type="Embedded" Class="com.group_finity.mascot.action.Dragged">
+            <Animation Condition="#{FootX &lt; mascot.environment.cursor.x-20}">
+                <Pose Image="/drag2.png" ImageAnchor="64,121" Velocity="0,0" Duration="6"/>
+            </Animation>
+            <Animation Condition="#{FootX &gt; mascot.environment.cursor.x+20}">
+                <Pose Image="/drag4.png" ImageAnchor="64,115" Velocity="0,0" Duration="6"/>
+            </Animation>
+            <Animation>
+                <Pose Image="/drag1.png" ImageAnchor="64,121" Velocity="0,0" Duration="6"/>
+                <Pose Image="/drag3.png" ImageAnchor="64,120" Velocity="0,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Resisting" Type="Embedded" Class="com.group_finity.mascot.action.Regist">
+            <Animation>
+                <Pose Image="/drag2.png" ImageAnchor="64,121" Velocity="0,0" Duration="6"/>
+                <Pose Image="/drag3.png" ImageAnchor="64,120" Velocity="0,0" Duration="6"/>
+                <Pose Image="/drag4.png" ImageAnchor="64,115" Velocity="0,0" Duration="6"/>
+                <Pose Image="/drag1.png" ImageAnchor="64,121" Velocity="0,0" Duration="6"/>
+            </Animation>
+        </Action>
+
+        <Action Name="Split1" Type="Embedded" Class="com.group_finity.mascot.action.Breed"
+                BornX="-16" BornY="0" BornBehavior="StandUp">
+            <Animation>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split2.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split3.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split4.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split5.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split6.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split7.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+                <Pose Image="/split8.png" ImageAnchor="64,125" Velocity="0,0" Duration="10"/>
+            </Animation>
+        </Action>
+    </ActionList>
+
+    <ActionList>
+        <!-- ALWAYS REQUIRED -->
+        <Action Name="Fall" Type="Sequence" Loop="false">
+            <ActionReference Name="Falling"/>
+            <Action Type="Select">
+                <Action Type="Sequence" Condition="${mascot.environment.floor.isOn(mascot.anchor)}">
+                    <ActionReference Name="Bouncing"/>
+                    <ActionReference Name="GetUp"/>
+                </Action>
+                <ActionReference Name="GrabWall" Duration="100"/>
+            </Action>
+        </Action>
+
+        <!-- ALWAYS REQUIRED -->
+        <Action Name="Dragged" Type="Sequence" Loop="true">
+            <ActionReference Name="Pinched"/>
+            <ActionReference Name="Resisting"/>
+        </Action>
+
+        <!-- ALWAYS REQUIRED -->
+        <Action Name="Thrown" Type="Sequence" Loop="false">
+            <ActionReference Name="Falling" InitialVX="${mascot.environment.cursor.dx}" InitialVY="${mascot.environment.cursor.dy}"/>
+            <Action Type="Select">
+                <Action Type="Sequence" Condition="${mascot.environment.floor.isOn(mascot.anchor)}">
+                    <ActionReference Name="Bouncing"/>
+                    <ActionReference Name="GetUp"/>
+                </Action>
+                <ActionReference Name="GrabWall" Duration="100"/>
+            </Action>
+        </Action>
+
+        <Action Name="StandUp" Type="Sequence" Loop="false">
+            <ActionReference Name="Stand" Duration="${500+Math.random()*800}"/>
+        </Action>
+
+        <Action Name="WalkAround" Type="Sequence" Loop="false">
+            <ActionReference Name="Walk" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+            <ActionReference Name="Stand" Duration="${80+Math.random()*120}"/>
+        </Action>
+
+        <Action Name="RunAround" Type="Sequence" Loop="false">
+            <ActionReference Name="Run" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+            <ActionReference Name="Run" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+            <ActionReference Name="PoseRunEnd"/>
+        </Action>
+
+        <Action Name="PoseRunEnd" Type="Animate" BorderType="Floor">
+            <Animation>
+                <Pose Image="/run5.png" ImageAnchor="64,122" Velocity="0,0" Duration="8"/>
+                <Pose Image="/stand1.png" ImageAnchor="64,125" Velocity="0,0" Duration="8"/>
+            </Animation>
+        </Action>
+
+        <Action Name="CrawlAround" Type="Sequence" Loop="false">
+            <ActionReference Name="Crawl" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+            <ActionReference Name="GetUp"/>
+        </Action>
+
+        <Action Name="HoldOntoWall" Type="Sequence" Loop="false">
+            <ActionReference Name="GrabWall" Duration="${300+Math.random()*500}"/>
+        </Action>
+
+        <Action Name="HoldOntoCeiling" Type="Sequence" Loop="false">
+            <ActionReference Name="GrabCeiling" Duration="${300+Math.random()*500}"/>
+        </Action>
+
+        <Action Name="ClimbAlongWall" Type="Sequence" Loop="false">
+            <ActionReference Name="ClimbWall" TargetY="${mascot.environment.workArea.top+64+Math.random()*(mascot.environment.workArea.height-128)}"/>
+        </Action>
+
+        <Action Name="ClimbAlongCeiling" Type="Sequence" Loop="false">
+            <ActionReference Name="ClimbCeiling" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+        </Action>
+
+        <Action Name="FallFromWall" Type="Sequence" Loop="false">
+            <ActionReference Name="Offset" X="${mascot.lookRight ? -1 : 1}"/>
+            <ActionReference Name="Falling"/>
+            <ActionReference Name="Bouncing"/>
+            <ActionReference Name="GetUp"/>
+        </Action>
+
+        <Action Name="FallFromCeiling" Type="Sequence" Loop="false">
+            <ActionReference Name="Offset" Y="1"/>
+            <ActionReference Name="Falling"/>
+            <ActionReference Name="Bouncing"/>
+            <ActionReference Name="GetUp"/>
+        </Action>
+
+        <Action Name="JumpAction" Type="Sequence" Loop="false">
+            <ActionReference Name="JumpPose"/>
+            <ActionReference Name="Jumping" TargetX="${mascot.anchor.x + (Math.random()*240-120)}" TargetY="${mascot.anchor.y-(80+Math.random()*120)}"/>
+            <ActionReference Name="Falling"/>
+            <ActionReference Name="Bouncing"/>
+            <ActionReference Name="GetUp"/>
+        </Action>
+
+        <Action Name="Heart" Type="Sequence" Loop="false">
+            <ActionReference Name="HeartAction"/>
+        </Action>
+
+        <Action Name="Pat" Type="Sequence" Loop="false">
+            <ActionReference Name="PatAction" Duration="3"/>
+        </Action>
+
+        <Action Name="StandSway" Type="Sequence" Loop="false">
+            <ActionReference Name="StandSwayAction"/>
+        </Action>
+
+        <Action Name="WindowShake" Type="Sequence" Loop="false">
+            <ActionReference Name="WindowShakeAction"/>
+        </Action>
+
+        <Action Name="WindowPush" Type="Sequence" Loop="false">
+            <ActionReference Name="WindowPushAction"/>
+        </Action>
+
+        <Action Name="FrisbeeRun" Type="Sequence" Loop="false">
+            <ActionReference Name="FrisbeeRunStart"/>
+            <ActionReference Name="FrisbeeRunMove" TargetX="${mascot.environment.workArea.left+64+Math.random()*(mascot.environment.workArea.width-128)}"/>
+            <ActionReference Name="FrisbeeRunEnd"/>
+        </Action>
+
+        <Action Name="SplitIntoTwo" Type="Sequence" Loop="false">
+            <ActionReference Name="Split1"/>
+            <ActionReference Name="Offset" X="16"/>
+            <ActionReference Name="Look"/>
+            <ActionReference Name="GetUp"/>
+        </Action>
+
+        <Action Name="ChaseMouse" Type="Sequence" Loop="false">
+            <ActionReference Name="Dash" TargetX="${mascot.anchor.x+(mascot.environment.cursor.x-mascot.anchor.x)*Math.random()}"/>
+            <ActionReference Name="Look" LookRight="${mascot.anchor.x &lt; mascot.environment.cursor.x}"/>
+        </Action>
+    </ActionList>
+</Mascot>
+
+
+
+
+
+

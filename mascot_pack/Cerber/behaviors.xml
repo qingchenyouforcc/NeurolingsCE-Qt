@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Mascot xmlns="http://www.group-finity.com/Mascot" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.group-finity.com/Mascot Mascot.xsd">
+
+    <BehaviorList>
+        <!-- ALWAYS REQUIRED -->
+        <Behavior Name="ChaseMouse" Frequency="5" Hidden="true">
+            <NextBehaviorList Add="false">
+                <BehaviorReference Name="StandUp" Frequency="50"/>
+            </NextBehaviorList>
+        </Behavior>
+
+        <!-- ALWAYS REQUIRED -->
+        <Behavior Name="Fall" Frequency="0" Hidden="true"/>
+
+        <!-- ALWAYS REQUIRED -->
+        <Behavior Name="Dragged" Frequency="0" Hidden="true"/>
+
+        <!-- ALWAYS REQUIRED -->
+        <Behavior Name="Thrown" Frequency="0" Hidden="true"/>
+
+        <!-- On the Floor -->
+        <Condition Condition="#{mascot.environment.floor.isOn(mascot.anchor)}">
+            <Behavior Name="StandUp" Frequency="260" Hidden="true"/>
+            <Behavior Name="WalkAround" Frequency="160"/>
+            <Behavior Name="RunAround" Frequency="130"/>
+            <Behavior Name="CrawlAround" Frequency="70"/>
+            <Behavior Name="StandSway" Frequency="120"/>
+            <Behavior Name="Heart" Frequency="90"/>
+            <Behavior Name="JumpAction" Frequency="80"/>
+            <Behavior Name="WindowShake" Frequency="80"/>
+            <Behavior Name="WindowPush" Frequency="70"/>
+            <Behavior Name="FrisbeeRun" Frequency="70"/>
+            <Behavior Name="SplitIntoTwo" Frequency="30" Condition="#{mascot.totalCount &lt; 30}"/>
+
+            <Behavior Name="Pat" Frequency="0" Hidden="true">
+                <NextBehaviorList Add="false">
+                    <BehaviorReference Name="StandUp" Frequency="1"/>
+                </NextBehaviorList>
+            </Behavior>
+        </Condition>
+
+        <!-- On the Wall -->
+        <Condition Condition="#{mascot.environment.wall.isOn(mascot.anchor)}">
+            <Behavior Name="HoldOntoWall" Frequency="140" Hidden="true"/>
+            <Behavior Name="ClimbAlongWall" Frequency="120"/>
+            <Behavior Name="FallFromWall" Frequency="40" Hidden="true"/>
+        </Condition>
+
+        <!-- On the Ceiling -->
+        <Condition Condition="#{mascot.environment.ceiling.isOn(mascot.anchor)}">
+            <Behavior Name="HoldOntoCeiling" Frequency="140" Hidden="true"/>
+            <Behavior Name="ClimbAlongCeiling" Frequency="120"/>
+            <Behavior Name="FallFromCeiling" Frequency="40" Hidden="true"/>
+        </Condition>
+    </BehaviorList>
+</Mascot>
+
