@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.1] - 2026-08-06
+
+### ✨ Added / 新增功能
+
+- **Codex Markdown notifications** - Codex companion notifications now render Markdown and style file references for easier reading / **Codex Markdown 通知** - Codex companion 通知现在支持 Markdown 渲染，并会突出显示文件引用，便于阅读
+- **Dropped template folders** - Dropping a template folder into the manager now imports it as a mascot package / **拖放导入模板文件夹** - 将模板文件夹拖入管理器即可导入为桌宠包
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed Codex notification truncation so the leading context is retained within the display limit / 修复 Codex 通知截断逻辑，确保在显示限制内保留开头上下文
+- Fixed Codex notification lifecycle and window-pushing edge cases, including notifications arriving while the runtime is closing / 修复 Codex 通知生命周期与窗口推送边界问题，包括运行时关闭期间到达通知的情况
+- Fixed a Windows crash (`0xC0000409`) caused by writing logs to `stderr` when no console is attached / 修复 Windows 在无控制台时向 `stderr` 写日志导致的 `0xC0000409` 崩溃
+- Fixed first-launch language selection to prefer the system locale when no language has been configured / 修复首次启动语言选择逻辑，在未配置语言时优先使用系统区域设置
+
+### 🔧 Changed / 改进与优化
+
+- **Update checksums** - Hardened release checksum generation, upload, and validation in the update-manifest workflow / **更新校验和** - 加强更新清单工作流中的发布校验和生成、上传与校验流程
+- **Community links** - Removed the defunct feedback QQ group entry from the About page and issue configuration / **社区链接** - 从关于页面和 Issue 配置中移除已失效的反馈 QQ 群入口
+- **Release metadata** - Synchronized 0.5.1 version metadata and platform manifests / **发布元数据** - 同步 0.5.1 版本号及各平台打包元数据
+- **Mascot pack** - Refreshed the bundled mascot pack files / **桌宠包** - 更新仓库内置的桌宠包文件
+
+---
+
 ## [0.5.0] - 2026-08-02
 
 ### ✨ Added / 新增功能
@@ -305,6 +328,9 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.5.1]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Codex companion, import, update workflow, and Windows stability improvements / Codex companion、导入、更新工作流与 Windows 稳定性改进
+
 ### [0.5.0]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Continuous head-patting interaction / 连续摸头交互
 
@@ -337,6 +363,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.5.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.3...0.4.0

@@ -40,7 +40,7 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
 ## Highlights Since 0.3.3
 
-Current `main` has moved past the `0.5.0` release line and includes additional updater and startup improvements:
+Current `main` has moved past the `0.5.1` release line and includes additional updater and startup improvements:
 
 - Added a mascot combinations page for saving the currently running mascot group and restoring the group from the previous close.
 - Double-clicking a template can now spawn the matching mascot directly.

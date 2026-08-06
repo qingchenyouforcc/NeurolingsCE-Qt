@@ -12,7 +12,7 @@ VERSION_PATCH=1
 VERSION_NAME=Alpha
 
 # Release date (format: YYYY-MM-DD)
-RELEASE_DATE=2026-08-02
+RELEASE_DATE=2026-08-06
 
 # Application Information
 APP_NAME=NeurolingsCE
