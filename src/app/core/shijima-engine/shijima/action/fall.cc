@@ -100,7 +100,26 @@ bool fall::subtick(int idx) {
 
     #undef IE_STICK
     #undef AREA_STICK
-    
+
+    // Global boundaries take priority over the active-window interaction box
+    // when they conflict on the same axis. Win32 window rects use an
+    // exclusive bottom/right edge while Qt screen geometry is inclusive, so
+    // a maximized window next to the taskbar can expose active_ie.bottom one
+    // pixel past floor.y. Without this final clamp the IE stick would push
+    // the anchor below the floor and re-enter Fall forever.
+    if (mascot->anchor.x > mascot->env->work_area.right) {
+        mascot->anchor.x = mascot->env->work_area.right;
+    }
+    else if (mascot->anchor.x < mascot->env->work_area.left) {
+        mascot->anchor.x = mascot->env->work_area.left;
+    }
+    if (mascot->anchor.y < mascot->env->ceiling.y) {
+        mascot->anchor.y = mascot->env->ceiling.y;
+    }
+    else if (mascot->anchor.y > mascot->env->floor.y) {
+        mascot->anchor.y = mascot->env->floor.y;
+    }
+
     return true;
 }
 

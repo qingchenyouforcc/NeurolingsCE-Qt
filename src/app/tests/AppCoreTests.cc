@@ -1348,6 +1348,136 @@ void testWindowPushBehaviorGate() {
         "an unavailable active window should never receive a push request");
 }
 
+void testFallBoundaryPriorityOverActiveWindow() {
+    // Keep the fixture close to the default mascot's Fall flow: a Sequence
+    // wrapping the embedded Fall action, with a bounded successor after
+    // landing. This exercises parser -> action -> manager -> behavior manager
+    // against the Windows inclusive/exclusive bottom-edge mismatch.
+    std::string const actions = R"xml(
+        <Mascot>
+          <ActionList>
+            <Action Name="Fall" Type="Sequence" Loop="false">
+              <ActionReference Name="Falling"/>
+            </Action>
+            <Action Name="Falling" Type="Embedded"
+                Class="com.group_finity.mascot.action.Fall"
+                RegistanceX="0.05" RegistanceY="0.1" Gravity="2">
+              <Animation>
+                <Pose Image="/fall.png" ImageAnchor="0,0" Velocity="0,0" Duration="250" />
+              </Animation>
+            </Action>
+            <Action Name="Landed" Type="Stay" Duration="1000000">
+              <Animation>
+                <Pose Image="/stand.png" ImageAnchor="0,0" Velocity="0,0" Duration="250" />
+              </Animation>
+            </Action>
+          </ActionList>
+        </Mascot>
+    )xml";
+    std::string const behaviors = R"xml(
+        <Mascot>
+          <BehaviorList>
+            <Behavior Name="Fall" Frequency="0" Hidden="true">
+              <NextBehaviorList Add="false">
+                <BehaviorReference Name="Landed" Frequency="1" />
+              </NextBehaviorList>
+            </Behavior>
+            <Behavior Name="Landed" Frequency="1" />
+          </BehaviorList>
+        </Mascot>
+    )xml";
+
+    // A maximized window next to the taskbar exposes an exclusive Win32
+    // bottom (1040) while the Qt floor is inclusive (1039). Dropping the
+    // mascot below the floor must land it on the floor, not one pixel below.
+    shijima::mascot::manager mascot(actions, behaviors,
+        { { 960, 1050 }, "Fall", false });
+    auto env = std::make_shared<shijima::mascot::environment>();
+    env->screen = { 0, 1919, 1079, 0 };
+    env->work_area = { 0, 1919, 1039, 0 };
+    env->floor = { 1039, 0, 1919 };
+    env->ceiling = { 0, 0, 1919 };
+    env->active_ie = { 0, 1919, 1040, 0 };
+    env->subtick_count = 1;
+    mascot.state->env = env;
+
+    mascot.tick();
+    expect(mascot.state->anchor.y == 1039,
+        "fall should clamp to the global floor when the active window "
+        "bottom lies one pixel past it");
+    expect(env->floor.is_on(mascot.state->anchor),
+        "fall should be on the global floor after clamping");
+    mascot.tick();
+    expect(mascot.active_behavior() != nullptr &&
+        mascot.active_behavior()->name == "Landed",
+        "fall should complete into its successor after landing on the floor");
+    expect(mascot.state->anchor.y == 1039,
+        "a landed mascot should stay on the global floor");
+
+    // An active window inside the screen must keep its normal top-edge
+    // interaction: a falling mascot lands on the window top, not the floor.
+    shijima::mascot::manager windowMascot(actions, behaviors,
+        { { 960, 400 }, "Fall", false });
+    auto windowEnv = std::make_shared<shijima::mascot::environment>();
+    windowEnv->screen = { 0, 1919, 1079, 0 };
+    windowEnv->work_area = { 0, 1919, 1039, 0 };
+    windowEnv->floor = { 1039, 0, 1919 };
+    windowEnv->ceiling = { 0, 0, 1919 };
+    windowEnv->active_ie = { 500, 1919, 800, 0 };
+    windowEnv->subtick_count = 1;
+    windowMascot.state->env = windowEnv;
+
+    int guard = 0;
+    while (guard < 200) {
+        windowMascot.tick();
+        ++guard;
+        auto behavior = windowMascot.active_behavior();
+        if (behavior == nullptr || behavior->name != "Fall") {
+            break;
+        }
+    }
+    expect(guard < 200,
+        "fall should reach an active window edge within bounded ticks");
+    expect(windowMascot.state->anchor.y == 500,
+        "fall should still stick to the active window top when no global "
+        "boundary conflicts");
+    expect(windowMascot.state->on_land(),
+        "a mascot on the active window top should be on land");
+
+    // Fall-through mode lowers the floor to the real screen bottom. The
+    // inclusive Qt bottom (1079) must still win over the exclusive Win32
+    // edge (1080) so long falls keep landing on the screen instead of
+    // re-entering Fall below it. Starting below both edges exercises the
+    // same clamp-then-IE-stick conflict as a mascot dragged off-screen.
+    shijima::mascot::manager fallThrough(actions, behaviors,
+        { { 960, 1090 }, "Fall", false });
+    auto fallThroughEnv = std::make_shared<shijima::mascot::environment>();
+    fallThroughEnv->screen = { 0, 1919, 1079, 0 };
+    fallThroughEnv->work_area = { 0, 1919, 1079, 0 };
+    fallThroughEnv->floor = { 1079, 0, 1919 };
+    fallThroughEnv->ceiling = { 0, 0, 1919 };
+    fallThroughEnv->active_ie = { 0, 1919, 1080, 0 };
+    fallThroughEnv->subtick_count = 1;
+    fallThrough.state->env = fallThroughEnv;
+
+    guard = 0;
+    while (guard < 200) {
+        fallThrough.tick();
+        ++guard;
+        auto behavior = fallThrough.active_behavior();
+        if (behavior == nullptr || behavior->name != "Fall") {
+            break;
+        }
+    }
+    expect(guard < 200,
+        "fall-through should reach the screen bottom within bounded ticks");
+    expect(fallThrough.state->anchor.y == 1079,
+        "fall-through should land on the inclusive screen bottom instead of "
+        "the exclusive Win32 edge");
+    expect(fallThroughEnv->floor.is_on(fallThrough.state->anchor),
+        "fall-through should end on the real screen-bottom floor");
+}
+
 void testMascotHoldGestureBoundaries() {
     using Gesture = shijima::ui::MascotHoldGesture;
 
@@ -1413,6 +1543,7 @@ int main() {
     testBehaviorPreferenceRestoration();
     testHotspotBehaviorRepeatsAcrossActionCompletion();
     testWindowPushBehaviorGate();
+    testFallBoundaryPriorityOverActiveWindow();
     testMascotHoldGestureBoundaries();
 
     if (g_failures > 0) {

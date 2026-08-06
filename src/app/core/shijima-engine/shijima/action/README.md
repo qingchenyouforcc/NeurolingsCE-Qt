@@ -18,7 +18,7 @@ base → instant、reference、sequence、select 等控制动作；
 | animate.hpp / animate.cc | 使用动画序列推进 pose 的具体动作变体。 |
 | breed.hpp / breed.cc | 发起繁殖请求并等待 runtime/factory 处理。 |
 | dragged.hpp / dragged.cc | 在用户拖拽期间跟随外部位置，处理拖拽结束后的恢复。 |
-| fall.hpp / fall.cc | 应用重力/下落 subtick，直到落地或被边界处理。 |
+| fall.hpp / fall.cc | 应用重力/下落 subtick，直到落地或被边界处理；floor、ceiling 与 work_area 在与活动窗口边界冲突时优先（用于 Windows 包含/排他底边语义差异）。 |
 | instant.hpp / instant.cc | 立即执行一次效果并完成的动作包装。 |
 | interact.hpp / interact.cc | 查找并发起附近 mascot 的广播/交互。 |
 | jump.hpp / jump.cc | 设置跳跃速度和动画，执行腾空到落地的过程。 |
