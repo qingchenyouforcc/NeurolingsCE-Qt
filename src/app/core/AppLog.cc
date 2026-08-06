@@ -236,14 +236,22 @@ void writeLineUnlocked(QString const& line) {
         g_logFile->flush();
     }
     else {
-        std::fwrite(utf8.constData(), 1, static_cast<size_t>(utf8.size()), stderr);
-        std::fflush(stderr);
+        if (stderr != nullptr && !std::ferror(stderr)) {
+            std::fwrite(utf8.constData(), 1, static_cast<size_t>(utf8.size()), stderr);
+            if (!std::ferror(stderr)) {
+                std::fflush(stderr);
+            }
+        }
         return;
     }
 
     if (g_mirrorToStderr) {
-        std::fwrite(utf8.constData(), 1, static_cast<size_t>(utf8.size()), stderr);
-        std::fflush(stderr);
+        if (stderr != nullptr && !std::ferror(stderr)) {
+            std::fwrite(utf8.constData(), 1, static_cast<size_t>(utf8.size()), stderr);
+            if (!std::ferror(stderr)) {
+                std::fflush(stderr);
+            }
+        }
     }
 }
 

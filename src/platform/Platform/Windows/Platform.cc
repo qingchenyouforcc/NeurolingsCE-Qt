@@ -25,8 +25,13 @@
 namespace Platform {
 
 void initialize(int argc, char **argv) {
-    freopen("shijima_stdout.txt", "a", stdout);
-    freopen("shijima_stderr.txt", "a", stderr);
+    // Only redirect stdout/stderr to files when the process has a valid
+    // console attached. GUI processes launched without a console can have
+    // invalid inherited handles, and freopen would corrupt CRT stream state.
+    if (GetConsoleWindow() != nullptr) {
+        freopen("shijima_stdout.txt", "a", stdout);
+        freopen("shijima_stderr.txt", "a", stderr);
+    }
 }
 
 void showOnAllDesktops(QWidget *widget) {
