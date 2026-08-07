@@ -69,6 +69,8 @@ QString helpText() {
         "      Import mascot templates from a zip archive.\n"
         "  --mascot, -m remove MASCOT\n"
         "      Remove a loaded mascot template by name.\n"
+        "  --mascot, -m validate FILE\n"
+        "      Validate a .mascot package; --json for stable machine output.\n"
         "  --list, -l\n"
         "      List running mascots.\n"
         "  --version, -v\n"
@@ -141,8 +143,9 @@ QJsonObject helpJson() {
         QStringLiteral("--stop"),
         QStringLiteral("Close all mascots and stop the NeurolingsCE runtime."));
     appendCommand(QStringLiteral("--mascot"), QJsonArray { QStringLiteral("-m") },
-        QStringLiteral("--mascot list | --mascot add ZIP | --mascot remove MASCOT"),
-        QStringLiteral("List, import, or remove mascot templates."));
+        QStringLiteral("--mascot list | --mascot add ZIP | --mascot remove MASCOT | "
+            "--mascot validate FILE"),
+        QStringLiteral("List, import, remove, or validate mascot templates."));
     appendCommand(QStringLiteral("--list"), QJsonArray { QStringLiteral("-l") },
         QStringLiteral("--list|-l"),
         QStringLiteral("List running mascots and their labels."));
@@ -193,6 +196,33 @@ void printDocumentMascotLine(MascotInfo const& mascot) {
 QJsonObject buildDocumentMascotJson(CliCommand const& command,
     CliExecutionResult const& result)
 {
+    if (command.mascotAction == QStringLiteral("validate") &&
+        result.mascotValidation.has_value())
+    {
+        MascotPackageReport const& report = result.mascotValidation.value();
+        QJsonObject object;
+        object[QStringLiteral("ok")] = report.ok;
+        QJsonObject metadata;
+        metadata[QStringLiteral("name")] = report.metadata.name;
+        metadata[QStringLiteral("version")] = report.metadata.version;
+        metadata[QStringLiteral("description")] = report.metadata.description;
+        metadata[QStringLiteral("author")] = report.metadata.author;
+        object[QStringLiteral("mascot")] = metadata;
+        object[QStringLiteral("package_version")] = report.metadata.version;
+        object[QStringLiteral("entry_count")] =
+            static_cast<qint64>(report.entryCount);
+        object[QStringLiteral("file_count")] =
+            static_cast<qint64>(report.fileCount);
+        object[QStringLiteral("extracted_bytes")] =
+            static_cast<qint64>(report.extractedBytes);
+        QJsonArray errors;
+        for (auto const& error : report.errors) {
+            errors.append(error);
+        }
+        object[QStringLiteral("errors")] = errors;
+        return object;
+    }
+
     QJsonObject object;
     if (command.mascotAction == QStringLiteral("remove")) {
         object["removed"] = result.removedTemplateName.isEmpty()
@@ -313,6 +343,28 @@ void writeJson(QJsonObject const& object) {
 void writeDocumentMascotText(CliCommand const& command,
     CliExecutionResult const& result)
 {
+    if (command.mascotAction == QStringLiteral("validate") &&
+        result.mascotValidation.has_value())
+    {
+        MascotPackageReport const& report = result.mascotValidation.value();
+        if (report.ok) {
+            std::cout << "Valid mascot package: "
+                << report.metadata.name.toStdString();
+            if (!report.metadata.version.isEmpty()) {
+                std::cout << " v" << report.metadata.version.toStdString();
+            }
+            std::cout << " (" << report.fileCount << " files, "
+                << report.extractedBytes << " bytes)" << std::endl;
+        }
+        else {
+            std::cout << "Invalid mascot package:" << std::endl;
+            for (auto const& error : report.errors) {
+                std::cout << "  - " << error.toStdString() << std::endl;
+            }
+        }
+        return;
+    }
+
     if (command.mascotAction == QStringLiteral("remove")) {
         std::cout << "Removed mascot template "
             << (result.removedTemplateName.isEmpty()
@@ -438,6 +490,23 @@ int writeCliError(CliGlobalOptions const& global, CliError const& error) {
 int writeCliOutput(CliCommand const& command, CliExecutionResult const& result) {
     if (result.error.has_value()) {
         return writeCliError(command.global, result.error.value());
+    }
+
+    if (command.kind == CliCommandKind::DocumentMascot &&
+        command.mascotAction == QStringLiteral("validate") &&
+        result.mascotValidation.has_value())
+    {
+        bool ok = result.mascotValidation.value().ok;
+        if (command.global.quiet) {
+            return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+        }
+        if (command.global.json) {
+            writeJson(successJson(command, result));
+        }
+        else {
+            writeStandardTextOutput(command, result);
+        }
+        return ok ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
     if (command.global.quiet) {

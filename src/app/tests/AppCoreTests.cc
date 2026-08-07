@@ -1524,6 +1524,157 @@ void testMascotHoldGestureBoundaries() {
 
 }
 
+QByteArray testValidMascotInfoJson() {
+    return QByteArrayLiteral(
+        "{\"name\":\"Validate Me\",\"version\":\"1.2.3\","
+        "\"description\":\"fixture\",\"author\":\"tester\"}");
+}
+
+QString testWriteValidMascotPackage(QString const& packagePath,
+    QByteArray const& infoJson = QByteArray {})
+{
+    std::vector<TestZipEntry> entries {
+        { QStringLiteral("info.json"),
+            infoJson.isEmpty() ? testValidMascotInfoJson() : infoJson },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+    };
+    testWriteZip(packagePath, entries);
+    return packagePath;
+}
+
+void testMascotPackageValidation() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QDir tempDir(temp.path());
+
+    QString validPath = testWriteValidMascotPackage(
+        tempDir.absoluteFilePath(QStringLiteral("valid.mascot")));
+    MascotPackageReport report;
+    expect(MascotPackage::validatePackage(validPath, report),
+        "validatePackage should accept a minimal valid package");
+    expect(report.ok && report.errors.isEmpty(),
+        "valid package report should be ok with no errors");
+    expect(report.metadata.name == QStringLiteral("Validate Me") &&
+        report.metadata.version == QStringLiteral("1.2.3") &&
+        report.metadata.author == QStringLiteral("tester"),
+        "valid package report should carry package metadata");
+    expect(report.entryCount == 4 && report.fileCount == 4,
+        "valid package report should report entry and file counts");
+    expect(report.extractedBytes ==
+        static_cast<std::uint64_t>(testValidMascotInfoJson().size() +
+            minimalActionsXml().size() + minimalBehaviorsXml().size() +
+            minimalPngBytes().size()),
+        "valid package report should report extracted size");
+
+    QString missingActionsPath = tempDir.absoluteFilePath(
+        QStringLiteral("missing-actions.mascot"));
+    testWriteZip(missingActionsPath, {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+    });
+    MascotPackageReport missingActions;
+    expect(!MascotPackage::validatePackage(missingActionsPath, missingActions) &&
+        !missingActions.ok,
+        "validatePackage should reject a package without actions.xml");
+    expect(missingActions.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("actions.xml")),
+        "missing actions.xml should be listed in the error report");
+
+    QString traversalPath = tempDir.absoluteFilePath(
+        QStringLiteral("traversal.mascot"));
+    std::vector<TestZipEntry> traversalEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("../evil.png"), minimalPngBytes() },
+    };
+    testWriteZip(traversalPath, traversalEntries);
+    MascotPackageReport traversal;
+    expect(!MascotPackage::validatePackage(traversalPath, traversal),
+        "validatePackage should reject path traversal entries");
+    expect(traversal.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("unsafe")),
+        "path traversal should be reported as unsafe");
+
+    QString payloadPath = tempDir.absoluteFilePath(
+        QStringLiteral("payload.mascot"));
+    std::vector<TestZipEntry> payloadEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("sound/evil.exe"), QByteArrayLiteral("MZ") },
+    };
+    testWriteZip(payloadPath, payloadEntries);
+    MascotPackageReport payload;
+    expect(!MascotPackage::validatePackage(payloadPath, payload),
+        "validatePackage should reject executable payloads in sound/");
+    expect(payload.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("forbidden")),
+        "executable payloads should be reported as forbidden");
+
+    QString nestedPath = tempDir.absoluteFilePath(
+        QStringLiteral("nested.mascot"));
+    std::vector<TestZipEntry> nestedEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("img/evil.zip"), QByteArrayLiteral("PK") },
+    };
+    testWriteZip(nestedPath, nestedEntries);
+    MascotPackageReport nested;
+    expect(!MascotPackage::validatePackage(nestedPath, nested),
+        "validatePackage should reject nested archives");
+}
+
+void testCliMascotValidateParsing() {
+    char argv0[] = "NeurolingsCE-cli";
+    char mascotOption[] = "--mascot";
+    char jsonOption[] = "--json";
+    char action[] = "validate";
+    char packagePath[] = "C:/tmp/fixture.mascot";
+    char *validArgv[] = { argv0, jsonOption, mascotOption, action, packagePath };
+    auto valid = parseCliArguments(5, validArgv);
+    expect(!valid.hasError && valid.hasCommand &&
+        valid.command.kind == CliCommandKind::DocumentMascot &&
+        valid.command.mascotAction == QStringLiteral("validate") &&
+        valid.command.mascotArchivePath == QStringLiteral("C:/tmp/fixture.mascot") &&
+        valid.global.json,
+        "CLI should parse --mascot validate FILE with --json");
+
+    char *missingPathArgv[] = { argv0, mascotOption, action };
+    auto missing = parseCliArguments(3, missingPathArgv);
+    expect(missing.hasError &&
+        missing.error.error.contains(QStringLiteral("Missing mascot package path")) &&
+        missing.error.exitCode == 2,
+        "CLI should require a package path for --mascot validate");
+
+    char extra[] = "extra";
+    char *extraArgv[] = { argv0, mascotOption, action, packagePath, extra };
+    auto extraArgs = parseCliArguments(5, extraArgv);
+    expect(extraArgs.hasError &&
+        extraArgs.error.error.contains(QStringLiteral("Unexpected argument")),
+        "CLI should reject extra arguments after --mascot validate FILE");
+
+    char unknownAction[] = "frobnicate";
+    char *unknownArgv[] = { argv0, mascotOption, unknownAction };
+    auto unknown = parseCliArguments(3, unknownArgv);
+    expect(unknown.hasError &&
+        unknown.error.error.contains(QStringLiteral("list, add, remove, or validate")),
+        "CLI should enumerate supported mascot actions on unknown actions");
+
+    char listAction[] = "list";
+    char *listArgv[] = { argv0, jsonOption, mascotOption, listAction };
+    auto list = parseCliArguments(4, listArgv);
+    expect(!list.hasError && list.command.mascotAction == QStringLiteral("list"),
+        "existing --mascot list parsing should remain intact");
+}
+
 int main() {
     testMascotPatchParsing();
     testJsonRoundTrips();
@@ -1534,6 +1685,8 @@ int main() {
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
     testImportArchiveSupportsLegacyTemplateDirectory();
+    testMascotPackageValidation();
+    testCliMascotValidateParsing();
     testPackageInspectionRejectsOversizedPngHeader();
     testPackageInspectionRejectsMalformedPng();
     testCommandDispatcher();

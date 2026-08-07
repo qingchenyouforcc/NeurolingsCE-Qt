@@ -13,6 +13,7 @@ inline constexpr std::uint64_t kMascotExtractedMaxBytes = 100ULL * 1024ULL * 102
 inline constexpr std::uint64_t kMascotSingleFileMaxBytes = 16ULL * 1024ULL * 1024ULL;
 inline constexpr std::uint64_t kMascotAudioFileMaxBytes = 16ULL * 1024ULL * 1024ULL;
 inline constexpr std::uint64_t kMascotImageMaxPixels = 4096ULL * 4096ULL;
+inline constexpr std::uint64_t kMascotImageTotalMaxPixels = 256ULL * 1024ULL * 1024ULL;
 inline constexpr std::size_t kMascotZipEntryMaxCount = 4096;
 
 }

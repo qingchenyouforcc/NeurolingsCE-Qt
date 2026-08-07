@@ -122,6 +122,7 @@ QString documentHelpText(char const *argv0) {
         "  %2 --mascot|-m list\n"
         "  %2 --mascot|-m add ZIP\n"
         "  %2 --mascot|-m remove MASCOT\n"
+        "  %2 --mascot|-m validate FILE [--json]\n"
         "\n"
         "Global options:\n"
         "  --quiet  --json  --connect-timeout-ms MS  --read-timeout-ms MS\n"
@@ -171,7 +172,8 @@ QString commandUsage(char const *argv0, QString const& commandName) {
             QStringLiteral(
                 "Usage: %1 [globals...] --mascot|-m list\n"
                 "       %1 [globals...] --mascot|-m add ZIP\n"
-                "       %1 [globals...] --mascot|-m remove MASCOT") },
+                "       %1 [globals...] --mascot|-m remove MASCOT\n"
+                "       %1 [globals...] --mascot|-m validate FILE [--json]") },
         { QStringLiteral("--list"),
             QStringLiteral("Usage: %1 [globals...] --list|-l") },
         { QStringLiteral("--version"),
@@ -377,8 +379,23 @@ CliParseResult parseDocumentMascotCommand(ArgCursor &args, CliParseResult result
         return result;
     }
 
+    if (command.mascotAction == QStringLiteral("validate")) {
+        if (!args.hasNext()) {
+            return failParse(result, QStringLiteral("Missing mascot package path"),
+                argv0, commandToken);
+        }
+        command.mascotArchivePath = args.take();
+        if (args.hasNext()) {
+            return failParse(result,
+                QStringLiteral("Unexpected argument: %1").arg(args.take()),
+                argv0, commandToken);
+        }
+        result.global = command.global;
+        return result;
+    }
+
     return failParse(result,
-        QStringLiteral("Mascot command must be list, add, or remove"),
+        QStringLiteral("Mascot command must be list, add, remove, or validate"),
         argv0, commandToken);
 }
 

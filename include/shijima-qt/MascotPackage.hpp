@@ -25,6 +25,7 @@
 #include <QStringList>
 
 #include <set>
+#include <cstdint>
 #include <string>
 
 struct MascotMetadata {
@@ -60,6 +61,15 @@ struct LegacyMascotConversionResult {
     QString errorMessage;
 };
 
+struct MascotPackageReport {
+    bool ok = false;
+    MascotMetadata metadata;
+    qsizetype entryCount = 0;
+    qsizetype fileCount = 0;
+    std::uint64_t extractedBytes = 0;
+    QStringList errors;
+};
+
 namespace MascotPackage {
 
 MascotMetadata defaultMetadata();
@@ -72,6 +82,7 @@ QString cachePathForName(QString const& cacheRootPath, QString const& name);
 
 bool inspectPackage(QString const& packagePath, MascotMetadata &metadata,
     QString &errorMessage);
+bool validatePackage(QString const& packagePath, MascotPackageReport &report);
 bool extractPackage(QString const& packagePath, QString const& outputPath,
     QString &errorMessage);
 bool writePackageFromDirectory(QString const& sourcePath,
