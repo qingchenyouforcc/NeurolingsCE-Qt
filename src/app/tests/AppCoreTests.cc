@@ -21,8 +21,15 @@
 #include "shijima-qt/MascotApi.hpp"
 #include "shijima-qt/CodexActivity.hpp"
 #include "shijima-qt/CodexConfigManager.hpp"
+#include "shijima-qt/CredentialStore.hpp"
+#include "shijima-qt/GitHubAuthManager.hpp"
 #include "shijima-qt/MascotPackage.hpp"
+#include "shijima-qt/MascotStoreCache.hpp"
+#include "shijima-qt/MascotStoreCoordinator.hpp"
+#include "shijima-qt/MascotStoreIndex.hpp"
+#include "shijima-qt/MascotStoreNetwork.hpp"
 #include "shijima-qt/SafePath.hpp"
+#include "shijima-qt/Secrets.hpp"
 #include "shijima-qt/SecurityLimits.hpp"
 #include "core/shijima-engine/shijima/broadcast/manager.hpp"
 #include "core/shijima-engine/shijima/behavior/manager.hpp"
@@ -31,17 +38,30 @@
 #include "ui/mascot/MascotHoldGesture.hpp"
 
 #include <QJsonArray>
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QDir>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
+#include <QHostAddress>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QString>
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -932,6 +952,26 @@ void testLegacyArchiveAnalysisAndConversion() {
     }
 }
 
+QByteArray testValidMascotInfoJson() {
+    return QByteArrayLiteral(
+        "{\"name\":\"Validate Me\",\"version\":\"1.2.3\","
+        "\"description\":\"fixture\",\"author\":\"tester\"}");
+}
+
+QString testWriteValidMascotPackage(QString const& packagePath,
+    QByteArray const& infoJson = QByteArray {})
+{
+    std::vector<TestZipEntry> entries {
+        { QStringLiteral("info.json"),
+            infoJson.isEmpty() ? testValidMascotInfoJson() : infoJson },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+    };
+    testWriteZip(packagePath, entries);
+    return packagePath;
+}
+
 void testPackageInspectionRejectsOversizedPngHeader() {
     QTemporaryDir temp;
     expect(temp.isValid(), "temporary directory should be available");
@@ -1522,9 +1562,419 @@ void testMascotHoldGestureBoundaries() {
         "closing a mascot should cancel its active gesture");
 }
 
+QByteArray testStoreIndexJson() {
+    QJsonObject alphaDownload {
+        { QStringLiteral("url"), QStringLiteral(
+            "https://example.invalid/download/alpha.mascot") },
+        { QStringLiteral("size"), 1234 },
+        { QStringLiteral("sha256"), QString(64, QLatin1Char('a')) },
+    };
+    QJsonObject alpha {
+        { QStringLiteral("id"), QStringLiteral("alpha") },
+        { QStringLiteral("name"), QStringLiteral("Alpha Mascot") },
+        { QStringLiteral("version"), QStringLiteral("1.0.0") },
+        { QStringLiteral("summary"), QStringLiteral("First mascot") },
+        { QStringLiteral("authors"), QJsonArray { QStringLiteral("octocat") } },
+        { QStringLiteral("maintainers"), QJsonArray { QStringLiteral("octocat") } },
+        { QStringLiteral("license"), QStringLiteral("MIT") },
+        { QStringLiteral("minimumNeurolingsCEVersion"), QStringLiteral("0.5.1") },
+        { QStringLiteral("tags"), QJsonArray { QStringLiteral("cat") } },
+        { QStringLiteral("download"), alphaDownload },
+        { QStringLiteral("createdAt"), QStringLiteral("2026-08-06T00:00:00Z") },
+        { QStringLiteral("updatedAt"), QStringLiteral("2026-08-06T00:00:00Z") },
+    };
+    QJsonObject zetaDownload {
+        { QStringLiteral("url"), QStringLiteral(
+            "https://example.invalid/download/zeta.mascot") },
+        { QStringLiteral("size"), 5678 },
+        { QStringLiteral("sha256"), QString(64, QLatin1Char('b')) },
+    };
+    QJsonObject zeta {
+        { QStringLiteral("id"), QStringLiteral("zeta") },
+        { QStringLiteral("name"), QStringLiteral("Zeta Mascot") },
+        { QStringLiteral("version"), QStringLiteral("2.1.0") },
+        { QStringLiteral("summary"), QStringLiteral("Second mascot") },
+        { QStringLiteral("authors"), QJsonArray { QStringLiteral("hubot") } },
+        { QStringLiteral("maintainers"), QJsonArray { QStringLiteral("hubot") } },
+        { QStringLiteral("license"), QStringLiteral("Apache-2.0") },
+        { QStringLiteral("minimumNeurolingsCEVersion"), QStringLiteral("0.4.0") },
+        { QStringLiteral("categories"), QJsonArray { QStringLiteral("animal") } },
+        { QStringLiteral("download"), zetaDownload },
+        { QStringLiteral("createdAt"), QStringLiteral("2026-08-06T01:00:00Z") },
+        { QStringLiteral("updatedAt"), QStringLiteral("2026-08-06T01:00:00Z") },
+    };
+    QJsonObject root {
+        { QStringLiteral("schemaVersion"), 1 },
+        { QStringLiteral("generatedAt"), QStringLiteral("2026-08-06T02:00:00Z") },
+        { QStringLiteral("registry"), QStringLiteral("test/registry") },
+        { QStringLiteral("mascots"), QJsonArray { zeta, alpha } },
+    };
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
-int main() {
+template <typename Sender, typename Signal>
+bool waitForSignal(Sender *sender, Signal signal, int timeoutMs) {
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(sender, signal, &loop, &QEventLoop::quit);
+    QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timer.start(timeoutMs);
+    loop.exec();
+    return timer.isActive();
+}
+
+void processEventsFor(int ms) {
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < ms) {
+        QCoreApplication::processEvents(
+            QEventLoop::AllEvents, static_cast<int>(ms - timer.elapsed()));
+    }
+}
+
+class TestStoreServer : public QObject {
+public:
+    TestStoreServer() {
+        m_server.listen(QHostAddress::LocalHost, 0);
+        connect(&m_server, &QTcpServer::newConnection, this, [this]() {
+            QTcpSocket *socket = m_server.nextPendingConnection();
+            m_sockets.append(socket);
+            connect(socket, &QTcpSocket::readyRead, this,
+                [this, socket]() { onReadyRead(socket); });
+            connect(socket, &QTcpSocket::disconnected, this,
+                [this, socket]() {
+                    m_sockets.removeAll(socket);
+                    socket->deleteLater();
+                });
+        });
+    }
+
+    ~TestStoreServer() override {
+        stop();
+    }
+
+    int port() const {
+        return m_server.serverPort();
+    }
+
+    std::function<QByteArray(QByteArray const&)> responder;
+    bool slowHang = false;
+
+    void stop() {
+        m_server.close();
+        for (auto *socket : m_sockets) {
+            socket->disconnectFromHost();
+        }
+        m_sockets.clear();
+    }
+
+private:
+    void onReadyRead(QTcpSocket *socket) {
+        QByteArray request = socket->readAll();
+        if (slowHang && !m_hung) {
+            m_hung = true;
+            socket->write(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+                "Content-Length: 1048576\r\n\r\npartial-data");
+            socket->flush();
+            return;
+        }
+        if (responder) {
+            socket->write(responder(request));
+            socket->flush();
+        }
+    }
+
+    QTcpServer m_server;
+    QList<QTcpSocket *> m_sockets;
+    bool m_hung = false;
+};
+
+QByteArray httpResponse(int status, QByteArray const& body) {
+    QByteArray reason = status == 200 ? QByteArray("OK")
+        : status == 201 ? QByteArray("Created")
+        : status == 401 ? QByteArray("Unauthorized")
+        : status == 404 ? QByteArray("Not Found")
+        : QByteArray("Error");
+    return QByteArray("HTTP/1.1 ") + QByteArray::number(status) +
+        QByteArray(" ") + reason + QByteArray("\r\n") +
+        QByteArray("Content-Type: application/json\r\n") +
+        QByteArray("Content-Length: ") +
+        QByteArray::number(body.size()) + QByteArray("\r\n\r\n") + body;
+}
+
+void testGitHubDeviceFlowSuccess() {
+    TestStoreServer server;
+    int pollCount = 0;
+    server.responder = [&server, &pollCount](QByteArray const& request) {
+        if (request.startsWith("POST /login/device/code")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("device_code"), QStringLiteral("dev-123") },
+                { QStringLiteral("user_code"), QStringLiteral("ABCD-1234") },
+                { QStringLiteral("verification_uri"), QStringLiteral(
+                    "http://127.0.0.1:%1/verify").arg(server.port()) },
+                { QStringLiteral("interval"), 1 },
+                { QStringLiteral("expires_in"), 900 },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("POST /login/oauth/access_token")) {
+            ++pollCount;
+            if (pollCount == 1) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("error"), QStringLiteral("authorization_pending") },
+                }).toJson(QJsonDocument::Compact));
+            }
+            if (pollCount == 2) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("error"), QStringLiteral("slow_down") },
+                }).toJson(QJsonDocument::Compact));
+            }
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("access_token"), QStringLiteral("at-1234567890abcdef") },
+                { QStringLiteral("refresh_token"), QStringLiteral("rt-1234567890abcdef") },
+                { QStringLiteral("token_type"), QStringLiteral("bearer") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("GET /user")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("id"), 1 },
+                { QStringLiteral("login"), QStringLiteral("octocat") },
+                { QStringLiteral("name"), QStringLiteral("Octo Cat") },
+                { QStringLiteral("avatar_url"), QStringLiteral(
+                    "https://example.invalid/avatar.png") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(404, QByteArrayLiteral("{\"error\":\"not found\"}"));
+    };
+
+    auto store = std::make_unique<InMemoryCredentialStore>();
+    InMemoryCredentialStore *rawStore = store.get();
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"), std::move(store),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager.setAutoOpenVerificationUrl(false);
+
+    bool codeReady = false;
+    bool signedIn = false;
+    QString userCode;
+    QUrl verificationUrl;
+    GitHubAuthManager::UserInfo userInfo;
+    QObject::connect(&manager, &GitHubAuthManager::deviceCodeReady,
+        [&](QString code, QUrl url) {
+            codeReady = true;
+            userCode = code;
+            verificationUrl = url;
+        });
+    QObject::connect(&manager, &GitHubAuthManager::signedIn,
+        [&](GitHubAuthManager::UserInfo user) {
+            signedIn = true;
+            userInfo = user;
+        });
+    manager.startDeviceFlow();
+    for (int i = 0; i < 120 && !signedIn; ++i) {
+        processEventsFor(100);
+    }
+    expect(codeReady && userCode == QStringLiteral("ABCD-1234") &&
+        verificationUrl.toString().endsWith(QStringLiteral("/verify")),
+        "device flow should surface the user code and verification URL");
+    expect(signedIn && manager.state() == GitHubAuthManager::State::SignedIn &&
+        manager.userInfo().login == QStringLiteral("octocat") &&
+        manager.accessToken() == QStringLiteral("at-1234567890abcdef"),
+        "device flow should complete and fetch the user");
+    expect(userInfo.displayName == QStringLiteral("Octo Cat"),
+        "device flow should carry the display name");
+    expect(pollCount >= 3,
+        "device flow should handle authorization_pending and slow_down");
+    QString stored;
+    expect(rawStore->load(QStringLiteral("NeurolingsCE-GitHub"),
+        QStringLiteral("oauth"), &stored) == CredentialStore::Status::Ok &&
+        stored.contains(QStringLiteral("at-1234567890abcdef")),
+        "successful login should persist tokens in the credential store");
+}
+
+void testGitHubDeviceFlowSendsNoScope() {
+    TestStoreServer server;
+    bool deviceRequestHasScope = false;
+    server.responder = [&deviceRequestHasScope](QByteArray const& request) {
+        if (request.startsWith("POST /login/device/code")) {
+            deviceRequestHasScope =
+                request.contains("scope=") || request.contains("scope%3D");
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("device_code"), QStringLiteral("dev-noscope") },
+                { QStringLiteral("user_code"), QStringLiteral("CODE-7") },
+                { QStringLiteral("verification_uri"), QStringLiteral(
+                    "http://127.0.0.1:9/verify") },
+                { QStringLiteral("interval"), 1 },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("POST /login/oauth/access_token")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("access_token"), QStringLiteral("at-noscope-1234567890") },
+                { QStringLiteral("refresh_token"), QStringLiteral("rt-noscope-1234567890") },
+                { QStringLiteral("token_type"), QStringLiteral("bearer") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("GET /user")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("id"), 1 },
+                { QStringLiteral("login"), QStringLiteral("octocat") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(404, QByteArrayLiteral("{\"error\":\"not found\"}"));
+    };
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"),
+        std::make_unique<InMemoryCredentialStore>(),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager.setAutoOpenVerificationUrl(false);
+    manager.startDeviceFlow();
+    for (int i = 0; i < 60 &&
+        manager.state() != GitHubAuthManager::State::SignedIn; ++i)
+    {
+        processEventsFor(100);
+    }
+    expect(manager.state() == GitHubAuthManager::State::SignedIn,
+        "device flow should complete without an OAuth scope");
+    expect(!deviceRequestHasScope,
+        "the device code request must not contain an OAuth scope");
+}
+
+class FailingSaveCredentialStore : public InMemoryCredentialStore {
+public:
+    bool failSave = false;
+
+    Status save(QString const& service, QString const& account,
+        QString const& secret, QString *error = nullptr) override
+    {
+        if (failSave) {
+            if (error != nullptr) {
+                *error = QStringLiteral("injected save failure");
+            }
+            return Status::Error;
+        }
+        return InMemoryCredentialStore::save(service, account, secret, error);
+    }
+};
+
+void testGitHubSlowDownUsesSuggestedInterval() {
+    TestStoreServer server;
+    int pollCount = 0;
+    server.responder = [&pollCount](QByteArray const& request) {
+        if (request.startsWith("POST /login/device/code")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("device_code"), QStringLiteral("dev-slow") },
+                { QStringLiteral("user_code"), QStringLiteral("CODE-8") },
+                { QStringLiteral("verification_uri"), QStringLiteral(
+                    "http://127.0.0.1:9/verify") },
+                { QStringLiteral("interval"), 1 },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("POST /login/oauth/access_token")) {
+            ++pollCount;
+            if (pollCount == 1) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("error"), QStringLiteral("slow_down") },
+                    { QStringLiteral("interval"), 3 },
+                }).toJson(QJsonDocument::Compact));
+            }
+            if (pollCount == 2) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("error"), QStringLiteral("slow_down") },
+                    { QStringLiteral("interval"), 4 },
+                }).toJson(QJsonDocument::Compact));
+            }
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("access_token"), QStringLiteral("at-slow-1234567890") },
+                { QStringLiteral("refresh_token"), QStringLiteral("rt-slow-1234567890") },
+                { QStringLiteral("token_type"), QStringLiteral("bearer") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("GET /user")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("id"), 1 },
+                { QStringLiteral("login"), QStringLiteral("octocat") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(404, QByteArrayLiteral("{\"error\":\"not found\"}"));
+    };
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"),
+        std::make_unique<InMemoryCredentialStore>(),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager.setAutoOpenVerificationUrl(false);
+    manager.startDeviceFlow();
+    for (int i = 0; i < 120 &&
+        manager.state() != GitHubAuthManager::State::SignedIn; ++i)
+    {
+        processEventsFor(100);
+    }
+    expect(manager.state() == GitHubAuthManager::State::SignedIn,
+        "repeated slow_down responses should still complete the flow");
+    expect(pollCount >= 3,
+        "multiple slow_down responses should be handled");
+}
+
+void testGitHubTokenRotationPersistFailure() {
+    TestStoreServer server;
+    int userCalls = 0;
+    server.responder = [&userCalls](QByteArray const& request) {
+        if (request.startsWith("GET /user")) {
+            ++userCalls;
+            if (userCalls == 1) {
+                return httpResponse(401, QByteArrayLiteral("{\"message\":\"Bad credentials\"}"));
+            }
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("id"), 1 },
+                { QStringLiteral("login"), QStringLiteral("octocat") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        if (request.startsWith("POST /login/oauth/access_token")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("access_token"), QStringLiteral("new-token-1234567890") },
+                { QStringLiteral("refresh_token"), QStringLiteral("new-refresh-1234567890") },
+                { QStringLiteral("token_type"), QStringLiteral("bearer") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(404, QByteArrayLiteral("{\"error\":\"not found\"}"));
+    };
+    auto store = std::make_unique<FailingSaveCredentialStore>();
+    FailingSaveCredentialStore *rawStore = store.get();
+    QByteArray oldPayload = QJsonDocument(QJsonObject {
+        { QStringLiteral("access_token"), QStringLiteral("old-token-123456") },
+        { QStringLiteral("refresh_token"), QStringLiteral("old-refresh-123456") },
+    }).toJson(QJsonDocument::Compact);
+    rawStore->save(QStringLiteral("NeurolingsCE-GitHub"), QStringLiteral("oauth"),
+        QString::fromUtf8(oldPayload));
+    rawStore->failSave = true;
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"), std::move(store),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    for (int i = 0; i < 120 &&
+        manager.accessToken() != QStringLiteral("new-token-1234567890"); ++i)
+    {
+        processEventsFor(100);
+    }
+    expect(manager.state() == GitHubAuthManager::State::SignedIn &&
+        manager.accessToken() == QStringLiteral("new-token-1234567890"),
+        "rotated tokens should be used in memory even when persistence fails");
+    QString stored;
+    expect(rawStore->load(QStringLiteral("NeurolingsCE-GitHub"),
+        QStringLiteral("oauth"), &stored) == CredentialStore::Status::Ok &&
+        stored.toUtf8() == oldPayload,
+        "a failed credential write must not delete the previous credentials");
+}
+
+int main(int argc, char **argv) {
+    QCoreApplication app(argc, argv);
     testMascotPatchParsing();
     testJsonRoundTrips();
     testStatusJson();
@@ -1545,6 +1995,10 @@ int main() {
     testWindowPushBehaviorGate();
     testFallBoundaryPriorityOverActiveWindow();
     testMascotHoldGestureBoundaries();
+    testGitHubDeviceFlowSuccess();
+    testGitHubDeviceFlowSendsNoScope();
+    testGitHubSlowDownUsesSuggestedInterval();
+    testGitHubTokenRotationPersistFailure();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;
