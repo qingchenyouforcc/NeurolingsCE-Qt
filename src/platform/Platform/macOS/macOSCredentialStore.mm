@@ -20,6 +20,7 @@
 
 #include <QString>
 
+#import <Foundation/Foundation.h>
 #import <Security/Security.h>
 
 namespace {
