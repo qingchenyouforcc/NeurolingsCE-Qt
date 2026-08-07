@@ -19,6 +19,7 @@
 //
 
 #include "shijima-qt/MascotApi.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 
 #include <QList>
 #include <QString>
@@ -84,6 +85,7 @@ struct CliExecutionResult {
     QList<MascotInfo> mascots;
     QList<LoadedMascotInfo> loadedMascots;
     std::optional<MascotInfo> mascot;
+    std::optional<MascotPackageReport> mascotValidation;
     QString removedTemplateName;
     bool codexHandled = false;
     QString codexEventType;

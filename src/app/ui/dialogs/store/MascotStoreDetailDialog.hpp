@@ -16,13 +16,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "shijima-qt/ShijimaManager.hpp"
+#pragma once
 
-void ShijimaManager::setupNavigation() {
-    setupHomePage();
-    setupStorePage();
-    setupCreatePage();
-    setupCombinationsPage();
-    setupSettingsPage();
-    setupAboutPage();
-}
+#include <QDialog>
+
+struct MascotStoreEntry;
+
+class MascotStoreDetailDialog final : public QDialog
+{
+    Q_OBJECT
+public:
+    explicit MascotStoreDetailDialog(MascotStoreEntry const& entry,
+        QWidget *parent = nullptr);
+};

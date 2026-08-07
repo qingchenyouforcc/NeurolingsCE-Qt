@@ -16,13 +16,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "shijima-qt/ShijimaManager.hpp"
+#pragma once
 
-void ShijimaManager::setupNavigation() {
-    setupHomePage();
-    setupStorePage();
-    setupCreatePage();
-    setupCombinationsPage();
-    setupSettingsPage();
-    setupAboutPage();
-}
+#include "shijima-qt/CredentialStore.hpp"
+
+class StubCredentialStore final : public CredentialStore {
+public:
+    Status save(QString const&, QString const&, QString const&,
+        QString *error) override;
+    Status load(QString const&, QString const&, QString *secret,
+        QString *error) override;
+    Status remove(QString const&, QString const&, QString *error) override;
+    Status removeAll(QString const&, QString *error) override;
+    bool isAvailable() const override;
+};

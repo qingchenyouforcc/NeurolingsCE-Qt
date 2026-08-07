@@ -850,6 +850,25 @@ CliExecutionResult executeStandaloneMascotCommand(CliCommand const& command,
         return result;
     }
 
+    if (command.mascotAction == QStringLiteral("validate")) {
+        QFileInfo packageInfo { command.mascotArchivePath };
+        if (!packageInfo.exists() || !packageInfo.isFile()) {
+            return failExecution(result, makeError(
+                QStringLiteral("invalid_arguments"),
+                QStringLiteral("Mascot package does not exist"), 2, 0,
+                packageInfo.absoluteFilePath()));
+        }
+        MascotPackageReport report;
+        MascotPackage::validatePackage(packageInfo.absoluteFilePath(), report);
+        result.mascotValidation = report;
+        APP_LOG_INFO("cli") << "Standalone mascot validation completed ok="
+            << (report.ok ? "1" : "0")
+            << " entries=" << report.entryCount
+            << " files=" << report.fileCount
+            << " errors=" << report.errors.size();
+        return result;
+    }
+
     if (!removeStandaloneMascotTemplate(command.mascotTemplateName,
         result.removedTemplateName, error))
     {

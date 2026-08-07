@@ -16,13 +16,22 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "shijima-qt/ShijimaManager.hpp"
+#pragma once
 
-void ShijimaManager::setupNavigation() {
-    setupHomePage();
-    setupStorePage();
-    setupCreatePage();
-    setupCombinationsPage();
-    setupSettingsPage();
-    setupAboutPage();
-}
+#include "shijima-qt/CredentialStore.hpp"
+
+// Linux Secret Service. Compiled with libsecret when
+// SHIJIMA_WITH_LIBSECRET is enabled; otherwise login persistence is
+// explicitly unavailable (no plaintext fallback).
+class LinuxCredentialStore final : public CredentialStore {
+public:
+    Status save(QString const& service, QString const& account,
+        QString const& secret, QString *error) override;
+    Status load(QString const& service, QString const& account,
+        QString *secret, QString *error) override;
+    Status remove(QString const& service, QString const& account,
+        QString *error) override;
+    Status removeAll(QString const& service,
+        QString *error) override;
+    bool isAvailable() const override;
+};

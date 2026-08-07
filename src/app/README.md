@@ -21,7 +21,8 @@
 core 下的引擎目录另有一组更细的导航：
 
 - core/assets：资产加载、裁剪、包导入和安全路径。
-- core/audio、core/codex、core/commands、core/http、core/localipc、core/update：应用边界服务。
+- core/audio、core/codex、core/commands、core/http、core/localipc、
+  core/mascotstore、core/github、core/submission、core/update：应用边界服务。
 - core/shijima-engine：内置 Shijima 模拟引擎；其 action、behavior、broadcast、mascot、scripting 子目录分别说明各自状态机。
 
 ## 最重要的数据流

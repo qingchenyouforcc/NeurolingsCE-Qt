@@ -18,6 +18,11 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/GitHubAuthManager.hpp"
+#include "shijima-qt/MascotStoreCache.hpp"
+#include "shijima-qt/MascotStoreCoordinator.hpp"
+#include "shijima-qt/MascotStoreNetwork.hpp"
+#include "shijima-qt/MascotSubmissionClient.hpp"
 #include "shijima-qt/ShijimaHttpApi.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
 

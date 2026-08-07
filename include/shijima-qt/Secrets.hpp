@@ -16,13 +16,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "shijima-qt/ShijimaManager.hpp"
+#pragma once
 
-void ShijimaManager::setupNavigation() {
-    setupHomePage();
-    setupStorePage();
-    setupCreatePage();
-    setupCombinationsPage();
-    setupSettingsPage();
-    setupAboutPage();
-}
+#include <QString>
+
+// Masks token-like values so sensitive material never reaches logs.
+QString redactSensitiveText(QString const& text);

@@ -20,6 +20,7 @@
 
 #include <QString>
 #include "shijima-qt/CodexActivity.hpp"
+#include "shijima-qt/MascotStoreIndex.hpp"
 #include <QList>
 #include <QMap>
 #include <QSet>
@@ -52,6 +53,11 @@ class QTranslator;
 class QWidget;
 class ShijimaWidget;
 class GitHubUpdateManager;
+class GitHubAuthManager;
+class MascotStoreCache;
+class MascotStoreCoordinator;
+class MascotStoreNetwork;
+class MascotSubmissionClient;
 class ShijimaHttpApi;
 class ShijimaLocalApi;
 struct ShijimaManagerRuntimeState;
@@ -122,7 +128,9 @@ private:
     void setupCombinationsPage();
     void setupSettingsPage();
     void setupAboutPage();
+    void setupStorePage();
     void showAboutDialog();
+    void showMascotStoreDetail(MascotStoreEntry const* entry);
     void importAction();
     void deleteAction();
     void updateSandboxBackground();
@@ -153,6 +161,12 @@ private:
     std::unique_ptr<ShijimaManagerUiState> m_ui;
     std::unique_ptr<QSettings> m_settings;
     GitHubUpdateManager *m_updateManager = nullptr;
+    std::unique_ptr<MascotStoreCache> m_storeCache;
+    std::unique_ptr<MascotStoreNetwork> m_storeNetwork;
+    std::unique_ptr<MascotStoreCoordinator> m_storeCoordinator;
+    std::unique_ptr<GitHubAuthManager> m_githubAuth;
+    std::unique_ptr<MascotSubmissionClient> m_submissionClient;
+    MascotStoreIndex m_lastStoreIndex;
     bool m_allowClose = false;
     bool m_firstShow = true;
     bool m_wasVisible = false;

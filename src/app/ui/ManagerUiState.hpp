@@ -24,6 +24,7 @@
 #include <QString>
 
 #include "ManagerTrayController.hpp"
+#include "interface/MascotStoreUi.hpp"
 
 class QAction;
 class QLabel;
@@ -58,6 +59,7 @@ struct ShijimaManagerUiState {
     QPushButton *restoreCombinationButton = nullptr;
     QPushButton *deleteCombinationButton = nullptr;
     QWidget *settingsPage = nullptr;
+    std::unique_ptr<MascotStoreUi> storeUi;
     std::unique_ptr<ManagerTrayController> trayController;
     QString settingsKey;
     QString aboutKey;

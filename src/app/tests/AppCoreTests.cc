@@ -972,6 +972,137 @@ QString testWriteValidMascotPackage(QString const& packagePath,
     return packagePath;
 }
 
+void testMascotPackageValidation() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QDir tempDir(temp.path());
+
+    QString validPath = testWriteValidMascotPackage(
+        tempDir.absoluteFilePath(QStringLiteral("valid.mascot")));
+    MascotPackageReport report;
+    expect(MascotPackage::validatePackage(validPath, report),
+        "validatePackage should accept a minimal valid package");
+    expect(report.ok && report.errors.isEmpty(),
+        "valid package report should be ok with no errors");
+    expect(report.metadata.name == QStringLiteral("Validate Me") &&
+        report.metadata.version == QStringLiteral("1.2.3") &&
+        report.metadata.author == QStringLiteral("tester"),
+        "valid package report should carry package metadata");
+    expect(report.entryCount == 4 && report.fileCount == 4,
+        "valid package report should report entry and file counts");
+    expect(report.extractedBytes ==
+        static_cast<std::uint64_t>(testValidMascotInfoJson().size() +
+            minimalActionsXml().size() + minimalBehaviorsXml().size() +
+            minimalPngBytes().size()),
+        "valid package report should report extracted size");
+
+    QString missingActionsPath = tempDir.absoluteFilePath(
+        QStringLiteral("missing-actions.mascot"));
+    testWriteZip(missingActionsPath, {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+    });
+    MascotPackageReport missingActions;
+    expect(!MascotPackage::validatePackage(missingActionsPath, missingActions) &&
+        !missingActions.ok,
+        "validatePackage should reject a package without actions.xml");
+    expect(missingActions.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("actions.xml")),
+        "missing actions.xml should be listed in the error report");
+
+    QString traversalPath = tempDir.absoluteFilePath(
+        QStringLiteral("traversal.mascot"));
+    std::vector<TestZipEntry> traversalEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("../evil.png"), minimalPngBytes() },
+    };
+    testWriteZip(traversalPath, traversalEntries);
+    MascotPackageReport traversal;
+    expect(!MascotPackage::validatePackage(traversalPath, traversal),
+        "validatePackage should reject path traversal entries");
+    expect(traversal.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("unsafe")),
+        "path traversal should be reported as unsafe");
+
+    QString payloadPath = tempDir.absoluteFilePath(
+        QStringLiteral("payload.mascot"));
+    std::vector<TestZipEntry> payloadEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("sound/evil.exe"), QByteArrayLiteral("MZ") },
+    };
+    testWriteZip(payloadPath, payloadEntries);
+    MascotPackageReport payload;
+    expect(!MascotPackage::validatePackage(payloadPath, payload),
+        "validatePackage should reject executable payloads in sound/");
+    expect(payload.errors.join(QStringLiteral(";"))
+        .contains(QStringLiteral("forbidden")),
+        "executable payloads should be reported as forbidden");
+
+    QString nestedPath = tempDir.absoluteFilePath(
+        QStringLiteral("nested.mascot"));
+    std::vector<TestZipEntry> nestedEntries {
+        { QStringLiteral("info.json"), testValidMascotInfoJson() },
+        { QStringLiteral("actions.xml"), minimalActionsXml() },
+        { QStringLiteral("behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("img/evil.zip"), QByteArrayLiteral("PK") },
+    };
+    testWriteZip(nestedPath, nestedEntries);
+    MascotPackageReport nested;
+    expect(!MascotPackage::validatePackage(nestedPath, nested),
+        "validatePackage should reject nested archives");
+}
+
+void testCliMascotValidateParsing() {
+    char argv0[] = "NeurolingsCE-cli";
+    char mascotOption[] = "--mascot";
+    char jsonOption[] = "--json";
+    char action[] = "validate";
+    char packagePath[] = "C:/tmp/fixture.mascot";
+    char *validArgv[] = { argv0, jsonOption, mascotOption, action, packagePath };
+    auto valid = parseCliArguments(5, validArgv);
+    expect(!valid.hasError && valid.hasCommand &&
+        valid.command.kind == CliCommandKind::DocumentMascot &&
+        valid.command.mascotAction == QStringLiteral("validate") &&
+        valid.command.mascotArchivePath == QStringLiteral("C:/tmp/fixture.mascot") &&
+        valid.global.json,
+        "CLI should parse --mascot validate FILE with --json");
+
+    char *missingPathArgv[] = { argv0, mascotOption, action };
+    auto missing = parseCliArguments(3, missingPathArgv);
+    expect(missing.hasError &&
+        missing.error.error.contains(QStringLiteral("Missing mascot package path")) &&
+        missing.error.exitCode == 2,
+        "CLI should require a package path for --mascot validate");
+
+    char extra[] = "extra";
+    char *extraArgv[] = { argv0, mascotOption, action, packagePath, extra };
+    auto extraArgs = parseCliArguments(5, extraArgv);
+    expect(extraArgs.hasError &&
+        extraArgs.error.error.contains(QStringLiteral("Unexpected argument")),
+        "CLI should reject extra arguments after --mascot validate FILE");
+
+    char unknownAction[] = "frobnicate";
+    char *unknownArgv[] = { argv0, mascotOption, unknownAction };
+    auto unknown = parseCliArguments(3, unknownArgv);
+    expect(unknown.hasError &&
+        unknown.error.error.contains(QStringLiteral("list, add, remove, or validate")),
+        "CLI should enumerate supported mascot actions on unknown actions");
+
+    char listAction[] = "list";
+    char *listArgv[] = { argv0, jsonOption, mascotOption, listAction };
+    auto list = parseCliArguments(4, listArgv);
+    expect(!list.hasError && list.command.mascotAction == QStringLiteral("list"),
+        "existing --mascot list parsing should remain intact");
+}
+
 void testPackageInspectionRejectsOversizedPngHeader() {
     QTemporaryDir temp;
     expect(temp.isValid(), "temporary directory should be available");
@@ -1633,6 +1764,92 @@ void processEventsFor(int ms) {
     }
 }
 
+void testMascotStoreIndexParsing() {
+    MascotStoreIndex index;
+    QString error;
+    expect(index.parse(testStoreIndexJson(), &error),
+        "store index should parse valid index-v1 JSON");
+    expect(index.schemaVersion == 1 &&
+        index.registry == QStringLiteral("test/registry"),
+        "store index should carry schema version and registry");
+    expect(index.entries.size() == 2 &&
+        index.entries[0].id == QStringLiteral("alpha") &&
+        index.entries[1].id == QStringLiteral("zeta"),
+        "store index entries should be sorted deterministically by id");
+    expect(index.findById(QStringLiteral("zeta")) != nullptr,
+        "store index should find entries by id");
+    expect(index.findById(QStringLiteral("missing")) == nullptr,
+        "store index should return null for unknown ids");
+    auto filtered = index.filter(QStringLiteral("mascot cat"), {});
+    expect(filtered.size() == 1 && filtered[0].id == QStringLiteral("alpha"),
+        "store index search should match name and tags");
+    auto tagged = index.filter({}, { QStringLiteral("animal") });
+    expect(tagged.size() == 1 && tagged[0].id == QStringLiteral("zeta"),
+        "store index category filter should match");
+
+    QJsonDocument document = QJsonDocument::fromJson(testStoreIndexJson());
+    QJsonObject root = document.object();
+    root[QStringLiteral("schemaVersion")] = 2;
+    MascotStoreIndex unsupported;
+    expect(!unsupported.parse(
+        QJsonDocument(root).toJson(QJsonDocument::Compact), &error),
+        "store index should reject unsupported schema versions");
+
+    root = document.object();
+    QJsonArray mascots = root.value(QStringLiteral("mascots")).toArray();
+    QJsonObject broken = mascots[0].toObject();
+    broken.remove(QStringLiteral("download"));
+    mascots[0] = broken;
+    root[QStringLiteral("mascots")] = mascots;
+    MascotStoreIndex missingDownload;
+    expect(!missingDownload.parse(
+        QJsonDocument(root).toJson(QJsonDocument::Compact), &error),
+        "store index should reject entries without a download object");
+
+    expect(MascotStoreIndex::isNewerVersion(
+        QStringLiteral("2.0.0"), QStringLiteral("1.9.9")),
+        "store index should compare versions correctly");
+    expect(!MascotStoreIndex::isNewerVersion(
+        QStringLiteral("1.0.0"), QStringLiteral("2.0.0")),
+        "store index should reject older versions");
+}
+
+void testMascotStoreCache() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    MascotStoreCache cache(temp.path());
+    MascotStoreCache::CachedIndex first {
+        testStoreIndexJson(), QStringLiteral("etag-1"),
+        QStringLiteral("Wed, 06 Aug 2026 00:00:00 GMT"),
+    };
+    QString error;
+    expect(cache.saveIndex(first, &error),
+        "store cache should save an index atomically");
+    MascotStoreCache::CachedIndex second {
+        QByteArrayLiteral("{\"schemaVersion\":1}"),
+        QStringLiteral("etag-2"), {},
+    };
+    expect(cache.saveIndex(second, &error),
+        "store cache should save a refreshed index");
+    MascotStoreCache::CachedIndex loaded;
+    expect(cache.loadIndex(&loaded) && loaded.body == second.body &&
+        loaded.etag == QStringLiteral("etag-2"),
+        "store cache should round-trip the latest index and validators");
+
+    QFile corrupt(cache.indexFilePath());
+    corrupt.open(QFile::WriteOnly | QFile::Truncate);
+    corrupt.write("{corrupt");
+    corrupt.close();
+    expect(cache.loadIndex(&loaded),
+        "store cache should expose raw bytes even before parsing");
+    MascotStoreIndex corruptIndex;
+    QString parseError;
+    expect(!corruptIndex.parse(loaded.body, &parseError),
+        "a corrupt cached index should fail index parsing");
+    expect(cache.loadPreviousIndex(&loaded) && loaded.body == first.body,
+        "store cache should keep the previous good index after a bad refresh");
+}
+
 class TestStoreServer : public QObject {
 public:
     TestStoreServer() {
@@ -1690,6 +1907,217 @@ private:
     QList<QTcpSocket *> m_sockets;
     bool m_hung = false;
 };
+
+void testMascotStoreNetworkConditionalAndChecksum() {
+    TestStoreServer server;
+    QByteArray payload = QByteArrayLiteral("mascot package bytes");
+    server.responder = [payload](QByteArray const& request) {
+        if (request.toLower().contains("if-none-match: etag-1") ||
+            request.contains("etag-1"))
+        {
+            return QByteArray("HTTP/1.1 304 Not Modified\r\n"
+                "Content-Length: 0\r\n\r\n");
+        }
+        return QByteArray("HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            "ETag: \"etag-1\"\r\n"
+            "Content-Length: ") + QByteArray::number(payload.size()) +
+            QByteArray("\r\n\r\n") + payload;
+    };
+
+    MascotStoreNetwork network;
+    MascotStoreIndexResponse indexResponse;
+    QObject::connect(&network, &MascotStoreNetwork::indexFetched,
+        [&indexResponse](MascotStoreIndexResponse response) {
+            indexResponse = response;
+        });
+    QUrl indexUrl { QStringLiteral("http://127.0.0.1:%1/index-v1.json")
+        .arg(server.port()) };
+    network.fetchIndex(indexUrl, QStringLiteral("etag-1"), {});
+    expect(waitForSignal(&network, &MascotStoreNetwork::indexFetched, 5000),
+        "index fetch should complete");
+    expect(indexResponse.ok && indexResponse.notModified,
+        "conditional index request should receive 304");
+
+    network.fetchIndex(indexUrl, {}, {});
+    expect(waitForSignal(&network, &MascotStoreNetwork::indexFetched, 5000),
+        "index fetch should complete for a fresh request");
+    expect(indexResponse.ok && !indexResponse.notModified &&
+        indexResponse.body == payload &&
+        indexResponse.etag == QStringLiteral("\"etag-1\""),
+        "fresh index request should return the body and ETag");
+
+    QTemporaryDir temp;
+    QString destination = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("package.mascot"));
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(QByteArrayLiteral("different content"));
+    QString wrongSha = QString::fromLatin1(hash.result().toHex());
+
+    QString downloadedPath;
+    bool downloadOk = false;
+    QString downloadCode;
+    QObject::connect(&network, &MascotStoreNetwork::downloadFinished,
+        [&](QString path, bool ok, QString code, QString) {
+            downloadedPath = path;
+            downloadOk = ok;
+            downloadCode = code;
+        });
+    server.responder = [payload](QByteArray const&) {
+        return QByteArray("HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/octet-stream\r\n"
+            "Content-Length: ") + QByteArray::number(payload.size()) +
+            QByteArray("\r\n\r\n") + payload;
+    };
+    network.download(QUrl { indexUrl }, destination, wrongSha);
+    expect(waitForSignal(&network, &MascotStoreNetwork::downloadFinished, 10000),
+        "download with a wrong checksum should complete");
+    expect(!downloadOk &&
+        downloadCode == QStringLiteral(
+            "mascotstore.download.sha256_mismatch") &&
+        downloadedPath == destination,
+        "download should fail with a SHA-256 mismatch code");
+    expect(!QFile::exists(destination) &&
+        !QFile::exists(destination + QStringLiteral(".part")),
+        "failed download should clean up partial files");
+
+    QCryptographicHash goodHash(QCryptographicHash::Sha256);
+    goodHash.addData(payload);
+    network.download(QUrl { indexUrl }, destination,
+        QString::fromLatin1(goodHash.result().toHex()));
+    expect(waitForSignal(&network, &MascotStoreNetwork::downloadFinished, 10000),
+        "download with a matching checksum should complete");
+    expect(downloadOk && QFile::exists(destination) &&
+        QFile(destination).size() == payload.size(),
+        "verified download should finalize the destination file");
+}
+
+void testMascotStoreNetworkCancelCleanup() {
+    TestStoreServer server;
+    server.slowHang = true;
+    QTemporaryDir temp;
+    QString destination = QDir(temp.path()).absoluteFilePath(
+        QStringLiteral("slow.mascot"));
+    MascotStoreNetwork network;
+    bool finished = false;
+    QString code;
+    QObject::connect(&network, &MascotStoreNetwork::downloadFinished,
+        [&](QString, bool, QString errorCode, QString) {
+            finished = true;
+            code = errorCode;
+        });
+    network.download(
+        QUrl { QStringLiteral("http://127.0.0.1:%1/slow.mascot")
+            .arg(server.port()) },
+        destination, {});
+    processEventsFor(300);
+    network.cancelAll();
+    processEventsFor(200);
+    expect(finished && code == QStringLiteral("mascotstore.download.canceled"),
+        "canceled download should report the canceled error code");
+    expect(!QFile::exists(destination) &&
+        !QFile::exists(destination + QStringLiteral(".part")),
+        "canceled download should remove partial files");
+}
+
+void testMascotStoreCoordinatorInstallAndOffline() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QDir tempDir(temp.path());
+    QString storagePath = tempDir.absoluteFilePath(QStringLiteral("mascots"));
+    QString downloadCache = tempDir.absoluteFilePath(QStringLiteral("downloads"));
+    QDir().mkpath(storagePath);
+    QDir().mkpath(downloadCache);
+
+    QString packagePath = testWriteValidMascotPackage(
+        tempDir.absoluteFilePath(QStringLiteral("fixture.mascot")));
+    QByteArray packageBytes;
+    QFile packageFile(packagePath);
+    packageFile.open(QFile::ReadOnly);
+    packageBytes = packageFile.readAll();
+    packageFile.close();
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(packageBytes);
+    QString sha256 = QString::fromLatin1(hash.result().toHex());
+
+    TestStoreServer server;
+    server.responder = [packageBytes](QByteArray const&) {
+        return QByteArray("HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/octet-stream\r\n"
+            "Content-Length: ") + QByteArray::number(packageBytes.size()) +
+            QByteArray("\r\n\r\n") + packageBytes;
+    };
+    QJsonObject download {
+        { QStringLiteral("url"), QStringLiteral(
+            "http://127.0.0.1:%1/alpha.mascot").arg(server.port()) },
+        { QStringLiteral("size"), packageBytes.size() },
+        { QStringLiteral("sha256"), sha256 },
+    };
+    QJsonObject entryJson {
+        { QStringLiteral("id"), QStringLiteral("alpha") },
+        { QStringLiteral("name"), QStringLiteral("Alpha Mascot") },
+        { QStringLiteral("version"), QStringLiteral("1.0.0") },
+        { QStringLiteral("summary"), QStringLiteral("First mascot") },
+        { QStringLiteral("authors"), QJsonArray { QStringLiteral("octocat") } },
+        { QStringLiteral("maintainers"), QJsonArray { QStringLiteral("octocat") } },
+        { QStringLiteral("license"), QStringLiteral("MIT") },
+        { QStringLiteral("minimumNeurolingsCEVersion"), QStringLiteral("0.5.1") },
+        { QStringLiteral("download"), download },
+        { QStringLiteral("createdAt"), QStringLiteral("2026-08-06T00:00:00Z") },
+        { QStringLiteral("updatedAt"), QStringLiteral("2026-08-06T00:00:00Z") },
+    };
+    QJsonObject root {
+        { QStringLiteral("schemaVersion"), 1 },
+        { QStringLiteral("generatedAt"), QStringLiteral("2026-08-06T02:00:00Z") },
+        { QStringLiteral("registry"), QStringLiteral("test/registry") },
+        { QStringLiteral("mascots"), QJsonArray { entryJson } },
+    };
+    QByteArray indexBytes = QJsonDocument(root).toJson(QJsonDocument::Compact);
+
+    MascotStoreCache cache(tempDir.absoluteFilePath(QStringLiteral("cache")));
+    MascotStoreNetwork network;
+    MascotStoreCoordinator coordinator(&cache, &network, storagePath,
+        downloadCache);
+    MascotStoreIndex parsed;
+    expect(parsed.parse(indexBytes), "coordinator fixture index should parse");
+    auto const* entry = parsed.findById(QStringLiteral("alpha"));
+    expect(entry != nullptr, "coordinator fixture entry should exist");
+
+    bool installed = false;
+    QString installedName;
+    QString installError;
+    QObject::connect(&coordinator, &MascotStoreCoordinator::entryFinished,
+        [&](QString, bool ok, QString name, QString, QString error) {
+            installed = ok;
+            installedName = name;
+            installError = error;
+        });
+    coordinator.downloadAndInstall(*entry);
+    expect(waitForSignal(&coordinator,
+        &MascotStoreCoordinator::entryFinished, 15000),
+        "coordinator install should complete");
+    expect(installed && installedName == QStringLiteral("Validate Me"),
+        qPrintable(QStringLiteral(
+            "coordinator should install the downloaded mascot; error=") +
+            installError));
+    expect(QFile::exists(QDir(storagePath).absoluteFilePath(
+        QStringLiteral("Validate Me.mascot"))),
+        "installed mascot should exist in the storage directory");
+
+    MascotStoreCache::CachedIndex cached { indexBytes, {}, {} };
+    cache.saveIndex(cached);
+    server.stop();
+    bool cachedLoaded = false;
+    bool fromCache = false;
+    QObject::connect(&coordinator, &MascotStoreCoordinator::indexStateChanged,
+        [&](MascotStoreCoordinator::IndexState state) {
+            cachedLoaded = state.loaded;
+            fromCache = state.fromCache;
+        });
+    coordinator.loadCachedIndex();
+    expect(cachedLoaded && fromCache,
+        "coordinator should load the cached index offline");
+}
 
 QByteArray httpResponse(int status, QByteArray const& body) {
     QByteArray reason = status == 200 ? QByteArray("OK")
@@ -1844,6 +2272,109 @@ void testGitHubDeviceFlowSendsNoScope() {
         "the device code request must not contain an OAuth scope");
 }
 
+void testGitHubDeviceFlowDeniedAndExpired() {
+    {
+        TestStoreServer server;
+        server.responder = [](QByteArray const& request) {
+            if (request.startsWith("POST /login/device/code")) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("device_code"), QStringLiteral("dev-1") },
+                    { QStringLiteral("user_code"), QStringLiteral("CODE-1") },
+                    { QStringLiteral("verification_uri"), QStringLiteral(
+                        "http://127.0.0.1:9/verify") },
+                    { QStringLiteral("interval"), 1 },
+                }).toJson(QJsonDocument::Compact));
+            }
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("error"), QStringLiteral("access_denied") },
+            }).toJson(QJsonDocument::Compact));
+        };
+        QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+        GitHubAuthManager manager(QStringLiteral("client-123"),
+            std::make_unique<InMemoryCredentialStore>(),
+            QUrl { base + QStringLiteral("/login/device/code") },
+            QUrl { base + QStringLiteral("/login/oauth/access_token") },
+            QUrl { base });
+        manager.setAutoOpenVerificationUrl(false);
+        bool signedOut = false;
+        QObject::connect(&manager, &GitHubAuthManager::signedOut,
+            [&]() { signedOut = true; });
+        manager.startDeviceFlow();
+        for (int i = 0; i < 60 && !signedOut; ++i) {
+            processEventsFor(100);
+        }
+        expect(signedOut &&
+            manager.state() == GitHubAuthManager::State::SignedOut,
+            "device flow should return to signed-out on access_denied");
+    }
+    {
+        TestStoreServer server;
+        server.responder = [](QByteArray const& request) {
+            if (request.startsWith("POST /login/device/code")) {
+                return httpResponse(200, QJsonDocument(QJsonObject {
+                    { QStringLiteral("device_code"), QStringLiteral("dev-2") },
+                    { QStringLiteral("user_code"), QStringLiteral("CODE-2") },
+                    { QStringLiteral("verification_uri"), QStringLiteral(
+                        "http://127.0.0.1:9/verify") },
+                    { QStringLiteral("interval"), 1 },
+                }).toJson(QJsonDocument::Compact));
+            }
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("error"), QStringLiteral("expired_token") },
+            }).toJson(QJsonDocument::Compact));
+        };
+        QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+        GitHubAuthManager manager(QStringLiteral("client-123"),
+            std::make_unique<InMemoryCredentialStore>(),
+            QUrl { base + QStringLiteral("/login/device/code") },
+            QUrl { base + QStringLiteral("/login/oauth/access_token") },
+            QUrl { base });
+        manager.setAutoOpenVerificationUrl(false);
+        QString errorCode;
+        QObject::connect(&manager, &GitHubAuthManager::errorOccurred,
+            [&](QString code, QString) { errorCode = code; });
+        manager.startDeviceFlow();
+        for (int i = 0; i < 60 && errorCode.isEmpty(); ++i) {
+            processEventsFor(100);
+        }
+        expect(errorCode == QStringLiteral("github.device_code_expired"),
+            "device flow should report an expired device code");
+    }
+}
+
+void testGitHubTokenRefreshFailureSignsOut() {
+    TestStoreServer server;
+    server.responder = [](QByteArray const& request) {
+        if (request.startsWith("GET /user")) {
+            return httpResponse(401, QByteArrayLiteral("{\"message\":\"Bad credentials\"}"));
+        }
+        if (request.startsWith("POST /login/oauth/access_token")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("error"), QStringLiteral("invalid_grant") },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(404, QByteArrayLiteral("{\"error\":\"not found\"}"));
+    };
+    auto store = std::make_unique<InMemoryCredentialStore>();
+    store->save(QStringLiteral("NeurolingsCE-GitHub"), QStringLiteral("oauth"),
+        QJsonDocument(QJsonObject {
+            { QStringLiteral("access_token"), QStringLiteral("old-token-123456") },
+            { QStringLiteral("refresh_token"), QStringLiteral("bad-refresh-123456") },
+        }).toJson(QJsonDocument::Compact));
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"), std::move(store),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    for (int i = 0; i < 60 &&
+        manager.state() == GitHubAuthManager::State::SignedIn; ++i)
+    {
+        processEventsFor(100);
+    }
+    expect(manager.state() == GitHubAuthManager::State::SignedOut,
+        "a failed token refresh should return to the signed-out state");
+}
+
 class FailingSaveCredentialStore : public InMemoryCredentialStore {
 public:
     bool failSave = false;
@@ -1860,6 +2391,40 @@ public:
         return InMemoryCredentialStore::save(service, account, secret, error);
     }
 };
+
+void testGitHubDeviceFlowDisabled() {
+    TestStoreServer server;
+    server.responder = [](QByteArray const& request) {
+        if (request.startsWith("POST /login/device/code")) {
+            return httpResponse(200, QJsonDocument(QJsonObject {
+                { QStringLiteral("device_code"), QStringLiteral("dev-disabled") },
+                { QStringLiteral("user_code"), QStringLiteral("CODE-9") },
+                { QStringLiteral("verification_uri"), QStringLiteral(
+                    "http://127.0.0.1:9/verify") },
+                { QStringLiteral("interval"), 1 },
+            }).toJson(QJsonDocument::Compact));
+        }
+        return httpResponse(200, QJsonDocument(QJsonObject {
+            { QStringLiteral("error"), QStringLiteral("device_flow_disabled") },
+        }).toJson(QJsonDocument::Compact));
+    };
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    GitHubAuthManager manager(QStringLiteral("client-123"),
+        std::make_unique<InMemoryCredentialStore>(),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager.setAutoOpenVerificationUrl(false);
+    QString errorCode;
+    QObject::connect(&manager, &GitHubAuthManager::errorOccurred,
+        [&](QString code, QString) { errorCode = code; });
+    manager.startDeviceFlow();
+    for (int i = 0; i < 60 && errorCode.isEmpty(); ++i) {
+        processEventsFor(100);
+    }
+    expect(errorCode == QStringLiteral("github.device_flow_disabled"),
+        "device_flow_disabled should surface a dedicated error code");
+}
 
 void testGitHubSlowDownUsesSuggestedInterval() {
     TestStoreServer server;
@@ -1973,6 +2538,81 @@ void testGitHubTokenRotationPersistFailure() {
         "a failed credential write must not delete the previous credentials");
 }
 
+void testGitHubLogoutRemovesAllCredentials() {
+    auto store = std::make_unique<InMemoryCredentialStore>();
+    InMemoryCredentialStore *rawStore = store.get();
+    rawStore->save(QStringLiteral("NeurolingsCE-GitHub"), QStringLiteral("oauth"),
+        QStringLiteral("payload-1"));
+    rawStore->save(QStringLiteral("NeurolingsCE-GitHub"), QStringLiteral("legacy"),
+        QStringLiteral("payload-2"));
+    rawStore->save(QStringLiteral("OtherService"), QStringLiteral("acct"),
+        QStringLiteral("keep-me"));
+    QString base = QStringLiteral("http://127.0.0.1:1");
+    GitHubAuthManager manager(QStringLiteral("client-123"), std::move(store),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager.setAutoOpenVerificationUrl(false);
+    manager.signOut();
+    expect(rawStore->load(QStringLiteral("NeurolingsCE-GitHub"),
+        QStringLiteral("oauth")) == CredentialStore::Status::Unavailable,
+        "logout should remove the oauth credential");
+    expect(rawStore->load(QStringLiteral("NeurolingsCE-GitHub"),
+        QStringLiteral("legacy")) == CredentialStore::Status::Unavailable,
+        "logout should remove every credential under the service");
+    expect(rawStore->load(QStringLiteral("OtherService"),
+        QStringLiteral("acct")) == CredentialStore::Status::Ok,
+        "logout should not remove unrelated services");
+}
+
+void testGitHubAuthManagerDestroyedDuringRequests() {
+    TestStoreServer server;
+    server.slowHang = true;
+    QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.port());
+    auto *manager = new GitHubAuthManager(QStringLiteral("client-123"),
+        std::make_unique<InMemoryCredentialStore>(),
+        QUrl { base + QStringLiteral("/login/device/code") },
+        QUrl { base + QStringLiteral("/login/oauth/access_token") },
+        QUrl { base });
+    manager->setAutoOpenVerificationUrl(false);
+    manager->startDeviceFlow();
+    processEventsFor(50);
+    delete manager;
+    processEventsFor(200);
+    expect(true,
+        "destroying the auth manager with an in-flight request must not crash");
+}
+
+void testCredentialStoreAndRedaction() {
+    InMemoryCredentialStore store;
+    QString secret = QStringLiteral("s3cr3t-token-123456");
+    expect(store.save(QStringLiteral("svc"), QStringLiteral("acct"), secret) ==
+        CredentialStore::Status::Ok,
+        "in-memory store should save credentials");
+    QString loaded;
+    expect(store.load(QStringLiteral("svc"), QStringLiteral("acct"), &loaded) ==
+        CredentialStore::Status::Ok && loaded == secret,
+        "in-memory store should round-trip credentials");
+    expect(store.load(QStringLiteral("svc"), QStringLiteral("other")) ==
+        CredentialStore::Status::Unavailable,
+        "in-memory store should not expose other accounts");
+    expect(store.remove(QStringLiteral("svc"), QStringLiteral("acct")) ==
+        CredentialStore::Status::Ok &&
+        store.load(QStringLiteral("svc"), QStringLiteral("acct"), &loaded) ==
+            CredentialStore::Status::Unavailable,
+        "in-memory store should remove credentials");
+
+    QString redacted = redactSensitiveText(
+        QStringLiteral("Authorization: Bearer gh_token_abcdef123456; "
+            "access_token=\"secret1234567890\""));
+    expect(!redacted.contains(QStringLiteral("gh_token_abcdef123456")) &&
+        !redacted.contains(QStringLiteral("secret1234567890")) &&
+        redacted.contains(QStringLiteral("[REDACTED]")),
+        "sensitive token values should be redacted");
+}
+
+}
+
 int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     testMascotPatchParsing();
@@ -1984,6 +2624,8 @@ int main(int argc, char **argv) {
     testMascotPackageNames();
     testLegacyArchiveAnalysisAndConversion();
     testImportArchiveSupportsLegacyTemplateDirectory();
+    testMascotPackageValidation();
+    testCliMascotValidateParsing();
     testPackageInspectionRejectsOversizedPngHeader();
     testPackageInspectionRejectsMalformedPng();
     testCommandDispatcher();
@@ -1995,10 +2637,21 @@ int main(int argc, char **argv) {
     testWindowPushBehaviorGate();
     testFallBoundaryPriorityOverActiveWindow();
     testMascotHoldGestureBoundaries();
+    testMascotStoreIndexParsing();
+    testMascotStoreCache();
+    testMascotStoreNetworkConditionalAndChecksum();
+    testMascotStoreNetworkCancelCleanup();
+    testMascotStoreCoordinatorInstallAndOffline();
     testGitHubDeviceFlowSuccess();
     testGitHubDeviceFlowSendsNoScope();
+    testGitHubDeviceFlowDeniedAndExpired();
+    testGitHubTokenRefreshFailureSignsOut();
+    testGitHubDeviceFlowDisabled();
     testGitHubSlowDownUsesSuggestedInterval();
     testGitHubTokenRotationPersistFailure();
+    testGitHubLogoutRemovesAllCredentials();
+    testGitHubAuthManagerDestroyedDuringRequests();
+    testCredentialStoreAndRedaction();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed" << std::endl;

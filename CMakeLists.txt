@@ -165,6 +165,13 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/cmake/libshimejifinder)
 option(SHIJIMA_WITH_DEFAULT_MASCOT "Embed DefaultMascot assets" ON)
 option(SHIJIMA_WITH_LICENSES_TEXT "Embed licenses text" ON)
 
+set(NEUROLINGSCE_MASCOT_INDEX_URL "" CACHE STRING
+    "Public Mascot store index URL (GitHub Pages index-v1.json)")
+set(NEUROLINGSCE_SUBMISSION_SERVICE_URL "" CACHE STRING
+    "Public submission service base URL")
+set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID "" CACHE STRING
+    "Public Login GitHub App client ID for Device Flow (separate from the Publisher App)")
+
 set(_shijima_generated_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(_shijima_licenses_header "${_shijima_generated_dir}/licenses_generated.hpp")
 
@@ -184,6 +191,15 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/assets/MascotPackage.cc
   src/app/core/assets/SafePath.cc
   src/app/core/assets/AssetLoader.cc
+  src/app/core/mascotstore/MascotStoreCache.cc
+  src/app/core/mascotstore/MascotStoreCoordinator.cc
+  src/app/core/mascotstore/MascotStoreIndex.cc
+  src/app/core/mascotstore/MascotStoreNetwork.cc
+  src/app/core/github/Secrets.cc
+  src/app/core/github/InMemoryCredentialStore.cc
+  src/app/core/github/CredentialStoreFactory.cc
+  src/app/core/github/GitHubAuthManager.cc
+  src/app/core/submission/MascotSubmissionClient.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/CodexActivity.cc
   src/app/core/codex/CodexConfigManager.cc
@@ -218,6 +234,9 @@ target_sources(NeurolingsCE PRIVATE
   src/app/ui/interface/ManagerHomePage.cc
   src/app/ui/interface/ManagerNavigation.cc
   src/app/ui/interface/ManagerSettingsPage.cc
+  src/app/ui/interface/ManagerStorePage.cc
+  src/app/ui/dialogs/submission/MascotSubmissionDialog.cc
+  src/app/ui/dialogs/store/MascotStoreDetailDialog.cc
   src/app/cli.cc
   src/app/cli/CommandLineParser.cc
   src/app/cli/CommandExecutor.cc
@@ -234,6 +253,12 @@ target_sources(NeurolingsCE PRIVATE
   include/shijima-qt/ui/dialogs/licenses/ShijimaLicensesDialog.hpp
   include/shijima-qt/ui/dialogs/inspector/ShimejiInspectorDialog.hpp
   src/app/core/update/GitHubUpdateManager.hpp
+  include/shijima-qt/MascotStoreCoordinator.hpp
+  include/shijima-qt/MascotStoreNetwork.hpp
+  include/shijima-qt/GitHubAuthManager.hpp
+  include/shijima-qt/MascotSubmissionClient.hpp
+  src/app/ui/dialogs/submission/MascotSubmissionDialog.hpp
+  src/app/ui/dialogs/store/MascotStoreDetailDialog.hpp
 
   include/shijima-qt/ui/widgets/SpeechBubbleWidget.hpp
   src/platform/Platform/Platform.hpp
@@ -323,13 +348,16 @@ endif()
 if(WIN32)
   target_sources(NeurolingsCE PRIVATE
     src/resources/resources.rc
+    src/platform/Platform/Windows/WindowsCredentialStore.cc
     src/platform/Platform/Windows/Platform.cc
     src/platform/Platform/Windows/ActiveWindowObserver.cc
     src/platform/Platform/Windows/PrivateActiveWindowObserver.cc
     src/platform/Platform/Windows/PrivateActiveWindowObserver.hpp
   )
+  target_link_libraries(NeurolingsCE PRIVATE advapi32)
 elseif(APPLE)
   target_sources(NeurolingsCE PRIVATE
+    src/platform/Platform/macOS/macOSCredentialStore.mm
     src/platform/Platform/macOS/Platform.mm
     src/platform/Platform/macOS/ActiveWindowObserver.cc
     src/platform/Platform/macOS/PrivateActiveWindowObserver.mm
@@ -344,7 +372,11 @@ elseif(APPLE)
   set(MACAPP_OUTPUT_DIR    "${CMAKE_CURRENT_BINARY_DIR}/macos")
   set(MACAPP_CLI_TARGET    NeurolingsCECli)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/MacApp.cmake)
+  target_link_libraries(NeurolingsCE PRIVATE "-framework Security")
 elseif(UNIX)
+  target_sources(NeurolingsCE PRIVATE
+    src/platform/Platform/Linux/LinuxCredentialStore.cc
+  )
   set(LINUX_TARGET NeurolingsCE)
   set(LINUX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
   set(LINUX_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -379,6 +411,9 @@ target_compile_definitions(NeurolingsCE PRIVATE
   NEUROLINGSCE_VERSION="${PROJECT_VERSION}"
   APP_NAME="NeurolingsCE"
   APP_DISPLAY_NAME="NeurolingsCE[Shijima-Qt Edition]"
+  NEUROLINGSCE_MASCOT_INDEX_URL="${NEUROLINGSCE_MASCOT_INDEX_URL}"
+  NEUROLINGSCE_SUBMISSION_SERVICE_URL="${NEUROLINGSCE_SUBMISSION_SERVICE_URL}"
+  NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID="${NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID}"
   $<$<BOOL:${SHIJIMA_USE_QTMULTIMEDIA}>:SHIJIMA_USE_QTMULTIMEDIA=1>
   $<$<NOT:$<BOOL:${SHIJIMA_USE_QTMULTIMEDIA}>>:SHIJIMA_USE_QTMULTIMEDIA=0>
 )
@@ -447,6 +482,16 @@ add_executable(NeurolingsCETests
   src/app/core/AppLog.cc
   src/app/core/assets/MascotPackage.cc
   src/app/core/assets/SafePath.cc
+  src/app/core/mascotstore/MascotStoreCache.cc
+  src/app/core/mascotstore/MascotStoreCoordinator.cc
+  src/app/core/mascotstore/MascotStoreIndex.cc
+  src/app/core/mascotstore/MascotStoreNetwork.cc
+  src/app/core/github/Secrets.cc
+  src/app/core/github/InMemoryCredentialStore.cc
+  src/app/core/github/GitHubAuthManager.cc
+  include/shijima-qt/MascotStoreCoordinator.hpp
+  include/shijima-qt/MascotStoreNetwork.hpp
+  include/shijima-qt/GitHubAuthManager.hpp
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/CodexActivity.cc
   src/app/core/codex/CodexConfigManager.cc
@@ -464,7 +509,9 @@ target_compile_definitions(NeurolingsCETests PRIVATE
 )
 target_link_libraries(NeurolingsCETests PRIVATE
   Qt6::Core
+  Qt6::Concurrent
   Qt6::Gui
+  Qt6::Network
   NeurolingsShijimaEngine
   shimejifinder
 )

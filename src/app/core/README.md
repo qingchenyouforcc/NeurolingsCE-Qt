@@ -10,8 +10,11 @@ core 是应用层的跨 UI、runtime、CLI 共享服务。它不负责主窗口�
 | audio | 可选 Qt Multimedia 声音播放；无该组件时提供兼容 no-op。 |
 | codex | 管理 Codex notify 配置块、备份和恢复。 |
 | commands | JSON API 类型、Codex 活动解析、命令分发和 Manager 业务服务。 |
+| github | GitHub App Device Flow 登录与平台安全凭据存储。 |
 | http | 基于 cpp-httplib 的 HTTP API 线程服务。 |
 | localipc | 本机 QLocalSocket JSONL 服务端和客户端。 |
+| mascotstore | Mascot 商店索引/缓存/网络/下载/安装协调核心。 |
+| submission | 投稿上传客户端（multipart、取消、结构化错误）。 |
 | shijima-engine | 内置的 XML/JS 驱动 mascot 模拟引擎。 |
 | update | GitHub release 更新检查、下载和安装准备。 |
 

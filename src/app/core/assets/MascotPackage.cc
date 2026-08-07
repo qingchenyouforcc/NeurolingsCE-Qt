@@ -48,10 +48,68 @@
 #include <shimejifinder/extractor.hpp>
 #include <shimejifinder/libunarr/archive.hpp>
 #include <shimejifinder/memory_extractor.hpp>
+#include <unarr/unarr.h>
 
 namespace {
 
 constexpr qsizetype kPortablePackageBaseNameMaxUtf8Bytes = 200;
+
+struct RawArchiveEntryInfo {
+    QString name;
+    bool isDirectory = false;
+    std::uint64_t uncompressedSize = 0;
+};
+
+bool readRawArchiveEntries(QString const& packagePath,
+    QList<RawArchiveEntryInfo> &entries, QString &errorMessage)
+{
+    entries.clear();
+    ar_stream *stream = ar_open_file(packagePath.toStdString().c_str());
+    if (stream == nullptr) {
+        errorMessage = QStringLiteral("Could not open package for inspection");
+        return false;
+    }
+    ar_archive *archive = ar_open_zip_archive(stream, false);
+    if (archive == nullptr) {
+        ar_close(stream);
+        errorMessage = QStringLiteral("Package is not a valid ZIP archive");
+        return false;
+    }
+    bool ok = true;
+    while (ar_parse_entry(archive)) {
+        if (entries.size() >= SecurityLimits::kMascotZipEntryMaxCount) {
+            errorMessage = QStringLiteral(
+                "Archive contains too many entries (%1, maximum %2)")
+                .arg(SecurityLimits::kMascotZipEntryMaxCount + 1)
+                .arg(SecurityLimits::kMascotZipEntryMaxCount);
+            ok = false;
+            break;
+        }
+        char const *name = ar_entry_get_name(archive);
+        if (name == nullptr) {
+            name = ar_entry_get_raw_name(archive);
+        }
+        if (name == nullptr) {
+            errorMessage = QStringLiteral(
+                "Archive contains an entry without a name");
+            ok = false;
+            break;
+        }
+        RawArchiveEntryInfo info;
+        info.name = QString::fromUtf8(name);
+        info.isDirectory = info.name.endsWith(QLatin1Char('/')) ||
+            info.name.endsWith(QLatin1Char('\\'));
+        info.uncompressedSize =
+            static_cast<std::uint64_t>(ar_entry_get_size(archive));
+        entries.append(info);
+    }
+    ar_close_archive(archive);
+    ar_close(stream);
+    if (!ok) {
+        return false;
+    }
+    return true;
+}
 
 class ExactPathExtractor : public shimejifinder::extractor {
 public:
@@ -207,6 +265,110 @@ bool isSupportedPackagePath(QString const& path) {
         lower.startsWith(QStringLiteral("sound/"));
 }
 
+bool isForbiddenPayloadPath(QString const& lowerPath)
+{
+    static const QStringList forbiddenExtensions = {
+        QStringLiteral(".exe"), QStringLiteral(".dll"), QStringLiteral(".com"),
+        QStringLiteral(".bat"), QStringLiteral(".cmd"), QStringLiteral(".ps1"),
+        QStringLiteral(".sh"), QStringLiteral(".js"), QStringLiteral(".vbs"),
+        QStringLiteral(".lnk"), QStringLiteral(".scr"), QStringLiteral(".pif"),
+        QStringLiteral(".msi"), QStringLiteral(".msp"), QStringLiteral(".hta"),
+        QStringLiteral(".jar"),
+    };
+    static const QStringList nestedArchiveExtensions = {
+        QStringLiteral(".zip"), QStringLiteral(".mascot"), QStringLiteral(".rar"),
+        QStringLiteral(".7z"), QStringLiteral(".tar"), QStringLiteral(".gz"),
+        QStringLiteral(".bz2"), QStringLiteral(".xz"), QStringLiteral(".tgz"),
+        QStringLiteral(".cab"), QStringLiteral(".iso"), QStringLiteral(".apk"),
+        QStringLiteral(".war"), QStringLiteral(".ear"),
+    };
+    for (auto const& extension : forbiddenExtensions) {
+        if (lowerPath.endsWith(extension)) {
+            return true;
+        }
+    }
+    for (auto const& extension : nestedArchiveExtensions) {
+        if (lowerPath.endsWith(extension)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isAllowedPackageEntryPath(QString const& rawPath,
+    QString &normalizedOut, bool *isDirectoryOut)
+{
+    bool isDirectory = rawPath.endsWith(QLatin1Char('/')) ||
+        rawPath.endsWith(QLatin1Char('\\'));
+    if (isDirectoryOut != nullptr) {
+        *isDirectoryOut = isDirectory;
+    }
+    QString normalized = normalizedArchivePath(rawPath);
+    if (normalized.isEmpty()) {
+        return false;
+    }
+    normalizedOut = normalized;
+    if (isDirectory) {
+        return true;
+    }
+    QString lower = normalized.toLower();
+    if (!isSupportedPackagePath(normalized)) {
+        return false;
+    }
+    if (lower.startsWith(QStringLiteral("sound/"))) {
+        return lower.endsWith(QStringLiteral(".wav")) ||
+            lower.endsWith(QStringLiteral(".mp3")) ||
+            lower.endsWith(QStringLiteral(".ogg")) ||
+            lower.endsWith(QStringLiteral(".flac")) ||
+            lower.endsWith(QStringLiteral(".m4a")) ||
+            lower.endsWith(QStringLiteral(".aac")) ||
+            lower.endsWith(QStringLiteral(".opus"));
+    }
+    return true;
+}
+
+QString sanitizeEntryNameForReport(QString name)
+{
+    for (qsizetype i = 0; i < name.size(); ++i) {
+        if (name[i].unicode() < 32 || name[i].unicode() == 0x7f) {
+            name[i] = QLatin1Char('_');
+        }
+    }
+    if (name.toUtf8().size() > 200) {
+        name = QString::fromUtf8(name.toUtf8().left(197)) +
+            QStringLiteral("...");
+    }
+    return name;
+}
+
+bool pngHeaderDimensions(QByteArray const& header, std::uint64_t *widthOut,
+    std::uint64_t *heightOut)
+{
+    static constexpr unsigned char kPngSignature[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+    };
+    if (header.size() < 24 ||
+        std::memcmp(header.constData(), kPngSignature, sizeof(kPngSignature)) != 0 ||
+        header.mid(12, 4) != QByteArrayLiteral("IHDR"))
+    {
+        return false;
+    }
+    auto readBigEndian32 = [](char const *data) -> std::uint32_t {
+        auto bytes = reinterpret_cast<unsigned char const *>(data);
+        return (static_cast<std::uint32_t>(bytes[0]) << 24) |
+            (static_cast<std::uint32_t>(bytes[1]) << 16) |
+            (static_cast<std::uint32_t>(bytes[2]) << 8) |
+            static_cast<std::uint32_t>(bytes[3]);
+    };
+    if (widthOut != nullptr) {
+        *widthOut = readBigEndian32(header.constData() + 16);
+    }
+    if (heightOut != nullptr) {
+        *heightOut = readBigEndian32(header.constData() + 20);
+    }
+    return true;
+}
+
 bool ensureFileSizeAtMost(QFileInfo const& fileInfo, std::uint64_t maxBytes,
     QString const& label, QString &errorMessage)
 {
@@ -357,7 +519,9 @@ bool validatePackageImageEntry(QString const& packagePath, QString const& entryP
     return validatePngDimensions(entryPath, header, errorMessage);
 }
 
-bool validateExtractedDirectory(QString const& rootPath, QString &errorMessage)
+bool validateExtractedDirectory(QString const& rootPath, QString &errorMessage,
+    std::size_t *outFileCount = nullptr,
+    std::uint64_t *outTotalBytes = nullptr)
 {
     QDir root(rootPath);
     if (!root.exists()) {
@@ -416,11 +580,18 @@ bool validateExtractedDirectory(QString const& rootPath, QString &errorMessage)
             return false;
         }
     }
+    if (outFileCount != nullptr) {
+        *outFileCount = fileCount;
+    }
+    if (outTotalBytes != nullptr) {
+        *outTotalBytes = totalBytes;
+    }
     return true;
 }
 
 bool extractArchiveSafely(shimejifinder::archive &archive, QString const& outputPath,
-    QString &errorMessage)
+    QString &errorMessage, std::size_t *outFileCount = nullptr,
+    std::uint64_t *outTotalBytes = nullptr)
 {
     QDir outputDir(outputPath);
     if (outputDir.exists()) {
@@ -437,7 +608,8 @@ bool extractArchiveSafely(shimejifinder::archive &archive, QString const& output
         return false;
     }
 
-    return validateExtractedDirectory(outputPath, errorMessage);
+    return validateExtractedDirectory(outputPath, errorMessage,
+        outFileCount, outTotalBytes);
 }
 
 bool openPackage(QString const& packagePath, shimejifinder::libunarr::archive &archive,
@@ -1235,6 +1407,213 @@ bool inspectPackage(QString const& packagePath, MascotMetadata &metadata,
             << errorMessage.toStdString();
     }
     return ok;
+}
+
+bool validatePackage(QString const& packagePath, MascotPackageReport &report)
+{
+    report = MascotPackageReport {};
+    QFileInfo packageInfo(packagePath);
+    if (!packageInfo.exists() || !packageInfo.isFile()) {
+        report.errors.append(QStringLiteral("Mascot package does not exist"));
+        return false;
+    }
+    QString errorMessage;
+    if (!ensurePackageFileAcceptable(packagePath, errorMessage)) {
+        report.errors.append(errorMessage);
+        return false;
+    }
+
+    QList<RawArchiveEntryInfo> rawEntries;
+    if (!readRawArchiveEntries(packagePath, rawEntries, errorMessage)) {
+        report.errors.append(errorMessage);
+        return false;
+    }
+    report.entryCount = static_cast<qsizetype>(rawEntries.size());
+
+    bool hasInfo = false;
+    bool hasActions = false;
+    bool hasBehaviors = false;
+    bool hasImage = false;
+    QStringList imagePaths;
+    std::uint64_t totalImagePixels = 0;
+    std::uint64_t totalUncompressedBytes = 0;
+    qsizetype fileCount = 0;
+
+    for (auto const& rawEntry : rawEntries) {
+        QString rawPath = rawEntry.name;
+        QString normalized = normalizedArchivePath(rawPath);
+        if (normalized.isEmpty()) {
+            report.errors.append(QStringLiteral(
+                "Unsupported or unsafe package entry: %1")
+                .arg(sanitizeEntryNameForReport(rawPath)));
+            continue;
+        }
+        bool isDirectory = rawPath.endsWith(QLatin1Char('/')) ||
+            rawPath.endsWith(QLatin1Char('\\'));
+        if (isDirectory) {
+            continue;
+        }
+        ++fileCount;
+        if (rawEntry.uncompressedSize >
+                SecurityLimits::kMascotExtractedMaxBytes - totalUncompressedBytes)
+        {
+            report.errors.append(QStringLiteral(
+                "Package extracted data is too large"));
+            break;
+        }
+        totalUncompressedBytes += rawEntry.uncompressedSize;
+        std::uint64_t maxEntryBytes = maxSizeForPackagePath(normalized);
+        if (rawEntry.uncompressedSize > maxEntryBytes) {
+            report.errors.append(QStringLiteral(
+                "Package entry %1 exceeds size limits")
+                .arg(sanitizeEntryNameForReport(normalized)));
+        }
+        QString lower = normalized.toLower();
+        if (isForbiddenPayloadPath(lower)) {
+            report.errors.append(QStringLiteral(
+                "Package contains a forbidden payload entry: %1")
+                .arg(sanitizeEntryNameForReport(normalized)));
+            continue;
+        }
+        if (!isSupportedPackagePath(normalized) ||
+            (lower.startsWith(QStringLiteral("sound/")) &&
+                !isAllowedPackageEntryPath(rawPath, normalized, nullptr)))
+        {
+            report.errors.append(QStringLiteral(
+                "Unsupported or unsafe package entry: %1")
+                .arg(sanitizeEntryNameForReport(normalized)));
+            continue;
+        }
+        hasInfo = hasInfo || lower == QStringLiteral("info.json");
+        hasActions = hasActions || lower == QStringLiteral("actions.xml");
+        hasBehaviors = hasBehaviors || lower == QStringLiteral("behaviors.xml");
+        bool isImage = lower.startsWith(QStringLiteral("img/")) &&
+            lower.endsWith(QStringLiteral(".png"));
+        hasImage = hasImage || isImage;
+        if (isImage) {
+            imagePaths.append(normalized);
+        }
+    }
+    report.fileCount = fileCount;
+    report.extractedBytes = totalUncompressedBytes;
+
+    if (!hasInfo) {
+        report.errors.append(QStringLiteral("Package must contain info.json"));
+    }
+    if (!hasActions) {
+        report.errors.append(QStringLiteral("Package must contain actions.xml"));
+    }
+    if (!hasBehaviors) {
+        report.errors.append(QStringLiteral("Package must contain behaviors.xml"));
+    }
+    if (!hasImage) {
+        report.errors.append(QStringLiteral("Package must contain img/*.png"));
+    }
+
+    if (hasInfo) {
+        QByteArray infoJson = readPackageFile(packagePath,
+            QStringLiteral("info.json"), errorMessage);
+        if (infoJson.isEmpty()) {
+            report.errors.append(errorMessage);
+        }
+        else {
+            try {
+                report.metadata = metadataFromJson(infoJson);
+            }
+            catch (std::exception const& ex) {
+                report.errors.append(QString::fromUtf8(ex.what()));
+            }
+            catch (...) {
+                report.errors.append(QStringLiteral("Invalid info.json"));
+            }
+        }
+    }
+
+    for (auto const& imagePath : imagePaths) {
+        QByteArray header = readPackageFile(packagePath, imagePath, errorMessage);
+        if (header.isEmpty()) {
+            report.errors.append(errorMessage);
+            continue;
+        }
+        std::uint64_t width = 0;
+        std::uint64_t height = 0;
+        if (!pngHeaderDimensions(header.left(24), &width, &height) ||
+            width == 0 || height == 0)
+        {
+            report.errors.append(QStringLiteral(
+                "Image %1 is not a valid PNG").arg(imagePath));
+            continue;
+        }
+        if (width > SecurityLimits::kMascotImageMaxPixels / height) {
+            report.errors.append(QStringLiteral(
+                "Image %1 exceeds the maximum pixel count of %2")
+                .arg(imagePath)
+                .arg(SecurityLimits::kMascotImageMaxPixels));
+            continue;
+        }
+        std::uint64_t pixels = width * height;
+        if (pixels > SecurityLimits::kMascotImageMaxPixels) {
+            report.errors.append(QStringLiteral(
+                "Image %1 exceeds the maximum pixel count of %2")
+                .arg(imagePath)
+                .arg(SecurityLimits::kMascotImageMaxPixels));
+            continue;
+        }
+        totalImagePixels += pixels;
+        if (totalImagePixels > SecurityLimits::kMascotImageTotalMaxPixels) {
+            report.errors.append(QStringLiteral(
+                "Package image data exceeds the total pixel budget of %1")
+                .arg(SecurityLimits::kMascotImageTotalMaxPixels));
+            break;
+        }
+    }
+
+    if (report.errors.isEmpty()) {
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            report.errors.append(QStringLiteral(
+                "Could not create temporary extraction directory"));
+        }
+        else {
+            shimejifinder::libunarr::archive extractionArchive;
+            if (!openPackage(packagePath, extractionArchive, errorMessage)) {
+                report.errors.append(errorMessage);
+            }
+            {
+                bool added = false;
+                for (size_t i = 0; i < extractionArchive.size(); ++i) {
+                    auto entry = extractionArchive.at(i);
+                    QString path = normalizedArchivePath(
+                        QString::fromStdString(entry->path()));
+                    if (path.isEmpty() || !isSupportedPackagePath(path)) {
+                        continue;
+                    }
+                    entry->add_target(shimejifinder::extract_target(
+                        path.toStdString()));
+                    added = true;
+                }
+                if (!added) {
+                    report.errors.append(QStringLiteral(
+                        "Package does not contain any supported files"));
+                }
+                else if (!extractArchiveSafely(extractionArchive,
+                        tempDir.path(), errorMessage))
+                {
+                    report.errors.append(errorMessage);
+                }
+            }
+        }
+    }
+
+    report.ok = report.errors.isEmpty();
+    APP_LOG_INFO("package") << "Validated mascot package path=\""
+        << packageInfo.absoluteFilePath().toStdString()
+        << "\" ok=" << (report.ok ? "1" : "0")
+        << " entries=" << report.entryCount
+        << " files=" << report.fileCount
+        << " extracted_bytes=" << report.extractedBytes
+        << " errors=" << report.errors.size();
+    return report.ok;
 }
 
 bool extractPackage(QString const& packagePath, QString const& outputPath,
