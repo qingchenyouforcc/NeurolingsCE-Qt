@@ -483,7 +483,7 @@ void GitHubAuthManager::signOut() {
     m_userInfo = UserInfo {};
     m_deviceCode.clear();
     m_userCode.clear();
-    m_verificationUrl = {};
+    m_verificationUrl.clear();
     if (m_credentialStore != nullptr) {
         QString error;
         m_credentialStore->removeAll(kServiceName, &error);
