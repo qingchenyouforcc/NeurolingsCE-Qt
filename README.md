@@ -133,9 +133,16 @@ git submodule update --init --recursive
 
 ### Windows（MSVC + CMake）
 
+Windows 上 Ninja + MSVC 请使用仓库提供的构建入口，保证 configure 与 build 在同一控制台代码页下执行。CMake 在 configure 时按控制台输出代码页生成 `msvc_deps_prefix`，Ninja 按字节匹配 cl 的 `/showIncludes` 输出；若两者代码页不一致（例如从 UTF-8 的 PowerShell 会话运行），依赖前缀会变成乱码，Ninja 不再记录头文件依赖，导致改动头文件后陈旧对象不会重新编译。
+
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQt6_DIR=D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6
-cmake --build build
+src\tools\build-windows-ninja.cmd build Release   # Debug / RelWithDebInfo 同样可用
+```
+
+脚本会固定控制台代码页（中文 Windows 为 936）、加载 MSVC 环境、用 Ninja 配置并构建。可通过环境变量 `NEUROLINGSCE_BUILD_CODEPAGE` 覆盖代码页（例如其他语言环境）。等价的原始命令必须在同一个 `cmd` 会话中运行：
+
+```bash
+cmd /c "chcp 936 >nul && cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQt6_DIR=D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6 && cmake --build build --parallel"
 ```
 
 也可以直接用 Visual Studio 打开项目，在 `CMakeSettings.json` 中已配置好 `x64-Debug` 和 `x64-Release` 两个方案。

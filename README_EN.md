@@ -132,9 +132,25 @@ git submodule update --init --recursive
 
 ### Windows (MSVC + CMake)
 
+For Ninja + MSVC on Windows, use the repository build entry so that configure
+and build run under the same console code page. CMake derives
+`msvc_deps_prefix` from the console output code page at configure time and
+Ninja matches cl's `/showIncludes` output byte-wise; a code-page mismatch (for
+example a UTF-8 PowerShell session) writes a mojibake prefix, Ninja records no
+header dependencies, and stale objects are not rebuilt after header changes.
+
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQt6_DIR=D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6
-cmake --build build
+src\tools\build-windows-ninja.cmd build Release   # Debug / RelWithDebInfo work too
+```
+
+The script pins the console code page (936 on zh-CN systems), loads the MSVC
+environment, configures with Ninja, and builds. Set
+`NEUROLINGSCE_BUILD_CODEPAGE` to override the code page (for example a
+non-zh-CN locale). The equivalent raw commands must run in the same `cmd`
+session:
+
+```bash
+cmd /c "chcp 936 >nul && cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQt6_DIR=D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6 && cmake --build build --parallel"
 ```
 
 You can also open the project directly in Visual Studio — `CMakeSettings.json` includes pre-configured `x64-Debug` and `x64-Release` profiles.
