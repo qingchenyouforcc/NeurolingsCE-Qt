@@ -1,7 +1,7 @@
 id ICON "../packaging/neurolingsce.ico"
 1 VERSIONINFO
-FILEVERSION     0,5,1,0
-PRODUCTVERSION  0,5,1,0
+FILEVERSION     0,5,2,0
+PRODUCTVERSION  0,5,2,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -9,12 +9,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "qingchenyou"
       VALUE "FileDescription", "NeurolingsCE"
-      VALUE "FileVersion", "0.5.1"
+      VALUE "FileVersion", "0.5.2"
       VALUE "InternalName", "NeurolingsCE"
       VALUE "LegalCopyright", "Copyright (c) - qingchenyou"
       VALUE "OriginalFilename", "NeurolingsCE.exe"
       VALUE "ProductName", "NeurolingsCE"
-      VALUE "ProductVersion", "0.5.1"
+      VALUE "ProductVersion", "0.5.2"
     END
   END
   BLOCK "VarFileInfo"
