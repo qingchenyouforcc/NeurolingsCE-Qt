@@ -216,7 +216,10 @@ void MascotStoreCoordinator::onIndexFetched(MascotStoreIndexResponse response) {
 }
 
 void MascotStoreCoordinator::downloadAndInstall(MascotStoreEntry const& entry) {
-    if (isDownloading(entry.id)) {
+    // MascotStoreNetwork owns one package transfer at a time. Refuse a second
+    // request instead of letting it cancel the first transfer and misattribute
+    // the resulting finished signal to the newly selected entry.
+    if (hasActiveOperation()) {
         return;
     }
     if (!entry.download.url.isValid() ||
@@ -245,14 +248,34 @@ void MascotStoreCoordinator::downloadAndInstall(MascotStoreEntry const& entry) {
 
 void MascotStoreCoordinator::cancelDownload(QString const& mascotId) {
     if (mascotId == m_activeDownloadId) {
-        m_network->cancelAll();
-        m_activeDownloadId.clear();
-        m_activeDownloadPath.clear();
+        // MascotStoreNetwork emits the canceled completion synchronously after
+        // it has invalidated the reply. Keep the active id until that callback
+        // runs so the coordinator reports the correct entry.
+        m_network->cancelDownload();
+        if (m_activeDownloadId == mascotId) {
+            // A transient failure may be waiting in the retry backoff with no
+            // network reply left to cancel. Clear that operation explicitly
+            // and invalidate its queued retry callback.
+            m_activeDownloadId.clear();
+            m_activeDownloadPath.clear();
+            m_retryCount = 0;
+            emit entryFinished(mascotId, false, {},
+                QStringLiteral("mascotstore.download.canceled"),
+                QStringLiteral("The download was canceled"));
+        }
     }
 }
 
 bool MascotStoreCoordinator::isDownloading(QString const& mascotId) const {
     return mascotId == m_activeDownloadId;
+}
+
+bool MascotStoreCoordinator::isInstalling(QString const& mascotId) const {
+    return mascotId == m_activeInstallId;
+}
+
+bool MascotStoreCoordinator::hasActiveOperation() const {
+    return !m_activeDownloadId.isEmpty() || !m_activeInstallId.isEmpty();
 }
 
 void MascotStoreCoordinator::onDownloadProgress(QString destinationPath,
@@ -268,8 +291,6 @@ void MascotStoreCoordinator::onDownloadFinished(QString destinationPath,
     bool ok, QString errorCode, QString error)
 {
     QString mascotId = m_activeDownloadId;
-    m_activeDownloadId.clear();
-    m_activeDownloadPath.clear();
     if (mascotId.isEmpty()) {
         mascotId = cacheKeyFor(destinationPath);
     }
@@ -280,6 +301,12 @@ void MascotStoreCoordinator::onDownloadFinished(QString destinationPath,
             ++m_retryCount;
             QTimer::singleShot(1500, this,
                 [this, mascotId, errorCode, error]() {
+                // Keep the active id while waiting so the UI cannot start a
+                // second package operation during the retry backoff. A
+                // cancellation clears the id and invalidates this callback.
+                if (m_activeDownloadId != mascotId) {
+                    return;
+                }
                 MascotStoreIndex index;
                 // Retry from the last known good index entry.
                 MascotStoreCache::CachedIndex cached;
@@ -288,21 +315,32 @@ void MascotStoreCoordinator::onDownloadFinished(QString destinationPath,
                     index.parse(cached.body, &parseError))
                 {
                     if (auto const* entry = index.findById(mascotId)) {
+                        m_activeDownloadId.clear();
+                        m_activeDownloadPath.clear();
                         downloadAndInstall(*entry);
                         return;
                     }
                 }
+                m_activeDownloadId.clear();
+                m_activeDownloadPath.clear();
                 emit entryFinished(mascotId, false, {}, errorCode, error);
             });
             return;
         }
+        m_activeDownloadId.clear();
+        m_activeDownloadPath.clear();
         emit entryFinished(mascotId, false, {}, errorCode, error);
         return;
     }
 
+    m_activeDownloadId.clear();
+    m_activeDownloadPath.clear();
+
     // Install off the GUI thread; storage writes must not block the UI.
     QString packagePath = destinationPath;
     QString storagePath = m_mascotStoragePath;
+    m_activeInstallId = mascotId;
+    emit entryInstallStarted(mascotId);
     auto future = QtConcurrent::run([packagePath, storagePath]() {
         QString installedName;
         QString error;
@@ -325,6 +363,9 @@ void MascotStoreCoordinator::onDownloadFinished(QString destinationPath,
 void MascotStoreCoordinator::onInstallFinished(QString mascotId, bool ok,
     QString installedName, QString errorCode, QString error)
 {
+    if (mascotId == m_activeInstallId) {
+        m_activeInstallId.clear();
+    }
     if (ok) {
         APP_LOG_INFO("mascotstore") << "Installed mascot id=\""
             << mascotId.toStdString() << "\" name=\""

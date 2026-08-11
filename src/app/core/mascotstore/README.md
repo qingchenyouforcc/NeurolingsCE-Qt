@@ -9,8 +9,8 @@
 | --- | --- |
 | MascotStoreIndex.cc/.hpp | 解析 `index-v1.json`（`schemaVersion == 1`）、按 id 确定性排序、搜索/标签过滤、SemVer 比较。 |
 | MascotStoreCache.cc/.hpp | 索引缓存原子写（`QSaveFile`）、ETag/Last-Modified 元数据、损坏时保留上一份好缓存。 |
-| MascotStoreNetwork.cc/.hpp | `QNetworkAccessManager` 条件请求（304）、超时、流式下载、SHA-256 校验（QtConcurrent 线程）、取消与临时文件清理。 |
-| MascotStoreCoordinator.cc/.hpp | 刷新/离线回退/重试/下载安装编排；安装调用 `MascotPackage::installPackage` 并在线程池执行。 |
+| MascotStoreNetwork.cc/.hpp | `QNetworkAccessManager` 条件请求（304）、带请求身份的超时、流式下载、SHA-256 校验（QtConcurrent 线程）、独立取消与临时文件清理；包下载不会中断索引刷新。 |
+| MascotStoreCoordinator.cc/.hpp | 刷新/离线回退/重试/下载安装编排；串行化单个下载/安装操作并发出安装开始、进度和完成状态；安装调用 `MascotPackage::installPackage` 并在线程池执行。 |
 
 ## 安全与线程约束
 

@@ -2103,6 +2103,10 @@ void testMascotStoreCoordinatorInstallAndOffline() {
     expect(QFile::exists(QDir(storagePath).absoluteFilePath(
         QStringLiteral("Validate Me.mascot"))),
         "installed mascot should exist in the storage directory");
+    expect(!coordinator.hasActiveOperation() &&
+        !coordinator.isDownloading(QStringLiteral("alpha")) &&
+        !coordinator.isInstalling(QStringLiteral("alpha")),
+        "coordinator should clear download and install state after completion");
 
     MascotStoreCache::CachedIndex cached { indexBytes, {}, {} };
     cache.saveIndex(cached);

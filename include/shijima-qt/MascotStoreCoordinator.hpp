@@ -52,10 +52,13 @@ public:
     void downloadAndInstall(MascotStoreEntry const& entry);
     void cancelDownload(QString const& mascotId);
     bool isDownloading(QString const& mascotId) const;
+    bool isInstalling(QString const& mascotId) const;
+    bool hasActiveOperation() const;
 
 signals:
     void indexStateChanged(MascotStoreCoordinator::IndexState state);
     void entryProgress(QString mascotId, qint64 received, qint64 total);
+    void entryInstallStarted(QString mascotId);
     void entryFinished(QString mascotId, bool ok, QString installedName,
         QString errorCode, QString error);
 
@@ -78,5 +81,6 @@ private:
     QString m_downloadCachePath;
     QString m_activeDownloadId;
     QString m_activeDownloadPath;
+    QString m_activeInstallId;
     int m_retryCount = 0;
 };

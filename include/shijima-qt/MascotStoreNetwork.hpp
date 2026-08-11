@@ -51,6 +51,9 @@ public:
     // thread). A previous destination file is replaced only on success.
     void download(QUrl const& url, QString const& destinationPath,
         QString const& expectedSha256, int timeoutMs = 60000);
+    // Cancel only the active package download. An index refresh can continue
+    // independently; cancelAll() is reserved for teardown.
+    void cancelDownload();
     void cancelAll();
 
 signals:
@@ -66,6 +69,8 @@ private slots:
 
 private:
     QString describeReplyFailure(QNetworkReply *reply) const;
+    void cancelIndex();
+    void abortDownload(bool notify, QString errorCode = {}, QString error = {});
 
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_indexReply = nullptr;
@@ -76,4 +81,5 @@ private:
     QString m_expectedSha256;
     qint64 m_downloadReceived = 0;
     qint64 m_downloadTotal = 0;
+    quint64 m_downloadGeneration = 0;
 };

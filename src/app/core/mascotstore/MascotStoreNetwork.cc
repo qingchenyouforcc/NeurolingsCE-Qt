@@ -73,11 +73,7 @@ MascotStoreNetwork::~MascotStoreNetwork() {
 void MascotStoreNetwork::fetchIndex(QUrl const& url, QString const& etag,
     QString const& lastModified, int timeoutMs)
 {
-    if (m_indexReply != nullptr) {
-        m_indexReply->abort();
-        m_indexReply->deleteLater();
-        m_indexReply = nullptr;
-    }
+    cancelIndex();
     if (!url.isValid() || (url.scheme() != QStringLiteral("https") &&
         url.scheme() != QStringLiteral("http")))
     {
@@ -89,20 +85,24 @@ void MascotStoreNetwork::fetchIndex(QUrl const& url, QString const& etag,
     }
     APP_LOG_INFO("mascotstore") << "Fetching mascot index url=\""
         << url.toDisplayString().toStdString() << "\"";
-    m_indexReply = m_network->get(makeRequest(url, etag, lastModified));
-    connect(m_indexReply, &QNetworkReply::finished,
+    QNetworkReply *reply = m_network->get(makeRequest(url, etag, lastModified));
+    m_indexReply = reply;
+    connect(reply, &QNetworkReply::finished,
         this, &MascotStoreNetwork::onIndexFinished);
-    QTimer::singleShot(timeoutMs, this, [this]() {
-        if (m_indexReply != nullptr) {
+    QTimer::singleShot(timeoutMs, this, [this, reply]() {
+        if (m_indexReply == reply) {
             APP_LOG_WARN("mascotstore") << "Index fetch timed out";
-            m_indexReply->abort();
+            reply->abort();
         }
     });
 }
 
 void MascotStoreNetwork::onIndexFinished() {
-    QNetworkReply *reply = m_indexReply;
-    if (reply == nullptr) {
+    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender());
+    if (reply == nullptr || reply != m_indexReply) {
+        if (reply != nullptr) {
+            reply->deleteLater();
+        }
         return;
     }
     m_indexReply = nullptr;
@@ -144,7 +144,11 @@ void MascotStoreNetwork::onIndexFinished() {
 void MascotStoreNetwork::download(QUrl const& url, QString const& destinationPath,
     QString const& expectedSha256, int timeoutMs)
 {
-    cancelAll();
+    // Package downloads must not interrupt an index refresh. A previous
+    // package transfer is superseded silently; the coordinator rejects a
+    // second active entry, so this is only a defensive cleanup path.
+    abortDownload(false);
+    ++m_downloadGeneration;
     QDir dir(QFileInfo(destinationPath).absolutePath());
     if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
         emit downloadFinished(destinationPath, false, kErrorWrite,
@@ -173,22 +177,24 @@ void MascotStoreNetwork::download(QUrl const& url, QString const& destinationPat
     APP_LOG_INFO("mascotstore") << "Downloading mascot url=\""
         << url.toDisplayString().toStdString() << "\" target=\""
         << m_partialDownloadPath.toStdString() << "\"";
-    m_downloadReply = m_network->get(request);
-    connect(m_downloadReply, &QNetworkReply::readyRead,
+    QNetworkReply *reply = m_network->get(request);
+    m_downloadReply = reply;
+    connect(reply, &QNetworkReply::readyRead,
         this, &MascotStoreNetwork::onDownloadReadyRead);
-    connect(m_downloadReply, &QNetworkReply::finished,
+    connect(reply, &QNetworkReply::finished,
         this, &MascotStoreNetwork::onDownloadFinished);
-    connect(m_downloadReply, &QNetworkReply::downloadProgress, this,
+    connect(reply, &QNetworkReply::downloadProgress, this,
         [this](qint64 received, qint64 total) {
             m_downloadReceived = received;
             m_downloadTotal = total;
             emit downloadProgress(m_downloadTargetPath, received, total);
         });
-    QTimer::singleShot(timeoutMs, this, [this]() {
-        if (m_downloadReply != nullptr) {
+    QTimer::singleShot(timeoutMs, this, [this, reply]() {
+        if (m_downloadReply == reply) {
             APP_LOG_WARN("mascotstore") << "Download timed out target=\""
                 << m_downloadTargetPath.toStdString() << "\"";
-            m_downloadReply->abort();
+            abortDownload(true, kErrorTimeout,
+                QStringLiteral("The download request timed out"));
         }
     });
 }
@@ -199,15 +205,16 @@ void MascotStoreNetwork::onDownloadReadyRead() {
     }
     QByteArray bytes = m_downloadReply->readAll();
     if (m_downloadFile->write(bytes) != bytes.size()) {
-        emit downloadFinished(m_downloadTargetPath, false, kErrorWrite,
-            m_downloadFile->errorString());
-        m_downloadReply->abort();
+        abortDownload(true, kErrorWrite, m_downloadFile->errorString());
     }
 }
 
 void MascotStoreNetwork::onDownloadFinished() {
-    QNetworkReply *reply = m_downloadReply;
-    if (reply == nullptr) {
+    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender());
+    if (reply == nullptr || reply != m_downloadReply) {
+        if (reply != nullptr) {
+            reply->deleteLater();
+        }
         return;
     }
     m_downloadReply = nullptr;
@@ -221,6 +228,8 @@ void MascotStoreNetwork::onDownloadFinished() {
     QString destinationPath = m_downloadTargetPath;
     if (reply->error() == QNetworkReply::OperationCanceledError) {
         QFile::remove(m_partialDownloadPath);
+        m_partialDownloadPath.clear();
+        m_downloadTargetPath.clear();
         emit downloadFinished(destinationPath, false, kErrorCanceled,
             QStringLiteral("The download was canceled"));
         return;
@@ -229,6 +238,8 @@ void MascotStoreNetwork::onDownloadFinished() {
         QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (reply->error() != QNetworkReply::NoError || status < 200 || status >= 300) {
         QFile::remove(m_partialDownloadPath);
+        m_partialDownloadPath.clear();
+        m_downloadTargetPath.clear();
         emit downloadFinished(destinationPath, false,
             status >= 400 ? kErrorHttp : kErrorNetwork,
             describeReplyFailure(reply));
@@ -237,16 +248,21 @@ void MascotStoreNetwork::onDownloadFinished() {
     if (m_expectedSha256.isEmpty()) {
         QFile::remove(destinationPath);
         if (!QFile::rename(m_partialDownloadPath, destinationPath)) {
+            m_partialDownloadPath.clear();
+            m_downloadTargetPath.clear();
             emit downloadFinished(destinationPath, false, kErrorWrite,
                 QStringLiteral("Could not finalize the downloaded file"));
             return;
         }
+        m_partialDownloadPath.clear();
+        m_downloadTargetPath.clear();
         emit downloadFinished(destinationPath, true, {}, {});
         return;
     }
     // Verify SHA-256 off the GUI thread, then finalize on the GUI thread.
     QString partialPath = m_partialDownloadPath;
     QString expected = m_expectedSha256.toLower();
+    quint64 generation = m_downloadGeneration;
     auto future = QtConcurrent::run([partialPath, expected]() {
         QFile file(partialPath);
         if (!file.open(QFile::ReadOnly)) {
@@ -269,21 +285,30 @@ void MascotStoreNetwork::onDownloadFinished() {
     });
     auto *watcher = new QFutureWatcher<QPair<bool, QString>>(this);
     connect(watcher, &QFutureWatcher<QPair<bool, QString>>::finished, this,
-        [this, watcher, destinationPath, partialPath]() {
+        [this, watcher, destinationPath, partialPath, generation]() {
             QPair<bool, QString> result = watcher->result();
             watcher->deleteLater();
+            if (generation != m_downloadGeneration) {
+                return;
+            }
             if (!result.first) {
                 QFile::remove(partialPath);
+                m_partialDownloadPath.clear();
+                m_downloadTargetPath.clear();
                 emit downloadFinished(destinationPath, false, kErrorSha256,
                     result.second);
                 return;
             }
             QFile::remove(destinationPath);
             if (!QFile::rename(partialPath, destinationPath)) {
+                m_partialDownloadPath.clear();
+                m_downloadTargetPath.clear();
                 emit downloadFinished(destinationPath, false, kErrorWrite,
                     QStringLiteral("Could not finalize the downloaded file"));
                 return;
             }
+            m_partialDownloadPath.clear();
+            m_downloadTargetPath.clear();
             APP_LOG_INFO("mascotstore") << "Download verified target=\""
                 << destinationPath.toStdString() << "\"";
             emit downloadFinished(destinationPath, true, {}, {});
@@ -291,22 +316,26 @@ void MascotStoreNetwork::onDownloadFinished() {
     watcher->setFuture(future);
 }
 
-void MascotStoreNetwork::cancelAll() {
+void MascotStoreNetwork::cancelIndex() {
     if (m_indexReply != nullptr) {
         QNetworkReply *reply = m_indexReply;
+        m_indexReply = nullptr;
         reply->abort();  // may synchronously emit finished() and null the member
-        if (m_indexReply == reply) {
-            m_indexReply = nullptr;
-            reply->deleteLater();
-        }
+        reply->deleteLater();
     }
+}
+
+void MascotStoreNetwork::abortDownload(bool notify, QString errorCode,
+    QString error) {
+    ++m_downloadGeneration;
+    QString destinationPath = m_downloadTargetPath;
+    bool hadDownload = m_downloadReply != nullptr || m_downloadFile != nullptr ||
+        !m_partialDownloadPath.isEmpty();
     if (m_downloadReply != nullptr) {
         QNetworkReply *reply = m_downloadReply;
+        m_downloadReply = nullptr;
         reply->abort();  // may synchronously emit finished() and null the member
-        if (m_downloadReply == reply) {
-            m_downloadReply = nullptr;
-            reply->deleteLater();
-        }
+        reply->deleteLater();
     }
     if (m_downloadFile != nullptr) {
         m_downloadFile->close();
@@ -318,6 +347,25 @@ void MascotStoreNetwork::cancelAll() {
         m_partialDownloadPath.clear();
     }
     m_downloadTargetPath.clear();
+    if (notify && hadDownload && !destinationPath.isEmpty()) {
+        if (errorCode.isEmpty()) {
+            errorCode = kErrorCanceled;
+        }
+        if (error.isEmpty()) {
+            error = QStringLiteral("The download was canceled");
+        }
+        emit downloadFinished(destinationPath, false,
+            errorCode, error);
+    }
+}
+
+void MascotStoreNetwork::cancelDownload() {
+    abortDownload(true);
+}
+
+void MascotStoreNetwork::cancelAll() {
+    cancelIndex();
+    abortDownload(true);
 }
 
 QString MascotStoreNetwork::describeReplyFailure(QNetworkReply *reply) const {
