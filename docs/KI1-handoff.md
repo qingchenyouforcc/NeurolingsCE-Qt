@@ -1,4 +1,4 @@
-# KI-1 交接文档：Release 客户端堆损坏崩溃（Unresolved）
+# KI-1 交接文档：Release 客户端堆损坏崩溃（修复待确认）
 
 > 本文档写给后续接手的高级模型/工程师。目标只有一个：定位并修复
 > **Release 客户端 `NeurolingsCE.exe` 的偶发堆损坏崩溃**（非 Debug 测试崩溃）。
@@ -6,7 +6,8 @@
 
 ## 1. 状态
 
-- **KI-1：Unresolved**，正式客户端发布阻断项。
+- **KI-1：已发现并修复明确 UB，待确认**；在原始 Release 路径复现、取得匹配
+  dump 或完成后续观察前，正式客户端发布仍暂不解除阻断。
 - 已确认不是“测试自身错误”，也不是旧的 Debug/RelWithDebInfo 测试崩溃
   （旧测试崩溃见 `docs/known-issues.md`，是 `NeurolingsCETests` 的
   hotspot/window-push 问题，与本文客户端崩溃是两件事）。
@@ -14,6 +15,17 @@
   不是单次偶发。
 - 尚未拿到可用的崩溃栈（WER dump 被系统清理；带 PDB 的
   RelWithDebInfo 构建在单次观察中未复现）。
+- 2026-08-11 已发现并修复一个明确的堆破坏候选：
+  `src/app/core/shijima-engine/shijima/scripting/context.cc` 中，
+  `context::push_function` 分配 `std::function<duk_ret_t(duk_context *)>`，
+  但 Duktape finalizer 原先按
+  `std::function<duk_ret_t(duk_context *, void *)>` 转型后 `delete`；这是不同
+  `std::function` 特化之间的未定义行为。现已改为按实际分配的特化删除。
+- 修复后的聚焦验证已完成：ASAN 引擎构建成功；context 创建/销毁 1000 次无
+  ASAN 报告；ASAN `NeurolingsCETests.exe` 退出码为 0 并报告
+  `All app core tests passed`；Release 与 RelWithDebInfo GUI 构建成功，Release
+  `--json --version` 正常。上述结果不能替代原始 Release 崩溃路径的复现或匹配
+  dump，KI-1 仍等待后续确认。
 
 ## 2. 崩溃证据（Windows Application 事件日志）
 
@@ -59,7 +71,18 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000; StartTime=(Get-D
 - 因此本机当前没有“崩溃二进制 + 匹配 PDB”的可用组合；下一步需要先
   制造这个组合（见第 5 节）。
 
-### 3.3 已有 cdb 命令模板
+### 3.3 本轮修复与聚焦验证（2026-08-11）
+
+- 修复内容见第 1 节：Duktape finalizer 对 `std::function` 的错误特化
+  `delete` 已改为与 `push_function` 分配类型完全一致。
+- `build-asan` 下的引擎与测试目标构建成功；独立 context probe 循环 1000 次
+  创建/销毁无 ASAN 报告，`NeurolingsCETests.exe` 退出码为 0。
+- `build-release` 与 `build-relwithdebinfo` 的 `NeurolingsCE` 构建成功；Release
+  CLI `--json --version` 输出 `{"app":"NeurolingsCE","version":"0.5.1"}`。
+- 尚未取得修复后原始 Release GUI 路径的复现、匹配 WER dump 或长期观察证据，
+  因此不将 KI-1 标记为已完全关闭。
+
+### 3.4 已有 cdb 命令模板
 
 `-cf` 配合 `-g` 不可靠（`-g` 会跳过初始断点导致命令文件不执行）。
 可用的模板（已实测能正确设置过滤并继续运行）：
@@ -83,19 +106,24 @@ $cdb='C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
 注意：cdb 被调试进程挂起时，`NeurolingsCE-cli` 会超时并尝试拉起第二个
 实例，产生干扰；CLI 检查必须在被调试进程可响应时进行。
 
-## 4. 已知线索与假设（按置信度排序，均未证实）
+## 4. 已确认修复点与剩余假设（按置信度排序）
 
-1. **Release 特有 / 优化相关**：3 次崩溃都在优化构建（Release /
+1. **明确的 `std::function` 特化删除 UB（已修复）**：
+   `context::push_function` 分配的是
+   `std::function<duk_ret_t(duk_context *)>`，而 finalizer 原先通过
+   `std::function<duk_ret_t(duk_context *, void *)>` 指针删除；Duktape GC 或
+   heap destroy 触发 finalizer 时，这种不匹配可能破坏 MSVC 堆元数据。
+2. **Release 特有 / 优化相关（仍待确认）**：3 次崩溃都在优化构建（Release /
    staging-Release）；带 PDB 的 RelWithDebInfo（同样 /O2）单次未复现，
    不排除布局/时序差异。崩溃点全部在 ntdll 堆校验，属于“事后发现”，
    真正的破坏点可能在崩溃前任意时刻。
-2. **UI Automation / Qt 辅助功能路径**：观察期间 UIA 读取会触发一次
+3. **UI Automation / Qt 辅助功能路径（仍未证实）**：观察期间 UIA 读取会触发一次
    OLEAUT32 的可恢复 C++ 异常（`8002801D Library not registered`，
    `Oleacc.dll` 加载后出现），cdb 日志可见。不确定它是否是破坏者，
    但 3 次崩溃中有 1 次（17:59:42）确实发生在 UIA 访问之后。
-3. **时序相关**：崩溃并非启动即发生（17:59:42 那次约 4 分钟后）；
+4. **时序相关（仍未证实）**：崩溃并非启动即发生（17:59:42 那次约 4 分钟后）；
    可能涉及定时器/窗口观察器/更新检查/后台网络。
-4. 与旧的 `NeurolingsCETests` hotspot 崩溃**无关**（不同可执行文件、
+5. 与旧的 `NeurolingsCETests` hotspot 崩溃**无关**（不同可执行文件、
    不同代码路径）。
 
 ## 5. 下一步建议（按优先级）
@@ -123,9 +151,9 @@ $cdb='C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
      窗口观察器（`windowObserver`）与平台线程；
    - 堆破坏优先怀疑点：任何持有裸指针/`reinterpret_cast`、
      `QListWidgetItem` 生命周期、线程间共享 `QObject` 的地方。
-6. **修复原则**：根因明确后才做最小修复 + 回归测试；不得用
-   sleep/重试/吞异常绕过；不得因“Release 通过”或“本轮未复现”而关闭
-   KI-1；修复后至少在 Release（含 PDB 组合）下复跑一次真实路径。
+6. **当前确认原则**：本轮已完成明确 UB 的最小修复与聚焦验证，但不得因
+   “Release 通过”或“本轮未复现”而关闭 KI-1；仍需等待原始 Release 路径复现、
+   匹配 dump 或后续观察确认。
 
 ## 6. 相关文件/产物
 

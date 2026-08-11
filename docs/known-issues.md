@@ -2,12 +2,26 @@
 
 ## KI-1（客户端）：Release 客户端堆损坏崩溃
 
-状态：**未修复（Unresolved，正式客户端发布阻断项）**
+状态：**已发现并修复明确 UB，待原始 Release 路径复现/匹配 dump 或后续观察确认**
+（正式客户端发布暂不解除阻断项）
 
 2026-08-07 三次真实复现（`build-staging-release` ×2、`build-release` ×1）：
 `NeurolingsCE.exe` 以 `0xc0000374`（堆损坏）崩溃在 ntdll，错误偏移均为
 `0x118ba5`（WER：`PCH_C2_FROM_ntdll+0x1617E4`）。带 PDB 的
 RelWithDebInfo 单次观察未复现，暂无可用崩溃栈。
+
+2026-08-11 已定位并修复 `src/app/core/shijima-engine/shijima/scripting/context.cc`
+中的明确 UB：`context::push_function` 分配
+`std::function<duk_ret_t(duk_context *)>`，而 Duktape finalizer 原先按
+`std::function<duk_ret_t(duk_context *, void *)>` 转型后 `delete`，即通过错误的
+`std::function` 特化释放对象；现已改为按实际分配的特化删除。这是 Release 堆
+损坏的明确候选，但尚无匹配 WER dump 或修复后原始 Release 路径复现来完成动态
+归因确认。
+
+已完成聚焦验证：ASAN 引擎构建与 context 创建/销毁 1000 次 probe 无报告，
+ASAN `NeurolingsCETests.exe` 退出码为 0（`All app core tests passed`）；Release
+与 RelWithDebInfo GUI 构建成功，Release `--json --version` 正常。以上证据不等同于
+完全关闭 KI-1，后续仍需原始 Release 路径复现、匹配 dump 或观察确认。
 
 完整证据、复现步骤、cdb 模板与下一步调查计划见
 [`docs/KI1-handoff.md`](KI1-handoff.md)。
