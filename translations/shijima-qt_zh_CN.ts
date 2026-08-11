@@ -118,6 +118,163 @@
         <source>Delete the selected mascot packages.</source>
         <translation>删除选中的桌宠包。</translation>
     </message>
+    <!-- Mascot Store page -->
+    <message>
+        <source>Mascot Store</source>
+        <translation>桌宠商店</translation>
+    </message>
+    <message>
+        <source>Discover community mascots, review their details, and install them into your local library.</source>
+        <translation>浏览社区桌宠、查看详情，并将它们安装到本地桌宠库。</translation>
+    </message>
+    <message>
+        <source>Search mascots...</source>
+        <translation>搜索桌宠...</translation>
+    </message>
+    <message>
+        <source>Search mascots</source>
+        <translation>搜索桌宠</translation>
+    </message>
+    <message>
+        <source>Filter the mascot registry by name, summary, id, or author.</source>
+        <translation>按名称、简介、ID 或作者筛选桌宠。</translation>
+    </message>
+    <message>
+        <source>All tags</source>
+        <translation>全部标签</translation>
+    </message>
+    <message>
+        <source>Filter by tag</source>
+        <translation>按标签筛选</translation>
+    </message>
+    <message>
+        <source>Show mascots in a selected category or tag.</source>
+        <translation>显示所选分类或标签中的桌宠。</translation>
+    </message>
+    <message>
+        <source>Fetch the latest mascot registry.</source>
+        <translation>获取最新桌宠目录。</translation>
+    </message>
+    <message>
+        <source>Refreshing store...</source>
+        <translation>正在刷新商店...</translation>
+    </message>
+    <message>
+        <source>%1 mascots</source>
+        <translation>%1 个桌宠</translation>
+    </message>
+    <message>
+        <source>Mascot registry</source>
+        <translation>桌宠目录</translation>
+    </message>
+    <message>
+        <source>Use the arrow keys to select a mascot, then choose Details or Install.</source>
+        <translation>使用方向键选择桌宠，然后选择“详情”或“安装”。</translation>
+    </message>
+    <message>
+        <source>No mascots match your filters</source>
+        <translation>没有匹配筛选条件的桌宠</translation>
+    </message>
+    <message>
+        <source>Try another search or tag, or refresh the registry.</source>
+        <translation>请尝试其他搜索词或标签，或刷新目录。</translation>
+    </message>
+    <message>
+        <source>Community mascot</source>
+        <translation>社区桌宠</translation>
+    </message>
+    <message>
+        <source>View the selected mascot's details.</source>
+        <translation>查看所选桌宠的详细信息。</translation>
+    </message>
+    <message>
+        <source>Download and install the selected mascot.</source>
+        <translation>下载并安装所选桌宠。</translation>
+    </message>
+    <message>
+        <source>Cancel the selected mascot download.</source>
+        <translation>取消所选桌宠的下载。</translation>
+    </message>
+    <message>
+        <source>Sign in to submit a mascot to the community registry.</source>
+        <translation>登录后即可向社区目录提交桌宠。</translation>
+    </message>
+    <message>
+        <source>Open the mascot submission form.</source>
+        <translation>打开桌宠提交表单。</translation>
+    </message>
+    <message>
+        <source>Loaded %1 mascots from the registry.</source>
+        <translation>已从目录加载 %1 个桌宠。</translation>
+    </message>
+    <message>
+        <source>Offline: showing the last cached index.</source>
+        <translation>离线：正在显示上次缓存的目录。</translation>
+    </message>
+    <message>
+        <source>Loaded from the local cache.</source>
+        <translation>已从本地缓存加载。</translation>
+    </message>
+    <message>
+        <source>The registry request failed.</source>
+        <translation>目录请求失败。</translation>
+    </message>
+    <message>
+        <source>Store unavailable: %1</source>
+        <translation>商店不可用：%1</translation>
+    </message>
+    <message>
+        <source>Downloading %1... %2 / %3</source>
+        <translation>正在下载 %1... %2 / %3</translation>
+    </message>
+    <message>
+        <source>Downloading %1...</source>
+        <translation>正在下载 %1...</translation>
+    </message>
+    <message>
+        <source>Installing %1...</source>
+        <translation>正在安装 %1...</translation>
+    </message>
+    <message>
+        <source>Preparing %1...</source>
+        <translation>正在准备 %1...</translation>
+    </message>
+    <message>
+        <source>Installed %1.</source>
+        <translation>已安装 %1。</translation>
+    </message>
+    <message>
+        <source>Download canceled.</source>
+        <translation>下载已取消。</translation>
+    </message>
+    <message>
+        <source>Install failed (%1): %2</source>
+        <translation>安装失败（%1）：%2</translation>
+    </message>
+    <message>
+        <source>Sign out</source>
+        <translation>退出登录</translation>
+    </message>
+    <message>
+        <source>Signed in as %1</source>
+        <translation>已登录为 %1</translation>
+    </message>
+    <message>
+        <source>(this session only; secure persistence is not available on this platform)</source>
+        <translation>（仅限本次会话；此平台不支持安全持久化）</translation>
+    </message>
+    <message>
+        <source>Signed out of GitHub.</source>
+        <translation>已退出 GitHub 登录。</translation>
+    </message>
+    <message>
+        <source>GitHub error (%1): %2</source>
+        <translation>GitHub 错误（%1）：%2</translation>
+    </message>
+    <message>
+        <source>Sign in with GitHub before submitting.</source>
+        <translation>提交前请先使用 GitHub 登录。</translation>
+    </message>
     <!-- Create page -->
     <message>
         <source>Create</source>

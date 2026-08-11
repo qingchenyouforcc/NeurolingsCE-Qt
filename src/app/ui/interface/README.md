@@ -8,6 +8,8 @@ interface 目录实现 Manager 主窗口的页面层。Navigation 负责页面�
 |---|---|
 | ManagerNavigation.cc | 建立 Home、Create、Combinations、Settings、About 页面并处理侧栏导航。 |
 | ManagerHomePage.cc | mascot library 主页：列表/详情、spawn/random、导入、刷新、打开目录、响应式布局和主题。 |
+| ManagerStorePage.cc | 商店目录浏览与筛选、缓存/刷新状态、详情、下载/安装/取消操作、GitHub 登录和提交入口；通过 MascotStoreCoordinator 消费核心状态。 |
+| MascotStoreUi.hpp | 商店页面 QWidget 指针和可见状态（筛选、空状态、下载进度、索引刷新）的集中所有权描述。 |
 | ManagerCreatePage.cc | legacy Shimeji archive 检查/转换：异步分析、候选选择、info.json 编辑、校验和选中项导入。 |
 | ManagerCombinationsPage.cc | 在 QSettings 中保存当前 mascot 数量组合，展示上次关闭/已保存组合，并恢复或删除组合。 |
 | ManagerSettingsPage.cc | 乘数、气泡、点击、窗口推动、Codex managed notify、detach/scale、背景、语言、启动、HTTP、更新/代理等设置 UI。 |
