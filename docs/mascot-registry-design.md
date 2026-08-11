@@ -262,15 +262,28 @@ POST /v1/auth/github 换取 session token → POST /v1/submissions（幂等，
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
 | `NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID` | 客户端编译期配置 | Login App Client ID（公开） |
-| `SUBMISSION_SERVICE_URL` | 客户端编译期配置 | 投稿服务地址 |
-| `MASCOT_INDEX_URL` | 客户端编译期配置 | Pages 索引地址 |
+| `NEUROLINGSCE_SUBMISSION_SERVICE_URL` | 客户端编译期配置 | 投稿服务地址 |
+| `NEUROLINGSCE_MASCOT_INDEX_URL` | 客户端编译期配置 | Pages 索引地址 |
 | `GITHUB_PUBLISHER_PRIVATE_KEY_PATH` | 投稿服务 Secret | Publisher App 私钥（PEM） |
 | `GITHUB_PUBLISHER_APP_ID` / `GITHUB_PUBLISHER_INSTALLATION_ID` | 投稿服务 Secret/环境 | 服务端使用 |
 | `SUBMISSION_SERVICE_TOKEN` | 客户端/服务端 | 可选服务间认证 |
 | `SUBMISSION_SESSION_SECRET` | 投稿服务 Secret | 生产必填；session token 签名密钥 |
 
 客户端编译期配置集中在 `include/shijima-qt/MascotStoreConfig.hpp`；
-未配置时商店与登录显示“维护者尚未配置”，不崩溃。
+`NEUROLINGSCE_STORE_PROFILE=custom|staging|disabled` 选择配置边界，三个
+`NEUROLINGSCE_*` 值也可通过同名环境变量传给 CMake。`staging` 是显式的
+synthetic E2E profile，只使用现有 `NeurolingsCE-Mascots-Staging` Pages
+索引和公开 Login App Client ID；它不能被当作生产内容源。默认 `custom`
+不配置值，`disabled` 会清空值。CI 通过仓库 Actions Variables
+`NEUROLINGSCE_STORE_PROFILE`、`NEUROLINGSCE_MASCOT_INDEX_URL`、
+`NEUROLINGSCE_SUBMISSION_SERVICE_URL` 和
+`NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID` 注入公开配置，不读取 gh CLI 的
+登录状态或发布服务 secret。未配置时商店与登录显示“维护者尚未配置”，
+并清空其他 profile 的旧索引条目，不崩溃。
+
+截至当前实现，`qingchenyouforcc/NeurolingsCE-Mascots` 正式仓库和对应
+production Pages 索引尚不存在；生产构建必须继续保持 `custom`/未配置，
+直到维护者提供真实内容源，不能把 staging 条目包装为生产目录。
 
 ## 8. 威胁模型摘要
 

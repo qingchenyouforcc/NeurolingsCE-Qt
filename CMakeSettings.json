@@ -35,6 +35,39 @@
                     "type": "PATH"
                 }
             ]
+        },
+        {
+            "name": "x64-Staging-Release",
+            "generator": "Ninja",
+            "configurationType": "Release",
+            "inheritEnvironments": [ "msvc_x64_x64" ],
+            "buildRoot": "${projectDir}\\out\\build\\${name}",
+            "installRoot": "${projectDir}\\out\\install\\${name}",
+            "cmakeCommandArgs": "",
+            "buildCommandArgs": "",
+            "ctestCommandArgs": "",
+            "variables": [
+                {
+                    "name": "Qt6_DIR",
+                    "value": "D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6",
+                    "type": "PATH"
+                },
+                {
+                    "name": "NEUROLINGSCE_STORE_PROFILE",
+                    "value": "staging",
+                    "type": "STRING"
+                },
+                {
+                    "name": "NEUROLINGSCE_MASCOT_INDEX_URL",
+                    "value": "https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json",
+                    "type": "STRING"
+                },
+                {
+                    "name": "NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID",
+                    "value": "Iv23liha58c6oVPSQvG2",
+                    "type": "STRING"
+                }
+            ]
         }
     ]
 }

@@ -13,6 +13,13 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     env:
       QT_VERSION: "6.8.3"
+      # Public Store values are repository Variables, not gh CLI credentials
+      # or publisher secrets. Empty values intentionally produce a disabled
+      # Store until the maintainer configures the production content source.
+      NEUROLINGSCE_STORE_PROFILE: ${{ vars.NEUROLINGSCE_STORE_PROFILE || 'custom' }}
+      NEUROLINGSCE_MASCOT_INDEX_URL: ${{ vars.NEUROLINGSCE_MASCOT_INDEX_URL || '' }}
+      NEUROLINGSCE_SUBMISSION_SERVICE_URL: ${{ vars.NEUROLINGSCE_SUBMISSION_SERVICE_URL || '' }}
+      NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID: ${{ vars.NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -116,6 +123,10 @@ jobs:
           cmake -S . -B build -G Ninja \
             -D CMAKE_BUILD_TYPE=Release \
             -D CMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.platform.qt_install_name }}" \
+            -D NEUROLINGSCE_STORE_PROFILE="$NEUROLINGSCE_STORE_PROFILE" \
+            -D NEUROLINGSCE_MASCOT_INDEX_URL="$NEUROLINGSCE_MASCOT_INDEX_URL" \
+            -D NEUROLINGSCE_SUBMISSION_SERVICE_URL="$NEUROLINGSCE_SUBMISSION_SERVICE_URL" \
+            -D NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID="$NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID" \
             -D CMAKE_C_COMPILER_LAUNCHER=ccache \
             -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
 

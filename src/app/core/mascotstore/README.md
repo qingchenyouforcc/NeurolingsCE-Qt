@@ -23,5 +23,9 @@
 ## 配置
 
 `include/shijima-qt/MascotStoreConfig.hpp` 保存维护者提供的编译期占位符：
-索引 URL、投稿服务 URL、GitHub App Client ID。未配置时 UI 显示
-“维护者尚未配置”，不会崩溃。
+索引 URL、投稿服务 URL、GitHub App Client ID。CMake 支持
+`NEUROLINGSCE_STORE_PROFILE=custom|staging|disabled`，也可从同名环境变量
+注入这些公开值；默认 `custom` 不推断任何 URL 或 gh CLI 登录状态。
+`staging` 只用于显式的 synthetic staging E2E，不能作为生产内容源；
+`disabled` 会在配置阶段清空所有 Store 值。未配置时 UI 清空旧缓存条目，
+并分别提示商店和 GitHub 登录不可用，不会把其他构建 profile 的缓存显示成当前商店。

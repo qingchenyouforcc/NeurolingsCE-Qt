@@ -165,12 +165,124 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/cmake/libshimejifinder)
 option(SHIJIMA_WITH_DEFAULT_MASCOT "Embed DefaultMascot assets" ON)
 option(SHIJIMA_WITH_LICENSES_TEXT "Embed licenses text" ON)
 
+# Store values are public build-time configuration, never secrets.  The
+# default custom profile remains disabled until a maintainer supplies values
+# through -D arguments or the matching environment variables.  The explicit
+# staging profile is intentionally opt-in and points only at the synthetic
+# staging registry used by the end-to-end tests.
+set(NEUROLINGSCE_STORE_PROFILE "custom" CACHE STRING
+    "Mascot Store profile: custom, staging, or disabled")
+set_property(CACHE NEUROLINGSCE_STORE_PROFILE PROPERTY STRINGS
+    custom staging disabled)
+set(_neurolingsce_store_profiles custom staging disabled)
+if(NOT NEUROLINGSCE_STORE_PROFILE IN_LIST _neurolingsce_store_profiles)
+  message(FATAL_ERROR
+    "NEUROLINGSCE_STORE_PROFILE must be custom, staging, or disabled")
+endif()
+
+set(_neurolingsce_store_previous_profile "")
+if(DEFINED NEUROLINGSCE_STORE_PROFILE_LAST)
+  set(_neurolingsce_store_previous_profile
+    "${NEUROLINGSCE_STORE_PROFILE_LAST}")
+endif()
+set(_neurolingsce_store_index_default
+    "$ENV{NEUROLINGSCE_MASCOT_INDEX_URL}")
+set(_neurolingsce_store_submission_default
+    "$ENV{NEUROLINGSCE_SUBMISSION_SERVICE_URL}")
+set(_neurolingsce_store_client_default
+    "$ENV{NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID}")
+set(_neurolingsce_store_staging_index
+    "https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json")
+set(_neurolingsce_store_staging_client "Iv23liha58c6oVPSQvG2")
+if(NEUROLINGSCE_STORE_PROFILE STREQUAL "staging")
+  if(_neurolingsce_store_index_default STREQUAL "")
+    set(_neurolingsce_store_index_default
+      "${_neurolingsce_store_staging_index}")
+  endif()
+  if(_neurolingsce_store_client_default STREQUAL "")
+    # Public client ID of the existing staging Login GitHub App.  The
+    # production profile must supply its own maintainer-owned values.
+    set(_neurolingsce_store_client_default
+      "${_neurolingsce_store_staging_client}")
+  endif()
+endif()
+
 set(NEUROLINGSCE_MASCOT_INDEX_URL "" CACHE STRING
     "Public Mascot store index URL (GitHub Pages index-v1.json)")
 set(NEUROLINGSCE_SUBMISSION_SERVICE_URL "" CACHE STRING
     "Public submission service base URL")
 set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID "" CACHE STRING
     "Public Login GitHub App client ID for Device Flow (separate from the Publisher App)")
+if(NEUROLINGSCE_STORE_PROFILE STREQUAL "disabled")
+  set(NEUROLINGSCE_MASCOT_INDEX_URL "" CACHE STRING "" FORCE)
+  set(NEUROLINGSCE_SUBMISSION_SERVICE_URL "" CACHE STRING "" FORCE)
+  set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID "" CACHE STRING "" FORCE)
+elseif(NEUROLINGSCE_STORE_PROFILE STREQUAL "staging")
+  # Selecting staging is deterministic: do not let a previously configured
+  # production cache leak into the synthetic E2E profile. Environment values
+  # above remain the explicit override for local test mirrors.
+  set(NEUROLINGSCE_MASCOT_INDEX_URL "${_neurolingsce_store_index_default}"
+    CACHE STRING "Public Mascot store index URL (GitHub Pages index-v1.json)"
+    FORCE)
+  set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID
+    "${_neurolingsce_store_client_default}" CACHE STRING
+    "Public Login GitHub App client ID for Device Flow (separate from the Publisher App)"
+    FORCE)
+  if(_neurolingsce_store_submission_default STREQUAL "")
+    set(NEUROLINGSCE_SUBMISSION_SERVICE_URL "" CACHE STRING
+      "Public submission service base URL" FORCE)
+  else()
+    set(NEUROLINGSCE_SUBMISSION_SERVICE_URL
+      "${_neurolingsce_store_submission_default}" CACHE STRING
+      "Public submission service base URL" FORCE)
+  endif()
+else()
+  # A profile switch from staging must not leave its synthetic cache visible
+  # under the default custom profile. Keep explicit custom values intact.
+  if(_neurolingsce_store_previous_profile STREQUAL "staging")
+    if(NEUROLINGSCE_MASCOT_INDEX_URL STREQUAL
+        "${_neurolingsce_store_staging_index}")
+      set(NEUROLINGSCE_MASCOT_INDEX_URL "" CACHE STRING "" FORCE)
+    endif()
+    if(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID STREQUAL
+        "${_neurolingsce_store_staging_client}")
+      set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID "" CACHE STRING "" FORCE)
+    endif()
+  endif()
+  if(NEUROLINGSCE_MASCOT_INDEX_URL STREQUAL "" AND
+      NOT _neurolingsce_store_index_default STREQUAL "")
+    set(NEUROLINGSCE_MASCOT_INDEX_URL "${_neurolingsce_store_index_default}"
+      CACHE STRING "Public Mascot store index URL (GitHub Pages index-v1.json)"
+      FORCE)
+  endif()
+  if(NEUROLINGSCE_SUBMISSION_SERVICE_URL STREQUAL "" AND
+      NOT _neurolingsce_store_submission_default STREQUAL "")
+    set(NEUROLINGSCE_SUBMISSION_SERVICE_URL
+      "${_neurolingsce_store_submission_default}" CACHE STRING
+      "Public submission service base URL" FORCE)
+  endif()
+  if(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID STREQUAL "" AND
+      NOT _neurolingsce_store_client_default STREQUAL "")
+    set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID
+      "${_neurolingsce_store_client_default}" CACHE STRING
+      "Public Login GitHub App client ID for Device Flow (separate from the Publisher App)"
+      FORCE)
+  endif()
+endif()
+set(NEUROLINGSCE_STORE_PROFILE_LAST "${NEUROLINGSCE_STORE_PROFILE}"
+  CACHE INTERNAL "Last configured Mascot Store profile")
+
+set(_neurolingsce_store_index_configured FALSE)
+set(_neurolingsce_store_login_configured FALSE)
+if(NOT NEUROLINGSCE_MASCOT_INDEX_URL STREQUAL "")
+  set(_neurolingsce_store_index_configured TRUE)
+endif()
+if(NOT NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID STREQUAL "")
+  set(_neurolingsce_store_login_configured TRUE)
+endif()
+message(STATUS "Mascot Store profile=${NEUROLINGSCE_STORE_PROFILE} "
+  "index_configured=${_neurolingsce_store_index_configured} "
+  "github_login_configured=${_neurolingsce_store_login_configured}")
 
 set(_shijima_generated_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(_shijima_licenses_header "${_shijima_generated_dir}/licenses_generated.hpp")

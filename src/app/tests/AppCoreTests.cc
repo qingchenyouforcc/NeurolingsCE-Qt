@@ -2121,6 +2121,17 @@ void testMascotStoreCoordinatorInstallAndOffline() {
     coordinator.loadCachedIndex();
     expect(cachedLoaded && fromCache,
         "coordinator should load the cached index offline");
+
+    bool notConfigured = false;
+    QObject::connect(&coordinator,
+        &MascotStoreCoordinator::indexStateChanged,
+        [&](MascotStoreCoordinator::IndexState state) {
+            notConfigured = !state.loaded && state.errorCode ==
+                QStringLiteral("mascotstore.not_configured");
+        });
+    coordinator.refreshIndex();
+    expect(notConfigured,
+        "refresh should report an explicit unconfigured Store profile");
 }
 
 QByteArray httpResponse(int status, QByteArray const& body) {

@@ -51,8 +51,19 @@ inline QString githubLoginClientId() {
     return QStringLiteral(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID);
 }
 
+inline bool isIndexConfigured() {
+    QUrl url(indexUrl());
+    return url.isValid() && !url.isEmpty() &&
+        (url.scheme() == QStringLiteral("https") ||
+            url.scheme() == QStringLiteral("http"));
+}
+
+inline bool isLoginConfigured() {
+    return !githubLoginClientId().trimmed().isEmpty();
+}
+
 inline bool isConfigured() {
-    return !indexUrl().isEmpty() && QUrl(indexUrl()).isValid();
+    return isIndexConfigured();
 }
 
 }
