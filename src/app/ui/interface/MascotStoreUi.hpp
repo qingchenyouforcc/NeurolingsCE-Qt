@@ -21,6 +21,7 @@
 #include <QString>
 
 class QComboBox;
+class QFrame;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -41,6 +42,7 @@ struct MascotStoreUi {
     QPushButton *loginButton = nullptr;
     QLabel *loginStatusLabel = nullptr;
     QLabel *storeStatusLabel = nullptr;
+    QFrame *storeStatusBanner = nullptr;
     QLabel *resultCountLabel = nullptr;
     QLabel *emptyStateTitleLabel = nullptr;
     QLabel *emptyStateDescriptionLabel = nullptr;
@@ -52,4 +54,5 @@ struct MascotStoreUi {
     QPushButton *cancelButton = nullptr;
     QWidget *loginHintLabel = nullptr;
     bool indexRefreshing = false;
+    bool githubLoginConfigured = false;
 };

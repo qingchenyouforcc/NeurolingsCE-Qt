@@ -149,6 +149,7 @@ void applyStoreTheme(QWidget *storePage)
     QColor selected = eTheme->getThemeColor(mode, ElaThemeType::PrimaryNormal);
     QColor selectedText = eTheme->getThemeColor(mode,
         ElaThemeType::BasicTextInvert);
+    QColor danger = eTheme->getThemeColor(mode, ElaThemeType::StatusDanger);
     storePage->setStyleSheet(QString(
         "#storeToolbar, #storeListSurface, #storeAccountSurface {"
         "  background-color: %1;"
@@ -164,6 +165,17 @@ void applyStoreTheme(QWidget *storePage)
         "#storeEntryMeta, #storeEntrySummary {"
         "  color: %4;"
         "}"
+        "#storeAccountTitle { color: %3; font-weight: 600; }"
+        "#storeStatusBanner {"
+        "  background-color: %5;"
+        "  border: 1px solid %2;"
+        "  border-radius: 6px;"
+        "}"
+        "#storeStatusLabel[state=\"error\"] {"
+        "  color: %8; font-weight: 500;"
+        "}"
+        "#storeStatusBanner[state=\"error\"] { border-color: %8; }"
+        "#storeStatusBanner[state=\"busy\"] { border-color: %6; }"
         "#storeToolbar QLineEdit, #storeToolbar QComboBox {"
         "  background-color: %5;"
         "  color: %3;"
@@ -188,18 +200,23 @@ void applyStoreTheme(QWidget *storePage)
         "}"
         "#storeList::item {"
         "  margin: 3px 2px;"
-        "  padding: 8px;"
+        "  padding: 0px;"
         "  border-radius: 7px;"
         "}"
         "#storeList::item:hover {"
         "  background-color: %5;"
         "}"
         "#storeList::item:selected {"
-        "  background-color: %6;"
-        "  color: %7;"
+        "  background-color: transparent;"
+        "  color: transparent;"
         "}"
-        "#storeEntryCard { background-color: transparent; border: none; }"
+        "#storeEntryCard {"
+        "  background-color: %5; border: 1px solid %2; border-radius: 7px;"
+        "}"
         "#storeEntryCard QLabel { color: %3; background: transparent; }"
+        "#storeEntryCard[selected=\"true\"] {"
+        "  background-color: %6; border: 2px solid %6;"
+        "}"
         "#storeEntryCard[selected=\"true\"] QLabel { color: %7; }"
         "#storeEntryName { font-weight: 600; }"
         "#storeEmptyState { background: transparent; border: none; }"
@@ -212,18 +229,22 @@ void applyStoreTheme(QWidget *storePage)
     ).arg(panel.name(QColor::HexArgb), border.name(QColor::HexArgb),
         text.name(QColor::HexArgb), muted.name(QColor::HexArgb),
         surface.name(QColor::HexArgb), selected.name(QColor::HexArgb),
-        selectedText.name(QColor::HexArgb)));
+        selectedText.name(QColor::HexArgb), danger.name(QColor::HexArgb)));
 }
 
 QWidget *createStoreEntryCard(MascotStoreEntry const& entry, QWidget *parent)
 {
     auto *card = new QFrame(parent);
     card->setObjectName(QStringLiteral("storeEntryCard"));
-    card->setMinimumHeight(82);
+    card->setMinimumHeight(86);
     card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    card->setAccessibleName(QStringLiteral("%1 v%2")
+        .arg(entry.name, entry.version));
+    card->setAccessibleDescription(entry.summary);
+    card->setFocusPolicy(Qt::NoFocus);
     auto *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(4, 2, 4, 2);
-    layout->setSpacing(3);
+    layout->setContentsMargins(10, 7, 10, 7);
+    layout->setSpacing(4);
 
     auto *titleRow = new QHBoxLayout;
     titleRow->setContentsMargins(0, 0, 0, 0);
@@ -345,19 +366,24 @@ void ShijimaManager::setupStorePage() {
     toolbar->addWidget(storeUi->refreshButton);
     rootLayout->addWidget(toolbarFrame);
 
-    storeUi->storeStatusLabel = new QLabel(page);
+    auto *statusBanner = new QFrame(page);
+    statusBanner->setObjectName(QStringLiteral("storeStatusBanner"));
+    statusBanner->setProperty("state", QStringLiteral("info"));
+    storeUi->storeStatusBanner = statusBanner;
+    auto *statusRow = new QHBoxLayout(statusBanner);
+    statusRow->setContentsMargins(10, 6, 10, 6);
+    statusRow->setSpacing(8);
+    storeUi->storeStatusLabel = new QLabel(statusBanner);
     storeUi->storeStatusLabel->setObjectName(QStringLiteral("storeStatusLabel"));
     storeUi->storeStatusLabel->setWordWrap(true);
-    auto *statusRow = new QHBoxLayout;
-    statusRow->setContentsMargins(2, 0, 2, 0);
-    statusRow->setSpacing(8);
     statusRow->addWidget(storeUi->storeStatusLabel, 1);
-    storeUi->resultCountLabel = new QLabel(page);
+    storeUi->resultCountLabel = new QLabel(statusBanner);
     storeUi->resultCountLabel->setObjectName(
         QStringLiteral("storeResultCountLabel"));
     storeUi->resultCountLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    storeUi->resultCountLabel->setAccessibleName(createTr("Result count"));
     statusRow->addWidget(storeUi->resultCountLabel);
-    rootLayout->addLayout(statusRow);
+    rootLayout->addWidget(statusBanner);
 
     auto *listSurface = new QFrame(page);
     listSurface->setObjectName(QStringLiteral("storeListSurface"));
@@ -421,14 +447,25 @@ void ShijimaManager::setupStorePage() {
 
     auto *accountSurface = new QFrame(page);
     accountSurface->setObjectName(QStringLiteral("storeAccountSurface"));
-    auto *accountRow = new QHBoxLayout(accountSurface);
-    accountRow->setContentsMargins(10, 8, 10, 8);
+    auto *accountLayout = new QVBoxLayout(accountSurface);
+    accountLayout->setContentsMargins(10, 8, 10, 8);
+    accountLayout->setSpacing(6);
+    auto *accountHeader = new QHBoxLayout;
+    accountHeader->setContentsMargins(0, 0, 0, 0);
+    auto *accountTitle = new QLabel(createTr("Community submissions"),
+        accountSurface);
+    accountTitle->setObjectName(QStringLiteral("storeAccountTitle"));
+    accountHeader->addWidget(accountTitle);
+    accountHeader->addStretch(1);
+    accountLayout->addLayout(accountHeader);
+    auto *accountRow = new QHBoxLayout;
+    accountRow->setContentsMargins(0, 0, 0, 0);
     accountRow->setSpacing(8);
     storeUi->loginButton = new QPushButton(createTr("Sign in with GitHub"),
         accountSurface);
     configureStoreButton(storeUi->loginButton, createTr(
         "Sign in to submit a mascot to the community registry."));
-    storeUi->loginStatusLabel = new QLabel(page);
+    storeUi->loginStatusLabel = new QLabel(accountSurface);
     storeUi->loginStatusLabel->setObjectName(
         QStringLiteral("storeLoginStatusLabel"));
     storeUi->loginStatusLabel->setWordWrap(true);
@@ -440,6 +477,7 @@ void ShijimaManager::setupStorePage() {
     configureStoreButton(submitButton, createTr(
         "Open the mascot submission form."));
     accountRow->addWidget(submitButton);
+    accountLayout->addLayout(accountRow);
     rootLayout->addWidget(accountSurface);
 
     storeUi->downloadProgress = new QProgressBar(page);
@@ -474,8 +512,31 @@ void ShijimaManager::setupStorePage() {
     m_githubAuth = std::make_unique<GitHubAuthManager>(
         MascotStoreConfig::githubLoginClientId(),
         createPlatformCredentialStore());
+    m_ui->storeUi->githubLoginConfigured =
+        MascotStoreConfig::isLoginConfigured();
+    if (!m_ui->storeUi->githubLoginConfigured) {
+        QString unavailable = createTr(
+            "GitHub login is not configured by the maintainer.");
+        m_ui->storeUi->loginButton->setEnabled(false);
+        m_ui->storeUi->loginButton->setToolTip(unavailable);
+        m_ui->storeUi->loginButton->setAccessibleDescription(unavailable);
+        m_ui->storeUi->submitButton->setEnabled(false);
+        m_ui->storeUi->loginStatusLabel->setText(unavailable);
+    }
     m_submissionClient = std::make_unique<MascotSubmissionClient>(
         QUrl { MascotStoreConfig::submissionServiceUrl() });
+
+    auto setStoreStatus = [this](QString const& text, QString const& state) {
+        auto *ui = m_ui->storeUi.get();
+        ui->storeStatusLabel->setText(text);
+        ui->storeStatusLabel->setProperty("state", state);
+        ui->storeStatusBanner->setProperty("state", state);
+        ui->storeStatusLabel->style()->unpolish(ui->storeStatusLabel);
+        ui->storeStatusLabel->style()->polish(ui->storeStatusLabel);
+        ui->storeStatusBanner->style()->unpolish(ui->storeStatusBanner);
+        ui->storeStatusBanner->style()->polish(ui->storeStatusBanner);
+        ui->storeStatusBanner->update();
+    };
 
     auto updateEntryActions = [this]() {
         auto *ui = m_ui->storeUi.get();
@@ -511,8 +572,12 @@ void ShijimaManager::setupStorePage() {
             int restoredRow = -1;
             for (auto const& entry : entries) {
                 auto *item = new QListWidgetItem(list);
-                item->setText(QStringLiteral("%1 v%2. %3")
-                    .arg(entry.name, entry.version, entry.summary));
+                // The card widget renders the visible content. Keeping the
+                // item's display text empty prevents QListWidget from drawing
+                // a second copy underneath the selected card; the card's
+                // accessible name/description remains available to assistive
+                // technologies.
+                item->setText(QString {});
                 item->setData(kMascotIdRole, entry.id);
                 item->setToolTip(entry.summary);
                 auto *card = createStoreEntryCard(entry, list);
@@ -563,13 +628,14 @@ void ShijimaManager::setupStorePage() {
     };
 
     connect(m_ui->storeUi->refreshButton, &QPushButton::clicked, this,
-        [this, updateEntryActions]() {
+        [this, setStoreStatus, updateEntryActions]() {
             auto *ui = m_ui->storeUi.get();
             // Set the busy state before entering the coordinator. Invalid or
             // unconfigured URLs report synchronously and must not be replaced
             // by a stale “Refreshing...” message afterwards.
             ui->indexRefreshing = true;
-            ui->storeStatusLabel->setText(createTr("Refreshing store..."));
+            setStoreStatus(createTr("Refreshing store..."),
+                QStringLiteral("busy"));
             updateEntryActions();
             m_storeCoordinator->refreshIndex();
         });
@@ -588,32 +654,52 @@ void ShijimaManager::setupStorePage() {
         });
 
     connect(m_storeCoordinator.get(), &MascotStoreCoordinator::indexStateChanged,
-        this, [this, refreshList, refreshTags, updateEntryActions](
+        this, [this, refreshList, refreshTags, setStoreStatus,
+            updateEntryActions](
             MascotStoreCoordinator::IndexState state) {
             auto *ui = m_ui->storeUi.get();
             ui->indexRefreshing = false;
             if (state.loaded) {
                 m_lastStoreIndex = state.index;
                 refreshTags();
-                ui->storeStatusLabel->setText(
+                setStoreStatus(
                     state.fromCache
                         ? (state.stale
                             ? createTr("Offline: showing the last cached index.")
                             : createTr("Loaded from the local cache."))
                         : createTr("Loaded %1 mascots from the registry.")
-                            .arg(state.index.entries.size()));
+                            .arg(state.index.entries.size()),
+                    state.stale ? QStringLiteral("warning")
+                                : QStringLiteral("success"));
             }
             else {
-                refreshList();
-                QString error = state.error.isEmpty()
-                    ? createTr("The registry request failed.") : state.error;
-                ui->storeStatusLabel->setText(
-                    createTr("Store unavailable: %1").arg(error));
+                if (state.errorCode ==
+                    QStringLiteral("mascotstore.not_configured")) {
+                    // A cache from a different (for example staging) profile
+                    // must not masquerade as the current unconfigured store.
+                    m_lastStoreIndex = MascotStoreIndex {};
+                    refreshTags();
+                }
+                else {
+                    refreshList();
+                }
+                QString error;
+                if (state.errorCode ==
+                    QStringLiteral("mascotstore.not_configured")) {
+                    error = createTr(
+                        "The mascot store is not configured by the maintainer.");
+                }
+                else {
+                    error = state.error.isEmpty()
+                        ? createTr("The registry request failed.") : state.error;
+                }
+                setStoreStatus(createTr("Store unavailable: %1").arg(error),
+                    QStringLiteral("error"));
             }
             updateEntryActions();
         });
     connect(m_storeCoordinator.get(), &MascotStoreCoordinator::entryProgress,
-        this, [this, updateEntryActions](QString id, qint64 received,
+        this, [this, setStoreStatus, updateEntryActions](QString id, qint64 received,
             qint64 total) {
             auto *ui = m_ui->storeUi.get();
             if (total > 0) {
@@ -622,49 +708,51 @@ void ShijimaManager::setupStorePage() {
                 ui->downloadProgress->setValue(
                     total > INT_MAX ? 0 : static_cast<int>(received));
                 ui->downloadProgress->setVisible(true);
-                ui->storeStatusLabel->setText(
+                setStoreStatus(
                     createTr("Downloading %1... %2 / %3")
                         .arg(id,
                             QLocale().formattedDataSize(received),
-                            QLocale().formattedDataSize(total)));
+                            QLocale().formattedDataSize(total)),
+                    QStringLiteral("busy"));
             }
             else {
                 // Servers may omit Content-Length. Keep the operation visible
                 // with an indeterminate bar instead of leaving stale status.
                 ui->downloadProgress->setRange(0, 0);
                 ui->downloadProgress->setVisible(true);
-                ui->storeStatusLabel->setText(
-                    createTr("Downloading %1...").arg(id));
+                setStoreStatus(createTr("Downloading %1...").arg(id),
+                    QStringLiteral("busy"));
             }
             updateEntryActions();
         });
     connect(m_storeCoordinator.get(),
         &MascotStoreCoordinator::entryInstallStarted, this,
-        [this, updateEntryActions](QString id) {
+        [this, setStoreStatus, updateEntryActions](QString id) {
             auto *ui = m_ui->storeUi.get();
             ui->downloadProgress->setRange(0, 0);
             ui->downloadProgress->setVisible(true);
-            ui->storeStatusLabel->setText(
-                createTr("Installing %1...").arg(id));
+            setStoreStatus(createTr("Installing %1...").arg(id),
+                QStringLiteral("busy"));
             updateEntryActions();
         });
     connect(m_storeCoordinator.get(), &MascotStoreCoordinator::entryFinished,
-        this, [this, updateEntryActions](QString id, bool ok,
+        this, [this, setStoreStatus, updateEntryActions](QString id, bool ok,
             QString installedName, QString errorCode, QString error) {
             auto *ui = m_ui->storeUi.get();
             ui->downloadProgress->setVisible(false);
             if (ok) {
-                ui->storeStatusLabel->setText(
-                    createTr("Installed %1.").arg(installedName));
+                setStoreStatus(createTr("Installed %1.").arg(installedName),
+                    QStringLiteral("success"));
                 reloadMascots({ installedName.toStdString() });
             }
             else if (errorCode == QStringLiteral("mascotstore.download.canceled")) {
-                ui->storeStatusLabel->setText(createTr("Download canceled."));
+                setStoreStatus(createTr("Download canceled."),
+                    QStringLiteral("info"));
             }
             else {
-                ui->storeStatusLabel->setText(
+                setStoreStatus(
                     createTr("Install failed (%1): %2")
-                        .arg(errorCode, error));
+                        .arg(errorCode, error), QStringLiteral("error"));
             }
             Q_UNUSED(id);
             updateEntryActions();
@@ -679,10 +767,10 @@ void ShijimaManager::setupStorePage() {
             item->data(kMascotIdRole).toString());
     };
     connect(m_ui->storeUi->installButton, &QPushButton::clicked, this,
-        [this, selectedEntry, updateEntryActions]() {
+        [this, selectedEntry, setStoreStatus, updateEntryActions]() {
             if (auto const* entry = selectedEntry()) {
-                m_ui->storeUi->storeStatusLabel->setText(
-                    createTr("Preparing %1...").arg(entry->name));
+                setStoreStatus(createTr("Preparing %1...").arg(entry->name),
+                    QStringLiteral("busy"));
                 updateEntryActions();
                 m_storeCoordinator->downloadAndInstall(*entry);
             }
@@ -711,6 +799,7 @@ void ShijimaManager::setupStorePage() {
         [this]() {
             if (m_githubAuth->isSignedIn()) {
                 m_ui->storeUi->loginButton->setText(createTr("Sign out"));
+                m_ui->storeUi->submitButton->setEnabled(true);
                 QString status = createTr("Signed in as %1")
                     .arg(m_githubAuth->userInfo().login);
                 if (!m_githubAuth->canPersistLogin()) {
@@ -723,7 +812,16 @@ void ShijimaManager::setupStorePage() {
             else {
                 m_ui->storeUi->loginButton->setText(
                     createTr("Sign in with GitHub"));
-                m_ui->storeUi->loginStatusLabel->clear();
+                m_ui->storeUi->submitButton->setEnabled(
+                    m_ui->storeUi->githubLoginConfigured);
+                if (!m_ui->storeUi->githubLoginConfigured) {
+                    m_ui->storeUi->loginStatusLabel->setText(createTr(
+                        "GitHub login is not configured by the maintainer."));
+                }
+                else {
+                    m_ui->storeUi->loginStatusLabel->setText(
+                        createTr("Not signed in."));
+                }
             }
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::deviceCodeReady, this,
@@ -731,15 +829,16 @@ void ShijimaManager::setupStorePage() {
             showUserCodeDialog(this, userCode, verificationUrl);
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::signedOut, this,
-        [this]() {
-            m_ui->storeUi->storeStatusLabel->setText(
-                createTr("Signed out of GitHub."));
+        [this, setStoreStatus]() {
+            setStoreStatus(createTr("Signed out of GitHub."),
+                QStringLiteral("info"));
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::errorOccurred, this,
-        [this](QString code, QString message) {
-            m_ui->storeUi->storeStatusLabel->setText(
-                createTr("GitHub error (%1): %2")
-                    .arg(code, redactSensitiveText(message)));
+        [this, setStoreStatus](QString code, QString message) {
+            QString status = createTr("GitHub error (%1): %2")
+                .arg(code, redactSensitiveText(message));
+            setStoreStatus(status, QStringLiteral("error"));
+            m_ui->storeUi->loginStatusLabel->setText(status);
         });
     connect(m_ui->storeUi->loginButton, &QPushButton::clicked, this,
         [this]() {
@@ -764,9 +863,20 @@ void ShijimaManager::setupStorePage() {
             dialog->show();
         });
 
-    // Start with the cached index so the page is usable offline.
-    m_storeCoordinator->loadCachedIndex();
     applyStoreTheme(page);
+    // Start with the cached index only when an index source is configured.
+    // Otherwise an old staging cache must not appear beside the unavailable
+    // production Store banner.
+    if (MascotStoreConfig::isIndexConfigured()) {
+        m_storeCoordinator->loadCachedIndex();
+    }
+    else {
+        m_lastStoreIndex = MascotStoreIndex {};
+        refreshTags();
+        setStoreStatus(createTr(
+            "Store unavailable: The mascot store is not configured by the maintainer"),
+            QStringLiteral("error"));
+    }
     connect(eTheme, &ElaTheme::themeModeChanged, page, [page]() {
         applyStoreTheme(page);
     });

@@ -156,6 +156,54 @@
         <translation>获取最新桌宠目录。</translation>
     </message>
     <message>
+        <source>Result count</source>
+        <translation>结果数量</translation>
+    </message>
+    <message>
+        <source>Install</source>
+        <translation>安装</translation>
+    </message>
+    <message>
+        <source>Cancel download</source>
+        <translation>取消下载</translation>
+    </message>
+    <message>
+        <source>Sign in with GitHub</source>
+        <translation>使用 GitHub 登录</translation>
+    </message>
+    <message>
+        <source>Submit a mascot...</source>
+        <translation>提交桌宠...</translation>
+    </message>
+    <message>
+        <source>Community submissions</source>
+        <translation>社区投稿</translation>
+    </message>
+    <message>
+        <source>GitHub login is not configured by the maintainer.</source>
+        <translation>维护者尚未配置 GitHub 登录。</translation>
+    </message>
+    <message>
+        <source>The mascot store is not configured by the maintainer.</source>
+        <translation>维护者尚未配置桌宠商店。</translation>
+    </message>
+    <message>
+        <source>Not signed in.</source>
+        <translation>未登录。</translation>
+    </message>
+    <message>
+        <source>GitHub Authorization</source>
+        <translation>GitHub 授权</translation>
+    </message>
+    <message>
+        <source>Enter this code on the GitHub page that opened in your browser:</source>
+        <translation>请在浏览器打开的 GitHub 页面中输入此代码：</translation>
+    </message>
+    <message>
+        <source>Copy code</source>
+        <translation>复制代码</translation>
+    </message>
+    <message>
         <source>Refreshing store...</source>
         <translation>正在刷新商店...</translation>
     </message>
