@@ -132,8 +132,11 @@ duk_ret_t context::duk_finalizer_callback(duk_context *duk) {
     duk_push_current_function(duk);
     duk_get_prop_string(duk, -1, DUK_HIDDEN_SYMBOL("stdfunc"));
     void *target_pt = duk_get_pointer(duk, -1);
-    auto target = static_cast<std::function<duk_ret_t(duk_context *,
-        void *)> *>(target_pt);
+    // push_function stores this exact specialization.  Deleting through a
+    // different std::function signature is undefined behaviour and can leave
+    // the MSVC heap metadata corrupted when Duktape finalizes the callback.
+    auto target = static_cast<std::function<duk_ret_t(duk_context *)> *>(
+        target_pt);
     delete target;
     duk_pop(duk);
     return 0;
