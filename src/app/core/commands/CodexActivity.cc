@@ -6,6 +6,7 @@
 #include <QVector>
 
 #include <initializer_list>
+#include <optional>
 
 namespace {
 
@@ -148,6 +149,75 @@ bool readOptionalString(QJsonObject const& object, QString const& key,
     return true;
 }
 
+struct EmbeddedSessionTitle {
+    QString title;
+    QString description;
+};
+
+// The official notify hook exposes only `last-assistant-message`. Some
+// desktop clients put a newly-created session title in that string as a JSON
+// object instead of emitting a separate event. Parse only a complete,
+// bounded object and copy allow-listed title/description fields; opaque
+// thread, cwd, and turn metadata must never reach a notification bubble.
+std::optional<EmbeddedSessionTitle> embeddedSessionTitle(
+    QJsonObject const& object, int depth = 0)
+{
+    constexpr int kMaxDepth = 2;
+    auto titleValue = findValue(object,
+        { QStringLiteral("session-title"), QStringLiteral("sessionTitle"),
+            QStringLiteral("thread-title"), QStringLiteral("threadTitle"),
+            QStringLiteral("session-name"), QStringLiteral("sessionName"),
+            QStringLiteral("thread-name"), QStringLiteral("threadName"),
+            QStringLiteral("title") });
+    if (titleValue.isString() && !titleValue.toString().trimmed().isEmpty()) {
+        auto descriptionValue = findValue(object,
+            { QStringLiteral("description"), QStringLiteral("summary"),
+                QStringLiteral("preview"), QStringLiteral("message"),
+                QStringLiteral("body"), QStringLiteral("content"),
+                QStringLiteral("text") });
+        QString description;
+        if (descriptionValue.isString()) {
+            description = descriptionValue.toString();
+        }
+        return EmbeddedSessionTitle { titleValue.toString(), description };
+    }
+
+    if (depth >= kMaxDepth) {
+        return std::nullopt;
+    }
+    for (auto const& key : { QStringLiteral("result"),
+        QStringLiteral("response"), QStringLiteral("data"),
+        QStringLiteral("message"), QStringLiteral("content") })
+    {
+        auto value = object.value(key);
+        if (!value.isObject()) {
+            continue;
+        }
+        auto nested = embeddedSessionTitle(value.toObject(), depth + 1);
+        if (nested.has_value()) {
+            return nested;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<EmbeddedSessionTitle> parseEmbeddedSessionTitle(
+    QString const& message)
+{
+    auto const bytes = message.trimmed().toUtf8();
+    if (bytes.isEmpty() || bytes.size() > kMaxStringBytes ||
+        !bytes.startsWith('{') || !bytes.endsWith('}')) {
+        return std::nullopt;
+    }
+    QJsonParseError parseError;
+    auto document = QJsonDocument::fromJson(bytes, &parseError);
+    if (parseError.error != QJsonParseError::NoError ||
+        !document.isObject()) {
+        return std::nullopt;
+    }
+    return embeddedSessionTitle(document.object());
+}
+
 }
 
 QString codexActivityStateName(CodexActivityState state) {
@@ -282,6 +352,25 @@ bool codexActivityFromJson(QJsonObject const& object, CodexActivity &activity,
                 activity.sessionDescription = activity.lastAssistantMessage;
             }
             activity.isNewSession = true;
+        }
+
+        // The official notify hook has no separate title event. Desktop
+        // clients may therefore return a JSON title object as the final
+        // assistant message. Convert it into the transient title model so
+        // the mascot bubble shows the title/summary rather than protocol JSON.
+        if (!activity.isNewSession) {
+            auto embedded = parseEmbeddedSessionTitle(
+                activity.lastAssistantMessage);
+            if (embedded.has_value()) {
+                activity.sessionTitle = embedded->title.trimmed();
+                activity.sessionDescription =
+                    embedded->description.trimmed();
+                activity.lastAssistantMessage =
+                    activity.sessionDescription.isEmpty()
+                    ? activity.sessionTitle
+                    : activity.sessionDescription;
+                activity.isNewSession = true;
+            }
         }
     }
 

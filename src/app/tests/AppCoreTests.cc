@@ -433,6 +433,32 @@ void testCodexActivityParsing() {
 
     recognized = false;
     error.clear();
+    auto embeddedTitle = QJsonDocument(QJsonObject {
+        { QStringLiteral("title"), QStringLiteral("Staging store") },
+        { QStringLiteral("description"),
+            QStringLiteral("Use the public registry.") },
+        // These fields must never be copied into the transient notification.
+        { QStringLiteral("cwd"), QStringLiteral("C:/private") },
+        { QStringLiteral("thread-id"), QStringLiteral("opaque-thread") },
+    }).toJson(QJsonDocument::Compact);
+    expect(codexActivityFromJson(QJsonObject {
+        { QStringLiteral("type"), QStringLiteral("agent-turn-complete") },
+        { QStringLiteral("last-assistant-message"),
+            QString::fromUtf8(embeddedTitle) },
+    }, activity, &recognized, &error) && recognized && activity.isNewSession &&
+        activity.sessionTitle == QStringLiteral("Staging store") &&
+        activity.sessionDescription == QStringLiteral("Use the public registry.") &&
+        activity.lastAssistantMessage == QStringLiteral("Use the public registry."),
+        "Codex completion should decode a bounded JSON session title");
+    auto embeddedJson = codexActivityToJson(activity);
+    expect(embeddedJson.value(QStringLiteral("last-assistant-message")).toString() ==
+        QStringLiteral("Use the public registry.") &&
+        !embeddedJson.contains(QStringLiteral("cwd")) &&
+        !embeddedJson.contains(QStringLiteral("thread-id")),
+        "Codex title adaptation should not expose private metadata");
+
+    recognized = false;
+    error.clear();
     expect(codexActivityFromJson(QJsonObject {
         { QStringLiteral("type"), QStringLiteral("session-title-updated") },
         { QStringLiteral("thread-id"), QStringLiteral("new-thread") },
