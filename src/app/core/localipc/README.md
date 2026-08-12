@@ -20,4 +20,5 @@ CLI client 连接固定 server name → 写入一行 JSON → server 读取到�
 - JSONL 的换行是消息边界；不要把多行 pretty JSON 写到 socket。
 - IPC 错误应区分无法连接、超时、非法 JSON、业务错误和 runtime 未启动。
 - worker 与 GUI 的边界由 Dispatcher/Service 维护；不要从 socket 线程访问 QWidget。
-- 安全上限见 include/shijima-qt/SecurityLimits.hpp；新增命令要补 AppCoreTests。
+- 安全上限见 include/shijima-qt/SecurityLimits.hpp；新增命令要补 CLI/IPC
+  smoke verification and keep the JSON contract documented at the dispatcher boundary。

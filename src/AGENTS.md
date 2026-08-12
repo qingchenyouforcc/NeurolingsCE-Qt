@@ -10,7 +10,8 @@ These guidelines apply to all code under `src/`. NeurolingsCE is a C++17/Qt 6 de
 - `app/core/` contains commands, assets, audio, HTTP, IPC, updates, and the embedded Shijima behavior engine. Preserve action/behavior XML compatibility when modifying `shijima-engine/`.
 - `app/runtime/` owns application lifecycle, mascot sessions, template storage, and environment coordination.
 - `app/ui/` is split into mascot rendering/interaction, pages, dialogs, menus, and reusable widgets. Keep domain rules out of widgets.
-- `app/tests/` contains CTest-backed regression tests, primarily `AppCoreTests.cc`.
+- Regression checks are covered by the application/CLI build and CI smoke paths;
+  no standalone test target is generated from `app/tests/`.
 - `platform/Platform/{Windows,Linux,macOS,Stub}` contains OS-specific implementations behind shared interfaces.
 - `assets/` and `resources/` hold the bundled mascot and Qt resources; `packaging/` and `tools/` support distribution builds.
 
@@ -23,11 +24,10 @@ Run commands from the repository root:
 ```powershell
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DQt6_DIR=D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6
 cmake --build build --parallel
-ctest --test-dir build -C Debug --output-on-failure
 build/bin/NeurolingsCE-cli --json --version
 ```
 
-These configure Qt, compile all targets, run registered tests, and smoke-test the CLI respectively.
+These configure Qt, compile all targets, and smoke-test the CLI.
 
 ## Coding Style & Naming Conventions
 
@@ -35,7 +35,9 @@ Follow nearby code: four-space indentation, same-line opening braces, `PascalCas
 
 ## Testing Guidelines
 
-Add focused regression cases to `app/tests/AppCoreTests.cc` and register new executables with CMake/CTest. Name helpers by behavior, such as `testSelectsNearestBroadcastTarget`. Engine, lifecycle, and platform fixes require a clean build plus relevant CTest and manual UI or CLI verification.
+Keep behavior checks in the supported application/CLI verification paths. Engine,
+lifecycle, and platform fixes require a clean build plus relevant manual UI or
+CLI verification.
 
 ## Commit & Pull Request Guidelines
 

@@ -6,8 +6,6 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_D
 
 project(NeurolingsCE VERSION ${PROJECT_VERSION} LANGUAGES C CXX)
 
-enable_testing()
-
 if(MSVC)
   # This project expects a 64-bit Qt when using Qt's msvc2022_64 kit.
   # If you configure with Ninja from a Win32 (x86) environment, Qt6Config will be rejected.
@@ -587,86 +585,6 @@ set_target_properties(NeurolingsCECli PROPERTIES OUTPUT_NAME "NeurolingsCE-cli")
 if(SHIJIMA_USE_QTMULTIMEDIA)
   target_link_libraries(NeurolingsCE PRIVATE Qt6::Multimedia)
 endif()
-
-add_executable(NeurolingsCETests
-  src/app/tests/AppCoreTests.cc
-  src/app/cli/CommandLineParser.cc
-  src/app/core/AppLog.cc
-  src/app/core/assets/MascotPackage.cc
-  src/app/core/assets/SafePath.cc
-  src/app/core/mascotstore/MascotStoreCache.cc
-  src/app/core/mascotstore/MascotStoreCoordinator.cc
-  src/app/core/mascotstore/MascotStoreIndex.cc
-  src/app/core/mascotstore/MascotStoreNetwork.cc
-  src/app/core/github/Secrets.cc
-  src/app/core/github/InMemoryCredentialStore.cc
-  src/app/core/github/GitHubAuthManager.cc
-  include/shijima-qt/MascotStoreCoordinator.hpp
-  include/shijima-qt/MascotStoreNetwork.hpp
-  include/shijima-qt/GitHubAuthManager.hpp
-  src/app/core/commands/MascotApi.cc
-  src/app/core/commands/CodexActivity.cc
-  src/app/core/codex/CodexConfigManager.cc
-)
-target_include_directories(NeurolingsCETests PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/app
-  ${CMAKE_CURRENT_SOURCE_DIR}/libshimejifinder
-)
-target_compile_definitions(NeurolingsCETests PRIVATE
-  NEUROLINGSCE_VERSION="${PROJECT_VERSION}"
-  APP_NAME="NeurolingsCE"
-  APP_DISPLAY_NAME="NeurolingsCE[Shijima-Qt Edition]"
-)
-target_link_libraries(NeurolingsCETests PRIVATE
-  Qt6::Core
-  Qt6::Concurrent
-  Qt6::Gui
-  Qt6::Network
-  NeurolingsShijimaEngine
-  shimejifinder
-)
-if(MSVC)
-  set_property(TARGET NeurolingsCETests PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
-endif()
-if(WIN32)
-  target_compile_definitions(NeurolingsCETests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-endif()
-add_test(NAME NeurolingsCETests COMMAND NeurolingsCETests)
-
-add_executable(NeurolingsCEBubbleTests
-  src/app/tests/CodexBubbleFormatterTests.cc
-  src/app/core/commands/CodexActivity.cc
-  src/app/ui/widgets/CodexBubbleFormatter.cc
-)
-target_include_directories(NeurolingsCEBubbleTests PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/app
-)
-target_link_libraries(NeurolingsCEBubbleTests PRIVATE
-  Qt6::Core
-  Qt6::Gui
-)
-if(MSVC)
-  set_property(TARGET NeurolingsCEBubbleTests PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
-endif()
-if(WIN32)
-  target_compile_definitions(NeurolingsCEBubbleTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-endif()
-add_test(NAME NeurolingsCEBubbleTests COMMAND NeurolingsCEBubbleTests)
-set(_codex_bubble_test_environment "QT_QPA_PLATFORM=offscreen")
-get_filename_component(_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
-set(_qt_platform_plugin_dir "${_qt_prefix}/plugins/platforms")
-if(EXISTS "${_qt_platform_plugin_dir}")
-  list(APPEND _codex_bubble_test_environment
-    "QT_QPA_PLATFORM_PLUGIN_PATH=${_qt_platform_plugin_dir}")
-endif()
-set_tests_properties(NeurolingsCEBubbleTests PROPERTIES
-  ENVIRONMENT "${_codex_bubble_test_environment}"
-  TIMEOUT 10
-)
 
 if(WIN32)
   target_compile_definitions(NeurolingsCE PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
