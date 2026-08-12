@@ -22,9 +22,13 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QIcon>
+#include <QLibraryInfo>
 #include <QMessageBox>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QLocale>
+#include <QSettings>
+#include <QTranslator>
 #include "shijima-qt/AppLog.hpp"
 #include <shijima/log.hpp>
 #include "Platform/Platform.hpp"
@@ -44,6 +48,63 @@ namespace {
 
 QString const kCliRuntimeArgument = QStringLiteral("--neurolingsce-cli-runtime");
 QString const kStartupLaunchArgument = QStringLiteral("--neurolingsce-startup");
+
+QString normalizeBootstrapLanguage(QString code)
+{
+    code = code.trimmed();
+    if (code.compare(QStringLiteral("zh_CN"), Qt::CaseInsensitive) == 0 ||
+        code.startsWith(QStringLiteral("zh"), Qt::CaseInsensitive))
+    {
+        return QStringLiteral("zh_CN");
+    }
+    return QStringLiteral("en");
+}
+
+struct BootstrapTranslators {
+    QCoreApplication *app = nullptr;
+    QTranslator own;
+    QTranslator qt;
+    bool ownInstalled = false;
+    bool qtInstalled = false;
+
+    ~BootstrapTranslators()
+    {
+        uninstall();
+    }
+
+    void install(QCoreApplication *application, QString const& language)
+    {
+        app = application;
+        if (app == nullptr || language == QStringLiteral("en")) {
+            return;
+        }
+        if (own.load(QStringLiteral("shijima-qt_") + language,
+                QStringLiteral(":/i18n"))) {
+            app->installTranslator(&own);
+            ownInstalled = true;
+        }
+        if (qt.load(QStringLiteral("qt_") + language,
+                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+            app->installTranslator(&qt);
+            qtInstalled = true;
+        }
+    }
+
+    void uninstall()
+    {
+        if (app == nullptr) {
+            return;
+        }
+        if (qtInstalled) {
+            app->removeTranslator(&qt);
+            qtInstalled = false;
+        }
+        if (ownInstalled) {
+            app->removeTranslator(&own);
+            ownInstalled = false;
+        }
+    }
+};
 
 bool cliRuntimeMode(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
@@ -199,6 +260,16 @@ int main(int argc, char **argv) {
     if (startedForCli) {
         app.setQuitOnLastWindowClosed(false);
     }
+    BootstrapTranslators bootstrapTranslators;
+    if (!startedForCli) {
+        QSettings settings(QStringLiteral("pixelomer"),
+            QStringLiteral("Shijima-Qt"));
+        QString language = settings.contains(QStringLiteral("language"))
+            ? normalizeBootstrapLanguage(settings.value(
+                QStringLiteral("language")).toString())
+            : normalizeBootstrapLanguage(QLocale::system().name());
+        bootstrapTranslators.install(&app, language);
+    }
     AppLog::initialize(&app);
     installShijimaEngineLogger();
     APP_LOG_INFO("startup") << "GUI startup initialized argc=" << argc
@@ -246,6 +317,10 @@ int main(int argc, char **argv) {
         }
         APP_LOG_INFO("startup") << "Application startup checks passed";
         auto *manager = ShijimaManager::defaultManager();
+        // The manager installs its own translators before creating visible
+        // widgets.  Drop the short-lived bootstrap copies once construction
+        // succeeds so translator ownership remains unambiguous.
+        bootstrapTranslators.uninstall();
         if (!startedForCli && !startedFromSystemStartup) {
             manager->show();
         }

@@ -48,6 +48,16 @@ ManagerMascotRuntime → ShijimaWidget / SpeechBubbleWidget。
 
 消息长度、事件识别、模板选择和气泡排版分别在 commands、runtime、ui/widgets 中完成。
 
+### 翻译边界
+
+GUI 自有文案维护在 `translations/shijima-qt_zh_CN.ts`，构建时由
+Qt LinguistTools 编译并嵌入；Qt 标准控件文案从 Qt 安装目录的
+`TranslationsPath` 加载。`main.cc` 只为重复实例和早期启动错误短暂安装
+bootstrap translator，正常窗口由 Manager 持有 translator。切换语言仍采用重启语义，
+以确保一次启动内所有页面使用同一套翻译。CLI 输出、JSON/IPC/HTTP 协议字段、错误代码、日志和包格式
+常量是稳定英文接口，不应本地化；GUI 可以只把已知错误代码映射为本地化说明，
+同时保留服务器或 Qt 返回的动态详情供诊断。
+
 ## Agent 阅读规则
 
 - 先读本文件，再读目标文件所在目录最近的 README.md；需要跨层修改时同时读调用方和被调用方的 README。

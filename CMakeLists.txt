@@ -564,7 +564,9 @@ if(TARGET Qt6::lrelease)
   )
   message(STATUS "Qt LinguistTools found; translations will be compiled and embedded.")
 else()
-  message(WARNING "Qt6 LinguistTools not found; translations will NOT be compiled. Install qt6-tools or equivalent.")
+  message(FATAL_ERROR
+    "Qt6 LinguistTools/lrelease is required to build the GUI with its embedded translations. "
+    "Install the Qt LinguistTools package or configure with a complete Qt installation.")
 endif()
 
 if(MSVC)
@@ -610,9 +612,12 @@ if(WIN32)
   endif()
 
   if(QT_WINDEPLOYQT_EXECUTABLE)
+    # The GUI loads Qt's standard zh_CN catalog from QLibraryInfo's deployed
+    # translations directory.  Deploy only the locale we ship; the CLI keeps
+    # its stable English output and does not need Qt widget catalogs.
     add_custom_command(TARGET NeurolingsCE POST_BUILD
       COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
-              --no-translations
+              --translations zh_CN
               --no-system-d3d-compiler
               "$<TARGET_FILE:NeurolingsCE>"
       WORKING_DIRECTORY "$<TARGET_FILE_DIR:NeurolingsCE>"

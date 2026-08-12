@@ -162,13 +162,6 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         ShijimaManagerUiInternal::applyMascotListTheme(*m_ui->listWidget);
     });
 
-    setWindowTitle(tr(APP_NAME " \u2014 Mascot Manager"));
-    auto *elaStatusBar = new ElaStatusBar(this);
-    setStatusBar(elaStatusBar);
-    m_ui->statusLabel = new QLabel(this);
-    elaStatusBar->addWidget(m_ui->statusLabel, 1);
-    updateStatusBar();
-
     auto normalizeLanguageCode = [](QString code) {
         code = code.trimmed();
         if (code.compare("zh_CN", Qt::CaseInsensitive) == 0 ||
@@ -179,6 +172,9 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         return QStringLiteral("en");
     };
 
+    // Install the persisted translator before constructing any user-visible
+    // labels/pages.  This makes the first title/status render match the
+    // selected language instead of relying on a later LanguageChange event.
     QString savedLang = m_settings->contains("language")
         ? normalizeLanguageCode(m_settings->value("language").toString())
         : normalizeLanguageCode(QLocale::system().name());
@@ -187,6 +183,13 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         m_ui->currentLanguage = "en";
         switchLanguage(savedLang);
     }
+
+    setWindowTitle(tr(APP_NAME " \u2014 Mascot Manager"));
+    auto *elaStatusBar = new ElaStatusBar(this);
+    setStatusBar(elaStatusBar);
+    m_ui->statusLabel = new QLabel(this);
+    elaStatusBar->addWidget(m_ui->statusLabel, 1);
+    updateStatusBar();
 
     m_runtime->environment.setDetachThreshold(m_settings->value("detachThreshold",
         QVariant::fromValue(30.0)).toDouble());
@@ -216,11 +219,14 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         m_settings->value("http/enabled", false).toBool())
     {
         if (!m_httpApi->start("127.0.0.1", 32456)) {
-            QString error = QString::fromStdString(m_httpApi->lastError());
-            if (error.isEmpty()) {
-                error = tr("HTTP API bind failed. The port may already be in use.");
+            QString const detail = QString::fromStdString(m_httpApi->lastError());
+            QString error = tr("HTTP API bind failed. The port may already be in use.");
+            if (!detail.trimmed().isEmpty()) {
+                error += QLatin1Char('\n') + tr("HTTP API details: %1")
+                    .arg(detail);
             }
-            APP_LOG_ERROR("http") << error.toStdString();
+            APP_LOG_ERROR("http") << (detail.isEmpty()
+                ? error.toStdString() : detail.toStdString());
             QTimer::singleShot(0, this, [this, error]() {
                 QMessageBox::warning(
                     this,

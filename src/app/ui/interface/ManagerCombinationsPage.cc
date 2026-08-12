@@ -37,6 +37,7 @@
 #include <QListWidget>
 #include <QMap>
 #include <QMessageBox>
+#include <QLocale>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSettings>
@@ -67,9 +68,10 @@ enum class CombinationType {
     Saved = 1,
 };
 
-QString combinationTr(char const *sourceText)
+QString combinationTr(char const *sourceText, int n = -1)
 {
-    return QCoreApplication::translate("ShijimaManager", sourceText);
+    return QCoreApplication::translate("ShijimaManager", sourceText,
+        nullptr, n);
 }
 
 QString formatSavedAt(QString const& isoDate)
@@ -78,7 +80,8 @@ QString formatSavedAt(QString const& isoDate)
     if (!savedAt.isValid()) {
         return combinationTr("Not saved yet");
     }
-    return savedAt.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+    return QLocale::system().toString(savedAt.toLocalTime(),
+        QLocale::ShortFormat);
 }
 
 QString sanitizedForLog(QString value)
@@ -410,6 +413,7 @@ void ShijimaManager::setupCombinationsPage()
     listLayout->addWidget(listTitle);
 
     m_ui->combinationListWidget = new QListWidget(listPanel);
+    m_ui->combinationListWidget->setAccessibleName(tr("Saved Combinations"));
     m_ui->combinationListWidget->setSelectionMode(QListWidget::SingleSelection);
     m_ui->combinationListWidget->setUniformItemSizes(false);
     listLayout->addWidget(m_ui->combinationListWidget, 1);
@@ -424,6 +428,7 @@ void ShijimaManager::setupCombinationsPage()
     detailsLayout->addWidget(detailsTitle);
 
     m_ui->combinationDetailsLabel = new QLabel(tr("Select a combination."), detailsPanel);
+    m_ui->combinationDetailsLabel->setAccessibleName(tr("Combination details"));
     m_ui->combinationDetailsLabel->setWordWrap(true);
     m_ui->combinationDetailsLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_ui->combinationDetailsLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -431,6 +436,8 @@ void ShijimaManager::setupCombinationsPage()
     detailsLayout->addWidget(m_ui->combinationDetailsLabel, 1);
 
     m_ui->restoreCombinationButton = new ElaPushButton(tr("Restore Combination"), detailsPanel);
+    m_ui->restoreCombinationButton->setAccessibleName(
+        m_ui->restoreCombinationButton->text());
     m_ui->restoreCombinationButton->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
     configureCombinationButton(static_cast<ElaPushButton *>(m_ui->restoreCombinationButton));
     connect(m_ui->restoreCombinationButton, &QPushButton::clicked,
@@ -438,6 +445,8 @@ void ShijimaManager::setupCombinationsPage()
     detailsLayout->addWidget(m_ui->restoreCombinationButton);
 
     m_ui->deleteCombinationButton = new ElaPushButton(tr("Delete Saved Combination"), detailsPanel);
+    m_ui->deleteCombinationButton->setAccessibleName(
+        m_ui->deleteCombinationButton->text());
     m_ui->deleteCombinationButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
     configureCombinationButton(static_cast<ElaPushButton *>(m_ui->deleteCombinationButton));
     connect(m_ui->deleteCombinationButton, &QPushButton::clicked,
@@ -578,7 +587,8 @@ void ShijimaManager::saveCurrentCombination()
     }
 
     QString defaultName = tr("Combination %1")
-        .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm")));
+        .arg(QLocale::system().toString(QDateTime::currentDateTime(),
+            QLocale::ShortFormat));
     bool ok = false;
     QString name = QInputDialog::getText(this,
         tr("Save Combination"),
@@ -740,15 +750,14 @@ int ShijimaManager::restoreCombination(QJsonObject const& combination, bool show
     if (showMessages && !missing.isEmpty()) {
         QMessageBox::warning(this,
             tr("Combinations"),
-            tr("Restored %1 mascot(s). Missing templates: %2")
-                .arg(restored)
+            combinationTr("Restored %n mascot(s). Missing templates: %1", restored)
                 .arg(missing.join(QStringLiteral(", "))));
     }
     else if (showMessages && !failed.isEmpty()) {
         QMessageBox::warning(this,
             tr("Combinations"),
-            tr("Restored %1 mascot(s). Some mascots could not be started: %2")
-                .arg(restored)
+            combinationTr("Restored %n mascot(s). Some mascots could not be started: %1",
+                restored)
                 .arg(failed.join(QStringLiteral(", "))));
     }
     return restored;

@@ -25,6 +25,7 @@
 
 #include <QBoxLayout>
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QJsonArray>
@@ -32,12 +33,149 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QStringList>
 
 #include <QUuid>
+
+namespace {
+
+QString submissionTr(char const *source)
+{
+    return QCoreApplication::translate("MascotSubmissionDialog", source);
+}
+
+QString withSubmissionDetail(QString message, QString const& detail)
+{
+    if (!detail.trimmed().isEmpty()) {
+        message += QLatin1Char('\n') + submissionTr("Submission details: %1")
+            .arg(redactSensitiveText(detail));
+    }
+    return message;
+}
+
+QString localizedSubmissionError(QString const& code, QString const& detail)
+{
+    char const *source = "Submission failed.";
+    if (code == QStringLiteral("submission.file_missing")) {
+        source = "The selected mascot package does not exist.";
+    }
+    else if (code == QStringLiteral("submission.not_configured")) {
+        source = "The submission service is not configured by the maintainer.";
+    }
+    else if (code == QStringLiteral("submission.not_signed_in")) {
+        source = "Sign in with GitHub before submitting a mascot.";
+    }
+    else if (code == QStringLiteral("submission.auth_failed")) {
+        source = "The submission service could not authenticate GitHub.";
+    }
+    else if (code == QStringLiteral("submission.auth_invalid")) {
+        source = "The submission service returned no session token.";
+    }
+    else if (code == QStringLiteral("submission.file_unreadable")) {
+        source = "The selected mascot package could not be read.";
+    }
+    else if (code == QStringLiteral("submission.canceled")) {
+        source = "The upload was canceled.";
+    }
+    else if (code == QStringLiteral("submission.service_error")) {
+        source = "The submission service rejected the upload.";
+    }
+    else if (code == QStringLiteral("submission.network_error")) {
+        source = "Could not reach the submission service.";
+    }
+    return withSubmissionDetail(submissionTr(source), detail);
+}
+
+QString localizedValidationError(QString const& error)
+{
+    if (error == QStringLiteral("Mascot package does not exist")) {
+        return submissionTr("Mascot package does not exist.");
+    }
+    if (error == QStringLiteral("Package is not a valid ZIP archive")) {
+        return submissionTr("Package is not a valid ZIP archive.");
+    }
+    if (error.startsWith(QStringLiteral("Package is missing "))) {
+        return submissionTr("Package is missing %1").arg(
+            error.mid(QStringLiteral("Package is missing ").size()));
+    }
+    if (error == QStringLiteral(
+            "Package must contain actions.xml, behaviors.xml, and img/*.png"))
+    {
+        return submissionTr(
+            "Package must contain actions.xml, behaviors.xml, and img/*.png.");
+    }
+    if (error.startsWith(QStringLiteral("Could not read "))) {
+        return submissionTr("Could not read %1").arg(
+            error.mid(QStringLiteral("Could not read ").size()));
+    }
+    if (error.startsWith(QStringLiteral("Missing "))) {
+        return submissionTr("Missing %1").arg(
+            error.mid(QStringLiteral("Missing ").size()));
+    }
+    if (error.startsWith(QStringLiteral("Unsupported or unsafe package entry: "))) {
+        return submissionTr("Unsupported or unsafe package entry: %1").arg(
+            error.mid(QStringLiteral("Unsupported or unsafe package entry: ").size()));
+    }
+    if (error.startsWith(QStringLiteral("Package contains a forbidden payload entry: "))) {
+        return submissionTr("Package contains a forbidden payload entry: %1").arg(
+            error.mid(QStringLiteral("Package contains a forbidden payload entry: ").size()));
+    }
+    if (error.startsWith(QStringLiteral("Package entry ")) &&
+        error.endsWith(QStringLiteral(" exceeds size limits"))) {
+        return submissionTr("Package entry %1 exceeds size limits").arg(
+            error.mid(QStringLiteral("Package entry ").size(),
+                error.size() - QStringLiteral("Package entry ").size() -
+                QStringLiteral(" exceeds size limits").size()));
+    }
+    if (error.startsWith(QStringLiteral("Package must contain "))) {
+        return submissionTr("Package must contain %1").arg(
+            error.mid(QStringLiteral("Package must contain ").size()));
+    }
+    if (error.startsWith(QStringLiteral("Image ")) &&
+        error.endsWith(QStringLiteral(" is not a valid PNG"))) {
+        return submissionTr("Image %1 is not a valid PNG").arg(
+            error.mid(QStringLiteral("Image ").size(),
+                error.size() - QStringLiteral("Image ").size() -
+                QStringLiteral(" is not a valid PNG").size()));
+    }
+    static QRegularExpression const imageBudgetPattern(
+        QStringLiteral("^Image (.+) exceeds the maximum pixel count of ([0-9]+)$"));
+    QRegularExpressionMatch imageBudgetMatch = imageBudgetPattern.match(error);
+    if (imageBudgetMatch.hasMatch()) {
+        return submissionTr("Image %1 exceeds the maximum pixel count of %2")
+            .arg(imageBudgetMatch.captured(1), imageBudgetMatch.captured(2));
+    }
+    if (error == QStringLiteral("Package extracted data is too large")) {
+        return submissionTr("Package extracted data is too large.");
+    }
+    if (error.startsWith(QStringLiteral(
+            "Package image data exceeds the total pixel budget of "))) {
+        return submissionTr(
+            "Package image data exceeds the total pixel budget of %1")
+            .arg(error.mid(QStringLiteral(
+                "Package image data exceeds the total pixel budget of ").size()));
+    }
+    if (error == QStringLiteral("Could not create temporary extraction directory")) {
+        return submissionTr("Could not create temporary extraction directory.");
+    }
+    if (error == QStringLiteral("Package does not contain any supported files")) {
+        return submissionTr("Package does not contain any supported files.");
+    }
+    if (error == QStringLiteral("Archive contains symbolic links")) {
+        return submissionTr("Archive contains symbolic links.");
+    }
+    if (error == QStringLiteral("Archive extracted an unsafe path")) {
+        return submissionTr("Archive extracted an unsafe path.");
+    }
+    return error;
+}
+
+}
 
 MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     MascotSubmissionClient *client, QWidget *parent):
@@ -53,17 +191,26 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     auto addRow = [&](QString const& labelText, QWidget *widget) {
         auto *row = new QHBoxLayout;
         auto *label = new QLabel(labelText, this);
+        label->setBuddy(widget);
         label->setMinimumWidth(110);
+        widget->setAccessibleName(labelText);
         row->addWidget(label);
         row->addWidget(widget, 1);
         layout->addLayout(row);
     };
 
     m_packagePath = new QLineEdit(this);
+    m_packagePath->setAccessibleName(tr("Mascot package path"));
+    m_packagePath->setAccessibleDescription(
+        tr("Path to the .mascot package to submit."));
     auto *pickButton = new QPushButton(tr("Choose .mascot..."), this);
+    pickButton->setAccessibleName(pickButton->text());
     auto *pathRow = new QHBoxLayout;
     pathRow->addWidget(m_packagePath, 1);
     pathRow->addWidget(pickButton);
+    auto *pathLabel = new QLabel(tr("Mascot package"), this);
+    pathLabel->setBuddy(m_packagePath);
+    layout->addWidget(pathLabel);
     layout->addLayout(pathRow);
     connect(pickButton, &QPushButton::clicked, this,
         &MascotSubmissionDialog::pickPackage);
@@ -81,7 +228,7 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     m_description = new QPlainTextEdit(this);
     m_description->setPlaceholderText(tr("Detailed description"));
     m_description->setMaximumHeight(120);
-    layout->addWidget(m_description);
+    addRow(tr("Description"), m_description);
     m_license = new QLineEdit(this);
     m_license->setPlaceholderText(QStringLiteral("MIT"));
     addRow(tr("License (SPDX)"), m_license);
@@ -91,6 +238,7 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     m_rightsConfirmed = new QCheckBox(
         tr("I confirm I have the right to publish this work under the "
            "declared license."), this);
+    m_rightsConfirmed->setAccessibleName(m_rightsConfirmed->text());
     layout->addWidget(m_rightsConfirmed);
 
     m_statusLabel = new QLabel(this);
@@ -103,6 +251,8 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
 
     m_submitButton = new QPushButton(tr("Submit"), this);
     auto *closeButton = new QPushButton(tr("Close"), this);
+    m_submitButton->setAccessibleName(m_submitButton->text());
+    closeButton->setAccessibleName(closeButton->text());
     auto *buttonRow = new QHBoxLayout;
     buttonRow->addStretch(1);
     buttonRow->addWidget(closeButton);
@@ -125,7 +275,8 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
             else {
                 m_statusLabel->setText(tr("Submission failed (%1): %2")
                     .arg(result.errorCode,
-                         redactSensitiveText(result.error)));
+                         localizedSubmissionError(result.errorCode,
+                             result.error)));
             }
         });
     connect(m_client, &MascotSubmissionClient::uploadProgress, this,
@@ -150,8 +301,12 @@ void MascotSubmissionDialog::pickPackage() {
 void MascotSubmissionDialog::submit() {
     MascotPackageReport report;
     if (!MascotPackage::validatePackage(m_packagePath->text(), report)) {
+        QStringList localizedErrors;
+        for (QString const& error : report.errors) {
+            localizedErrors.append(localizedValidationError(error));
+        }
         m_statusLabel->setText(tr("Local validation failed:\n%1")
-            .arg(report.errors.join(QStringLiteral("\n"))));
+            .arg(localizedErrors.join(QStringLiteral("\n"))));
         return;
     }
     if (!m_rightsConfirmed->isChecked()) {

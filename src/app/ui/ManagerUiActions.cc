@@ -31,6 +31,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QFileDialog>
+#include <QLibraryInfo>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
@@ -162,7 +163,7 @@ void ShijimaManager::deleteAction() {
         msg += "\n* " + selected[i]->text();
     }
     if (selected.size() > 5) {
-        msg += tr("\n... and %1 other(s)").arg(selected.size() - 5);
+        msg += tr("\n... and %n other(s)", nullptr, selected.size() - 5);
     }
 
     QMessageBox msgBox { this };
@@ -357,7 +358,12 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
             qApp->installTranslator(m_ui->translator);
         }
         m_ui->qtTranslator = new QTranslator(this);
-        if (m_ui->qtTranslator->load("qt_" + langCode, ":/i18n")) {
+        // Qt's standard-dialog strings live beside the Qt installation, not
+        // in NeurolingsCE's embedded resource collection.  Loading from the
+        // documented translations path also keeps the translator lifetime
+        // tied to this manager while preserving restart-on-language-change.
+        if (m_ui->qtTranslator->load("qt_" + langCode,
+                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
             qApp->installTranslator(m_ui->qtTranslator);
         }
     }

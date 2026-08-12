@@ -207,9 +207,11 @@
         <source>Refreshing store...</source>
         <translation>正在刷新商店...</translation>
     </message>
-    <message>
-        <source>%1 mascots</source>
-        <translation>%1 个桌宠</translation>
+    <message numerus="yes">
+        <source>%n mascot(s)</source>
+        <translation>
+            <numerusform>%n 个桌宠</numerusform>
+        </translation>
     </message>
     <message>
         <source>Mascot registry</source>
@@ -296,8 +298,8 @@
         <translation>下载已取消。</translation>
     </message>
     <message>
-        <source>Install failed (%1): %2</source>
-        <translation>安装失败（%1）：%2</translation>
+        <source>Install failed: %1</source>
+        <translation>安装失败：%1</translation>
     </message>
     <message>
         <source>Sign out</source>
@@ -415,26 +417,6 @@
     <message>
         <source>Check the mascots that should be converted.</source>
         <translation>勾选需要转换的桌宠。</translation>
-    </message>
-    <message>
-        <source>Description</source>
-        <translation>描述</translation>
-    </message>
-    <message>
-        <source>Select a mascot to view its description.</source>
-        <translation>选择桌宠后查看其描述。</translation>
-    </message>
-    <message>
-        <source>Selected mascot description</source>
-        <translation>所选桌宠的描述</translation>
-    </message>
-    <message>
-        <source>Description of the currently selected mascot.</source>
-        <translation>当前所选桌宠的描述。</translation>
-    </message>
-    <message>
-        <source>No description provided.</source>
-        <translation>未提供描述。</translation>
     </message>
     <message>
         <source>info.json</source>
@@ -579,10 +561,6 @@
         <translation>
             <numerusform>%n 个可转换。</numerusform>
         </translation>
-    </message>
-    <message>
-        <source>Found %1 mascot(s), %2 ready to convert.</source>
-        <translation>找到 %1 个桌宠，%2 个可转换。</translation>
     </message>
     <message>
         <source>Choose an output folder first.</source>
@@ -879,9 +857,17 @@
         <source>This combination does not contain any mascots.</source>
         <translation>这个组合不包含任何桌宠。</translation>
     </message>
-    <message>
-        <source>Restored %1 mascot(s). Missing templates: %2</source>
-        <translation>已恢复 %1 个桌宠。缺少模板：%2</translation>
+    <message numerus="yes">
+        <source>Restored %n mascot(s). Missing templates: %1</source>
+        <translation>
+            <numerusform>已恢复 %n 个桌宠。缺少模板：%1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Restored %n mascot(s). Some mascots could not be started: %1</source>
+        <translation>
+            <numerusform>已恢复 %n 个桌宠。部分桌宠无法启动：%1</numerusform>
+        </translation>
     </message>
     <message>
         <source>Delete Combination</source>
@@ -957,8 +943,14 @@
         <translation>通过专属桌宠气泡显示 Codex 完成消息。本集成不处理 Codex 审批请求。</translation>
     </message>
     <message>
-        <source>Allow NeurolingsCE to update the Codex user configuration?\n\nPath: %1\nCommand: %2</source>
-        <translation>是否允许 NeurolingsCE 更新 Codex 用户配置？\n\n路径：%1\n命令：%2</translation>
+        <source>Allow NeurolingsCE to update the Codex user configuration?
+
+Path: %1
+Command: %2</source>
+        <translation>是否允许 NeurolingsCE 更新 Codex 用户配置？
+
+路径：%1
+命令：%2</translation>
     </message>
     <message>
         <source>Enable Codex notifications</source>
@@ -969,8 +961,14 @@
         <translation>Codex 通知</translation>
     </message>
     <message>
-        <source>\n\nCopy this line into the configuration manually if desired:\n%1</source>
-        <translation>\n\n如需手动配置，请复制以下内容：\n%1</translation>
+        <source>
+
+Copy this line into the configuration manually if desired:
+%1</source>
+        <translation>
+
+如需手动配置，请复制以下内容：
+%1</translation>
     </message>
     <message>
         <source>Enable Codex message bubbles</source>
@@ -1190,10 +1188,6 @@
         <translation>查看许可证</translation>
     </message>
     <message>
-        <source>Shijima Website</source>
-        <translation>Shijima 网站</translation>
-    </message>
-    <message>
         <source>Report Issue</source>
         <translation>报告问题</translation>
     </message>
@@ -1354,11 +1348,13 @@
         <source>Are you sure you want to delete these shimeji?</source>
         <translation>确定要删除这些桌宠吗？</translation>
     </message>
-    <message>
+    <message numerus="yes">
         <source>
-... and %1 other(s)</source>
+... and %n other(s)</source>
         <translation>
-... 以及其他 %1 个</translation>
+            <numerusform>
+... 以及其他 %n 个</numerusform>
+        </translation>
     </message>
     <message>
         <source>Cancel</source>
@@ -1389,6 +1385,174 @@
     <message>
         <source>Do you want to close NeurolingsCE?</source>
         <translation>确定要关闭 NeurolingsCE 吗？</translation>
+    </message>
+    <message>
+        <source>No mascot selected</source>
+        <translation>未选择桌宠</translation>
+    </message>
+    <message>
+        <source>Language Changed</source>
+        <translation>语言已更改</translation>
+    </message>
+    <message>
+        <source>The application will restart to apply the new language.</source>
+        <translation>应用将重启以应用新语言。</translation>
+    </message>
+    <message>
+        <source>HTTP API bind failed. The port may already be in use.</source>
+        <translation>HTTP API 绑定失败。端口可能已被占用。</translation>
+    </message>
+    <message>
+        <source>HTTP API Failed</source>
+        <translation>HTTP API 失败</translation>
+    </message>
+    <message>
+        <source>HTTP API details: %1</source>
+        <translation>HTTP API 详情：%1</translation>
+    </message>
+    <message>
+        <source>Store</source>
+        <translation>商店</translation>
+    </message>
+    <message>
+        <source>Combination details</source>
+        <translation>组合详情</translation>
+    </message>
+    <message>
+        <source>Could not save the current combination.</source>
+        <translation>无法保存当前组合。</translation>
+    </message>
+    <message>
+        <source>Could not save the combination settings.</source>
+        <translation>无法保存组合设置。</translation>
+    </message>
+    <message>
+        <source>Could not restore this combination.</source>
+        <translation>无法恢复此组合。</translation>
+    </message>
+    <message>
+        <source>Could not clear the current mascots before restoring.</source>
+        <translation>恢复前无法清除当前桌宠。</translation>
+    </message>
+    <message>
+        <source>Could not update the saved combinations.</source>
+        <translation>无法更新已保存的组合。</translation>
+    </message>
+    <message>
+        <source>The store network request failed.</source>
+        <translation>商店网络请求失败。</translation>
+    </message>
+    <message>
+        <source>The store request timed out.</source>
+        <translation>商店请求超时。</translation>
+    </message>
+    <message>
+        <source>The store returned an HTTP error.</source>
+        <translation>商店返回了 HTTP 错误。</translation>
+    </message>
+    <message>
+        <source>The store returned an HTTP error: %1</source>
+        <translation>商店返回了 HTTP 错误：%1</translation>
+    </message>
+    <message>
+        <source>The mascot store cache is empty.</source>
+        <translation>桌宠商店缓存为空。</translation>
+    </message>
+    <message>
+        <source>The mascot store cache is corrupt.</source>
+        <translation>桌宠商店缓存已损坏。</translation>
+    </message>
+    <message>
+        <source>The mascot registry response is invalid.</source>
+        <translation>桌宠目录响应无效。</translation>
+    </message>
+    <message>
+        <source>The downloaded mascot URL is invalid.</source>
+        <translation>下载的桌宠 URL 无效。</translation>
+    </message>
+    <message>
+        <source>Could not cache the downloaded mascot.</source>
+        <translation>无法缓存下载的桌宠。</translation>
+    </message>
+    <message>
+        <source>The downloaded mascot failed SHA-256 verification.</source>
+        <translation>下载的桌宠未通过 SHA-256 校验。</translation>
+    </message>
+    <message>
+        <source>Could not write the downloaded mascot to disk.</source>
+        <translation>无法将下载的桌宠写入磁盘。</translation>
+    </message>
+    <message>
+        <source>GitHub request failed.</source>
+        <translation>GitHub 请求失败。</translation>
+    </message>
+    <message>
+        <source>Could not reach GitHub.</source>
+        <translation>无法连接到 GitHub。</translation>
+    </message>
+    <message>
+        <source>GitHub returned an invalid response.</source>
+        <translation>GitHub 返回了无效响应。</translation>
+    </message>
+    <message>
+        <source>GitHub Device Flow is disabled. Enable it in the app settings and try again.</source>
+        <translation>GitHub Device Flow 已禁用。请在应用设置中启用后重试。</translation>
+    </message>
+    <message>
+        <source>GitHub rejected the device code request.</source>
+        <translation>GitHub 拒绝了设备代码请求。</translation>
+    </message>
+    <message>
+        <source>GitHub authorization was denied.</source>
+        <translation>GitHub 授权被拒绝。</translation>
+    </message>
+    <message>
+        <source>The GitHub verification code expired; start again.</source>
+        <translation>GitHub 验证码已过期，请重新开始。</translation>
+    </message>
+    <message>
+        <source>GitHub polling failed.</source>
+        <translation>GitHub 轮询失败。</translation>
+    </message>
+    <message>
+        <source>GitHub details: %1</source>
+        <translation>GitHub 详情：%1</translation>
+    </message>
+    <message>
+        <source>Could not read Codex configuration: %1</source>
+        <translation>无法读取 Codex 配置：%1</translation>
+    </message>
+    <message>
+        <source>Could not create Codex configuration directory</source>
+        <translation>无法创建 Codex 配置目录</translation>
+    </message>
+    <message>
+        <source>Could not create a backup of Codex configuration</source>
+        <translation>无法创建 Codex 配置备份</translation>
+    </message>
+    <message>
+        <source>Could not open Codex configuration for writing: %1</source>
+        <translation>无法打开 Codex 配置进行写入：%1</translation>
+    </message>
+    <message>
+        <source>Could not atomically update Codex configuration: %1</source>
+        <translation>无法原子更新 Codex 配置：%1</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE's managed Codex block contains invalid forwarding metadata</source>
+        <translation>NeurolingsCE 管理的 Codex 配置块包含无效的转发元数据</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE's managed Codex block contains an unsupported forwarding command</source>
+        <translation>NeurolingsCE 管理的 Codex 配置块包含不支持的转发命令</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE CLI executable was not found: %1</source>
+        <translation>找不到 NeurolingsCE CLI 可执行文件：%1</translation>
+    </message>
+    <message>
+        <source>Codex config already contains a non-NeurolingsCE notify setting</source>
+        <translation>Codex 配置已经包含非 NeurolingsCE 的 notify 设置</translation>
     </message>
 </context>
 <context>
@@ -1577,6 +1741,54 @@
         <source>Custom proxy</source>
         <translation>自定义代理</translation>
     </message>
+    <message>
+        <source>Unsafe update asset name.</source>
+        <translation>更新资源名称不安全。</translation>
+    </message>
+    <message>
+        <source>The selected update asset URL is invalid.</source>
+        <translation>所选更新资源 URL 无效。</translation>
+    </message>
+    <message>
+        <source>No verified installer is ready to install.</source>
+        <translation>没有可安装的已验证安装程序。</translation>
+    </message>
+    <message>
+        <source>The release did not publish SHA256SUMS.txt. Open the release page and install manually.</source>
+        <translation>该版本未发布 SHA256SUMS.txt。请打开发布页面并手动安装。</translation>
+    </message>
+    <message>
+        <source>The downloaded installer changed after verification. Open the release page and install manually.</source>
+        <translation>下载的安装程序在验证后发生变化。请打开发布页面并手动安装。</translation>
+    </message>
+    <message>
+        <source>The downloaded installer failed SHA-256 verification. Open the release page and install manually.</source>
+        <translation>下载的安装程序未通过 SHA-256 校验。请打开发布页面并手动安装。</translation>
+    </message>
+    <message>
+        <source>Could not persist the verified installer state. Open the release page and install manually.</source>
+        <translation>无法保存已验证安装程序的状态。请打开发布页面并手动安装。</translation>
+    </message>
+    <message>
+        <source>The release does not include SHA256SUMS.txt, so the installer was not started automatically. Open the release page and install manually.</source>
+        <translation>该版本不包含 SHA256SUMS.txt，因此未自动启动安装程序。请打开发布页面并手动安装。</translation>
+    </message>
+    <message>
+        <source>Could not download SHA256SUMS.txt.</source>
+        <translation>无法下载 SHA256SUMS.txt。</translation>
+    </message>
+    <message>
+        <source>SHA256SUMS.txt does not contain a hash for %1. The installer was not started automatically.</source>
+        <translation>SHA256SUMS.txt 不包含 %1 的哈希值，因此未自动启动安装程序。</translation>
+    </message>
+    <message>
+        <source>No downloaded installer is available for checksum verification.</source>
+        <translation>没有可用于校验和验证的已下载安装程序。</translation>
+    </message>
+    <message>
+        <source>Could not read the downloaded installer for checksum verification.</source>
+        <translation>无法读取下载的安装程序以进行校验和验证。</translation>
+    </message>
 </context>
 <context>
     <name>SpeechBubbleWidget</name>
@@ -1591,6 +1803,10 @@
 </context>
 <context>
     <name>ShijimaContextMenu</name>
+    <message>
+        <source>Context menu</source>
+        <translation>上下文菜单</translation>
+    </message>
     <message>
         <source>Behaviors</source>
         <translation>行为</translation>
@@ -1632,6 +1848,246 @@
     </message>
 </context>
 <context>
+    <name>MascotStoreDetailDialog</name>
+    <message>
+        <source>Mascot Details</source>
+        <translation>桌宠详情</translation>
+    </message>
+    <message>
+        <source>License: %1&lt;br&gt;Authors: %2&lt;br&gt;Minimum client: %3&lt;br&gt;Package size: %4</source>
+        <translation>许可证：%1&lt;br&gt;作者：%2&lt;br&gt;最低客户端版本：%3&lt;br&gt;包大小：%4</translation>
+    </message>
+    <message>
+        <source>Mascot description</source>
+        <translation>桌宠描述</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
+    <name>MascotSubmissionDialog</name>
+    <message>
+        <source>Submit a Mascot</source>
+        <translation>提交桌宠</translation>
+    </message>
+    <message>
+        <source>Mascot package</source>
+        <translation>桌宠包</translation>
+    </message>
+    <message>
+        <source>Mascot package path</source>
+        <translation>桌宠包路径</translation>
+    </message>
+    <message>
+        <source>Path to the .mascot package to submit.</source>
+        <translation>要提交的 .mascot 包路径。</translation>
+    </message>
+    <message>
+        <source>Choose .mascot...</source>
+        <translation>选择 .mascot...</translation>
+    </message>
+    <message>
+        <source>lowercase-id (first publication is permanent)</source>
+        <translation>小写 ID（首次发布后不可更改）</translation>
+    </message>
+    <message>
+        <source>ID</source>
+        <translation>ID</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>名称</translation>
+    </message>
+    <message>
+        <source>Version</source>
+        <translation>版本</translation>
+    </message>
+    <message>
+        <source>Summary</source>
+        <translation>简介</translation>
+    </message>
+    <message>
+        <source>Description</source>
+        <translation>描述</translation>
+    </message>
+    <message>
+        <source>Detailed description</source>
+        <translation>详细描述</translation>
+    </message>
+    <message>
+        <source>License (SPDX)</source>
+        <translation>许可证（SPDX）</translation>
+    </message>
+    <message>
+        <source>github logins, comma separated</source>
+        <translation>GitHub 登录名，以逗号分隔</translation>
+    </message>
+    <message>
+        <source>Maintainers</source>
+        <translation>维护者</translation>
+    </message>
+    <message>
+        <source>I confirm I have the right to publish this work under the declared license.</source>
+        <translation>我确认有权根据所声明的许可证发布此作品。</translation>
+    </message>
+    <message>
+        <source>Submit</source>
+        <translation>提交</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Submitted. Review PR %1.</source>
+        <translation>已提交。请查看 PR %1。</translation>
+    </message>
+    <message>
+        <source>Submission failed (%1): %2</source>
+        <translation>提交失败（%1）：%2</translation>
+    </message>
+    <message>
+        <source>Uploading... %1 / %2</source>
+        <translation>正在上传……%1 / %2</translation>
+    </message>
+    <message>
+        <source>Choose a .mascot package</source>
+        <translation>选择 .mascot 包</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE packages (*.mascot)</source>
+        <translation>NeurolingsCE 包 (*.mascot)</translation>
+    </message>
+    <message>
+        <source>Local validation failed:
+%1</source>
+        <translation>本地验证失败：
+%1</translation>
+    </message>
+    <message>
+        <source>Confirm your publication rights first.</source>
+        <translation>请先确认发布权限。</translation>
+    </message>
+    <message>
+        <source>Submission details: %1</source>
+        <translation>提交详情：%1</translation>
+    </message>
+    <message>
+        <source>Submission failed.</source>
+        <translation>提交失败。</translation>
+    </message>
+    <message>
+        <source>The selected mascot package does not exist.</source>
+        <translation>所选桌宠包不存在。</translation>
+    </message>
+    <message>
+        <source>The submission service is not configured by the maintainer.</source>
+        <translation>维护者尚未配置投稿服务。</translation>
+    </message>
+    <message>
+        <source>Sign in with GitHub before submitting a mascot.</source>
+        <translation>提交桌宠前请先使用 GitHub 登录。</translation>
+    </message>
+    <message>
+        <source>The submission service could not authenticate GitHub.</source>
+        <translation>投稿服务无法验证 GitHub 身份。</translation>
+    </message>
+    <message>
+        <source>The submission service returned no session token.</source>
+        <translation>投稿服务未返回会话令牌。</translation>
+    </message>
+    <message>
+        <source>The selected mascot package could not be read.</source>
+        <translation>无法读取所选桌宠包。</translation>
+    </message>
+    <message>
+        <source>The upload was canceled.</source>
+        <translation>上传已取消。</translation>
+    </message>
+    <message>
+        <source>The submission service rejected the upload.</source>
+        <translation>投稿服务拒绝了上传。</translation>
+    </message>
+    <message>
+        <source>Could not reach the submission service.</source>
+        <translation>无法连接到投稿服务。</translation>
+    </message>
+    <message>
+        <source>Mascot package does not exist.</source>
+        <translation>桌宠包不存在。</translation>
+    </message>
+    <message>
+        <source>Package is not a valid ZIP archive.</source>
+        <translation>桌宠包不是有效的 ZIP 压缩包。</translation>
+    </message>
+    <message>
+        <source>Package is missing %1</source>
+        <translation>桌宠包缺少 %1</translation>
+    </message>
+    <message>
+        <source>Package must contain actions.xml, behaviors.xml, and img/*.png.</source>
+        <translation>桌宠包必须包含 actions.xml、behaviors.xml 和 img/*.png。</translation>
+    </message>
+    <message>
+        <source>Could not read %1</source>
+        <translation>无法读取 %1</translation>
+    </message>
+    <message>
+        <source>Missing %1</source>
+        <translation>缺少 %1</translation>
+    </message>
+    <message>
+        <source>Archive contains symbolic links.</source>
+        <translation>压缩包包含符号链接。</translation>
+    </message>
+    <message>
+        <source>Archive extracted an unsafe path.</source>
+        <translation>压缩包解压出了不安全的路径。</translation>
+    </message>
+    <message>
+        <source>Unsupported or unsafe package entry: %1</source>
+        <translation>不支持或不安全的桌宠包条目：%1</translation>
+    </message>
+    <message>
+        <source>Package contains a forbidden payload entry: %1</source>
+        <translation>桌宠包包含禁止的载荷条目：%1</translation>
+    </message>
+    <message>
+        <source>Package entry %1 exceeds size limits</source>
+        <translation>桌宠包条目 %1 超出大小限制</translation>
+    </message>
+    <message>
+        <source>Package must contain %1</source>
+        <translation>桌宠包必须包含 %1</translation>
+    </message>
+    <message>
+        <source>Image %1 is not a valid PNG</source>
+        <translation>图像 %1 不是有效的 PNG</translation>
+    </message>
+    <message>
+        <source>Image %1 exceeds the maximum pixel count of %2</source>
+        <translation>图像 %1 超出最大像素数 %2</translation>
+    </message>
+    <message>
+        <source>Package extracted data is too large.</source>
+        <translation>桌宠包解压数据过大。</translation>
+    </message>
+    <message>
+        <source>Package image data exceeds the total pixel budget of %1</source>
+        <translation>桌宠包图像数据超出总像素预算 %1</translation>
+    </message>
+    <message>
+        <source>Could not create temporary extraction directory.</source>
+        <translation>无法创建临时解压目录。</translation>
+    </message>
+    <message>
+        <source>Package does not contain any supported files.</source>
+        <translation>桌宠包不包含任何受支持的文件。</translation>
+    </message>
+</context>
+<context>
     <name>ShimejiInspectorDialog</name>
     <message>
         <source>Inspector — %1</source>
@@ -1652,6 +2108,10 @@
     <message>
         <source>Behavior</source>
         <translation>行为</translation>
+    </message>
+    <message>
+        <source>not available</source>
+        <translation>不可用</translation>
     </message>
     <message>
         <source>Image</source>

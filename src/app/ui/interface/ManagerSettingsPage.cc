@@ -37,12 +37,14 @@
 #include <QFrame>
 #include <QFormLayout>
 #include <QFileInfo>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPainter>
+#include <QLocale>
 #include <QRadioButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -125,6 +127,56 @@ QString settingsTr(char const* sourceText)
     return QCoreApplication::translate("ShijimaManager", sourceText);
 }
 
+QString localizedCodexConfigError(QString const& error)
+{
+    auto prefixError = [&error](QString const& prefix, char const *source) {
+        if (error.startsWith(prefix)) {
+            return settingsTr(source).arg(error.mid(prefix.size()));
+        }
+        return QString {};
+    };
+
+    QString localized = prefixError(
+        QStringLiteral("Could not read Codex configuration: "),
+        "Could not read Codex configuration: %1");
+    if (!localized.isEmpty()) {
+        return localized;
+    }
+    localized = prefixError(
+        QStringLiteral("Could not open Codex configuration for writing: "),
+        "Could not open Codex configuration for writing: %1");
+    if (!localized.isEmpty()) {
+        return localized;
+    }
+    localized = prefixError(
+        QStringLiteral("Could not atomically update Codex configuration: "),
+        "Could not atomically update Codex configuration: %1");
+    if (!localized.isEmpty()) {
+        return localized;
+    }
+    localized = prefixError(
+        QStringLiteral("NeurolingsCE CLI executable was not found: "),
+        "NeurolingsCE CLI executable was not found: %1");
+    if (!localized.isEmpty()) {
+        return localized;
+    }
+
+    static const QHash<QString, char const *> kKnownErrors {
+        { QStringLiteral("Could not create Codex configuration directory"),
+            "Could not create Codex configuration directory" },
+        { QStringLiteral("Could not create a backup of Codex configuration"),
+            "Could not create a backup of Codex configuration" },
+        { QStringLiteral("NeurolingsCE's managed Codex block contains invalid forwarding metadata"),
+            "NeurolingsCE's managed Codex block contains invalid forwarding metadata" },
+        { QStringLiteral("NeurolingsCE's managed Codex block contains an unsupported forwarding command"),
+            "NeurolingsCE's managed Codex block contains an unsupported forwarding command" },
+        { QStringLiteral("Codex config already contains a non-NeurolingsCE notify setting"),
+            "Codex config already contains a non-NeurolingsCE notify setting" },
+    };
+    auto it = kKnownErrors.constFind(error);
+    return it == kKnownErrors.constEnd() ? error : settingsTr(it.value());
+}
+
 struct SettingsColors {
     QString panelBg;
     QString panelBorder;
@@ -149,11 +201,13 @@ SettingsColors themedSettingsColors()
 
 QString formatNumber(double value, int decimals)
 {
-    QString text = QString::number(value, 'f', decimals);
-    while (text.contains(QLatin1Char('.')) && text.endsWith(QLatin1Char('0'))) {
+    QLocale locale = QLocale::system();
+    QString decimalPoint = locale.decimalPoint();
+    QString text = locale.toString(value, 'f', decimals);
+    while (text.contains(decimalPoint) && text.endsWith(QLatin1Char('0'))) {
         text.chop(1);
     }
-    if (text.endsWith(QLatin1Char('.'))) {
+    if (text.endsWith(decimalPoint)) {
         text.chop(1);
     }
     return text;
@@ -582,7 +636,7 @@ void ShijimaManager::setupSettingsPage() {
                         toggle->blockSignals(true);
                         toggle->setIsToggled(false);
                         toggle->blockSignals(false);
-                        QString message = result.error;
+                        QString message = localizedCodexConfigError(result.error);
                         if (result.conflict) {
                             message += tr("\n\nCopy this line into the configuration manually if desired:\n%1")
                                 .arg(result.snippet);
@@ -599,7 +653,8 @@ void ShijimaManager::setupSettingsPage() {
                     toggle->blockSignals(true);
                     toggle->setIsToggled(true);
                     toggle->blockSignals(false);
-                    QMessageBox::warning(this, tr("Codex notifications"), result.error);
+                    QMessageBox::warning(this, tr("Codex notifications"),
+                        localizedCodexConfigError(result.error));
                     return;
                 }
                 m_settings->setValue(QStringLiteral("codex/enabled"), false);

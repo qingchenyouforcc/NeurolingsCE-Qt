@@ -22,6 +22,7 @@
 
 #include <QBoxLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QPushButton>
 #include <QTextBrowser>
 
@@ -37,6 +38,7 @@ MascotStoreDetailDialog::MascotStoreDetailDialog(
     auto *title = new QLabel(QStringLiteral("<h2>%1 <small>v%2</small></h2>")
         .arg(entry.name.toHtmlEscaped(), entry.version.toHtmlEscaped()),
         this);
+    title->setAccessibleName(entry.name);
     layout->addWidget(title);
 
     QStringList authorLogins;
@@ -60,11 +62,13 @@ MascotStoreDetailDialog::MascotStoreDetailDialog(
     layout->addWidget(summary);
 
     auto *description = new QTextBrowser(this);
+    description->setAccessibleName(tr("Mascot description"));
     description->setOpenExternalLinks(true);
     description->setPlainText(entry.summary);
     layout->addWidget(description, 1);
 
     auto *closeButton = new QPushButton(tr("Close"), this);
+    closeButton->setAccessibleName(closeButton->text());
     connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
     layout->addWidget(closeButton, 0, Qt::AlignRight);
 }

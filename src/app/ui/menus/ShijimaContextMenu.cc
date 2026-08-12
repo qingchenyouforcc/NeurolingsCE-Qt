@@ -19,7 +19,7 @@
 #include "shijima-qt/ui/menus/ShijimaContextMenu.hpp"
 
 ShijimaContextMenu::ShijimaContextMenu(ShijimaWidget *parent)
-    : QMenu("Context menu", parent)
+    : QMenu(tr("Context menu"), parent)
 {
     populateMenu();
 }
