@@ -29,5 +29,6 @@
 Login App Client ID，不推断 gh CLI 登录状态。`custom` 不推断任何 URL，
 `disabled` 显式关闭商店。
 `staging` 指向当前公开的 NeurolingsCE-Mascots-Staging 内容源，不能作为生产
-仓库内容源；`disabled` 会在配置阶段清空所有 Store 值。未配置时 UI 清空旧缓存条目，
-并分别提示商店和 GitHub 登录不可用，不会把其他构建 profile 的缓存显示成当前商店。
+仓库内容源；`disabled` 会在配置阶段清空所有 Store 值。显式选择 `custom` 且未提供
+内容源时，UI 清空旧缓存条目并分别提示商店和 GitHub 登录不可用；CI 未设置 profile
+变量时使用公开 `staging` 默认值，不会把其他构建 profile 的缓存显示成当前商店。

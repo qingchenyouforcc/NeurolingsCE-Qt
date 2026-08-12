@@ -278,7 +278,8 @@ POST /v1/auth/github 换取 session token → POST /v1/submissions（幂等，
 `NEUROLINGSCE_STORE_PROFILE`、`NEUROLINGSCE_MASCOT_INDEX_URL`、
 `NEUROLINGSCE_SUBMISSION_SERVICE_URL` 和
 `NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID` 注入公开配置，不读取 gh CLI 的
-登录状态或发布服务 secret。未配置时商店与登录显示“维护者尚未配置”，
+登录状态或发布服务 secret。CI 未设置 profile 变量时使用公开 `staging` 默认值；
+维护者如选择 `custom` 但未提供内容源，商店与登录才会显示“维护者尚未配置”，
 并清空其他 profile 的旧索引条目，不崩溃。
 
 截至当前实现，正式生产仓库仍未配置；需要生产发布时必须显式选择
