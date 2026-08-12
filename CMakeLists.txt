@@ -46,6 +46,8 @@ endif()
 message(STATUS "Using Qt6 from: ${Qt6_DIR}")
 message(STATUS "Qt6 version: ${Qt6_VERSION}")
 
+find_package(Qt6 QUIET COMPONENTS Test)
+
 if(NOT TARGET Qt6::WidgetsPrivate)
   # Modern Qt installs (Homebrew, official online installer, MSYS2, ...) ship a
   # standalone Qt6WidgetsPrivate config. Pull it in via find_package before
@@ -313,6 +315,8 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/CodexActivity.cc
   src/app/core/codex/CodexConfigManager.cc
+  src/app/core/codex/CodexAppServerProtocol.cc
+  src/app/core/codex/CodexAppServerClient.cc
   src/app/core/commands/MascotCommandService.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
   src/app/core/localipc/ShijimaLocalApi.cc
@@ -340,6 +344,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/ui/ManagerTrayIcon.cc
   src/app/ui/interface/ManagerAboutSection.cc
   src/app/ui/interface/ManagerCombinationsPage.cc
+  src/app/ui/interface/ManagerCodexPage.cc
   src/app/ui/interface/ManagerCreatePage.cc
   src/app/ui/interface/ManagerHomePage.cc
   src/app/ui/interface/ManagerNavigation.cc
@@ -367,6 +372,7 @@ target_sources(NeurolingsCE PRIVATE
   include/shijima-qt/MascotStoreNetwork.hpp
   include/shijima-qt/GitHubAuthManager.hpp
   include/shijima-qt/MascotSubmissionClient.hpp
+  include/shijima-qt/CodexAppServerClient.hpp
   src/app/ui/dialogs/submission/MascotSubmissionDialog.hpp
   src/app/ui/dialogs/store/MascotStoreDetailDialog.hpp
 
@@ -388,6 +394,7 @@ target_sources(NeurolingsCECli PRIVATE
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/CodexActivity.cc
   src/app/core/codex/CodexConfigManager.cc
+  src/app/core/codex/CodexAppServerProtocol.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
 )
 
@@ -581,6 +588,36 @@ endif()
 target_compile_definitions(NeurolingsCE PRIVATE ELAWIDGETTOOLS_LIBRARY=0)
 
 target_link_libraries(NeurolingsCE PRIVATE shimejifinder)
+
+if(TARGET Qt6::Test)
+  enable_testing()
+  add_executable(NeurolingsCECodexTests
+    src/app/tests/CodexAppServerTests.cc
+    src/app/core/codex/CodexAppServerProtocol.cc
+    src/app/core/codex/CodexAppServerClient.cc
+    include/shijima-qt/CodexAppServerClient.hpp
+  )
+  target_include_directories(NeurolingsCECodexTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+  target_link_libraries(NeurolingsCECodexTests PRIVATE
+    Qt6::Core Qt6::Network Qt6::Widgets Qt6::Test
+  )
+  if(WIN32)
+    # Keep the standalone Debug test runnable from CTest without requiring a
+    # developer to copy Qt6Testd.dll (and its imported runtime dependencies).
+    add_custom_command(TARGET NeurolingsCECodexTests POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t
+        "$<TARGET_FILE_DIR:NeurolingsCECodexTests>"
+        "$<TARGET_RUNTIME_DLLS:NeurolingsCECodexTests>"
+      COMMAND_EXPAND_LISTS
+    )
+  endif()
+  add_test(NAME NeurolingsCECodexTests COMMAND NeurolingsCECodexTests)
+  set_tests_properties(NeurolingsCECodexTests PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
 
 set_target_properties(NeurolingsCECli PROPERTIES OUTPUT_NAME "NeurolingsCE-cli")
 
