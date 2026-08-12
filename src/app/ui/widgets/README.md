@@ -6,6 +6,10 @@ widgets 负责 speech bubble 的内容来源、队列、绘制和 Codex 消息�
 
 CodexActivity/普通 action 文本 → CodexBubbleFormatter 或 SpeechBubbleTextCatalog → SpeechBubbleWidget 队列 → 屏幕定位、主题绘制、定时隐藏。
 
+app-server 的审批与 `requestUserInput` 只产生结构化提醒，最终 Plan/回复才产生
+完成气泡；审批按钮和问题答案始终位于 ManagerCodexPage。流式 delta、步骤状态和
+未运行桌宠时不会唤醒或召唤 mascot。
+
 ## 文件说明
 
 | 文件 | 作用 |
@@ -23,3 +27,7 @@ CodexActivity/普通 action 文本 → CodexBubbleFormatter 或 SpeechBubbleText
 - 仅 Codex 正文走 Qt 的 `QTextDocument::setMarkdown()`；标题仍由结构化字段用普通文本绘制，普通点击气泡继续用纯文本和居中布局。
 - Markdown 先转义原始 HTML、移除链接目标并清除文档锚点，不加载资源也不打开外部链接。完整消息保留强调、粗体、行内代码、标题、列表和代码块；若受 8 行/360×240 约束需要摘录，只保留消息前缀，移除独立截断标记、修复必要的 Markdown 闭合标记，并让省略号成为最终可见字符。
 - Codex 本地文件、file URL 和相对路径链接只保留用户可读标签，并以 Qt 行内代码语义和当前 QPalette 的 AlternateBase/Text 颜色显示；http(s) 等外部链接同样只显示标签，不保留 href、下划线或可点击暗示。图片语法只呈现 alt 文本，不加载图片。
+- app-server 提醒不包含命令、cwd、diff 或完整审批理由，只显示稳定类型、限长摘要和
+  pending 数；点击提醒只导航到 Codex 页面，不抢焦点、不成为默认允许操作。Plan/回复
+  完成气泡按 `(threadId, turnId, itemId)` 去重，并与阶段一 notify 的同 turn 使用
+  有界 TTL 缓存去重。

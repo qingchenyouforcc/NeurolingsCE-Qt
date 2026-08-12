@@ -94,12 +94,13 @@ Computer Use 可以共存。其他块外 `notify =` 仍拒绝覆盖并给出可�
 
 ## 阶段二记录：app-server
 
-后续可以接入 [Codex app-server](https://developers.openai.com/codex/app-server/)
-的 stdio JSONL JSON-RPC 风格协议，使用 `initialize`/`initialized`、turn/item
-事件和审批 server request 做更丰富的活动映射。它将形成 NeurolingsCE 自己
-管理的 Codex 客户端会话；不能假定能够旁听现有 ChatGPT 桌面端任务。阶段二
-不在本次启动，不实现输入框、聊天列表、点击跳转或审批选择；如将来处理审批，
-必须采用明确的用户选择并保持默认拒绝。
+本阶段按独立实施计划接入 [Codex app-server](https://developers.openai.com/codex/app-server/)
+的 stdio JSONL JSON-RPC 风格协议；设计、状态机、审批/澄清、Plan reducer、关闭顺序和
+验收矩阵见 [`codex-app-server-approvals-and-plan-mode.md`](codex-app-server-approvals-and-plan-mode.md)。
+客户端只管理 NeurolingsCE 自己创建或用户明确恢复的单个会话，不能旁听现有 ChatGPT
+桌面端任务。`codex/appServerEnabled` 默认关闭，只有用户点击连接后才启动进程；
+阶段一 notify 配置和 CLI/IPC 链路不变。实现中的审批始终需要明确用户选择，默认拒绝，
+未知 server request、协议错误和断线均 fail-closed。
 
 Pets 文档定义的 Running / Needs input / Ready / Blocked 状态可作为后续状态色
 调和生命周期依据：[Pets](https://learn.chatgpt.com/docs/pets)。
@@ -111,6 +112,8 @@ Pets 文档定义的 Running / Needs input / Ready / Blocked 状态可作为后�
 - IPC：payload 类型、错误码/大小限制、未知事件成功、服务调用和 GUI 线程边界。
 - 自动化：`NeurolingsCETests` 覆盖规范化与队列前 prefix 压缩，`NeurolingsCEBubbleTests`
   使用 Qt offscreen 平台覆盖字体布局、二分前缀摘录、Unicode 字素安全和显示时长。
+- 阶段二：`NeurolingsCECodexTests` 覆盖 app-server JSON-RPC framing、request ID、
+  approval/input/Plan reducer 和关闭时 cancel；Linux CI 使用 `QT_QPA_PLATFORM=offscreen`。
 - UI：模板复用/召唤/回退、队列上限、空回复、中英文/emoji/多行 grapheme
   前缀摘录、4096 个连续 emoji 不死循环、8 行/360×240 布局、8–12 秒 Codex
   气泡与 3 秒普通气泡、多显示器定位。

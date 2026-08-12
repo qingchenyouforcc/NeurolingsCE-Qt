@@ -41,14 +41,32 @@ MascotCommandService → ShijimaManager。
 
 GUI 运行时还可以通过 core/http 提供 HTTP API。命令协议的 JSON 结构由 core/commands/MascotApi.cc 负责，不要在 CLI、IPC、HTTP 三处各自发明字段。
 
-### Codex 通知
+### Codex 通知与 app-server
 
 Codex 命令或通知脚本 → CodexActivity → MascotCommandService →
 ManagerMascotRuntime → ShijimaWidget / SpeechBubbleWidget。
 
 消息长度、事件识别、模板选择和气泡排版分别在 commands、runtime、ui/widgets 中完成。
 
-### 翻译边界
+阶段二 app-server 是独立的 GUI 线程链路：
+
+```text
+连接按钮 → CodexAppServerClient/QProcess
+  → CodexAppServerProtocol（有界 JSONL/JSON-RPC）
+  → ManagerCodexPage（approval、requestUserInput、Plan/reply）
+  → 最终摘要 → SpeechBubbleWidget（仅提醒/完成气泡）
+```
+
+它只管理 NeurolingsCE 自己创建或显式恢复的一个 thread，不经过 CLI、HTTP 或阶段一
+notify，不旁听其他 Codex 会话。`appServerEnabled=false` 时不启动进程；未知 server
+request、协议超限、断线和关闭均 fail-closed，pending approval 先 cancel 再终止。
+
+### 测试与翻译边界
+
+阶段二协议与状态回归位于 `src/app/tests/` 的
+`NeurolingsCECodexTests`，由 Debug CI 在 Windows/Linux/macOS 构建并运行 CTest；
+Linux 使用 `QT_QPA_PLATFORM=offscreen`。Release workflow 保持正式构建，不重复完整
+测试。旧的 `NeurolingsCETests` 与 `NeurolingsCEBubbleTests` 不恢复。
 
 GUI 自有文案维护在 `translations/shijima-qt_zh_CN.ts`，构建时由
 Qt LinguistTools 编译并嵌入；Qt 标准控件文案从 Qt 安装目录的

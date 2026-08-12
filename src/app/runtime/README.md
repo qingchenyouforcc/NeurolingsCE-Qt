@@ -9,13 +9,15 @@ ManagerLifecycle 启动/停止 timer → 每 40 ms 进入 ManagerMascotRuntime t
 ManagerEnvironmentSync 更新环境 → MascotSessionStore 反向遍历 ShijimaWidget →
 引擎推进、繁殖/自毁/刷新 → UI 状态和托盘更新。
 
-导入走 ManagerImportWorkflow；Codex 通知和 CLI/IPC 命令最终通过 MascotCommandService 回到这里。
+导入走 ManagerImportWorkflow；阶段一 Codex 通知和 CLI/IPC 命令最终通过
+MascotCommandService 回到这里。阶段二 app-server client 由 Manager 持有，页面
+通过 queued signal 读取其状态；它不经过 notify、CLI 或 HTTP。
 
 ## 文件说明
 
 | 文件 | 作用 |
 |---|---|
-| ManagerRuntimeState.hpp | 保存运行时组合状态：环境控制器、timer、路径、模板/会话 store、刷新集合、计数器和关闭/CLI 标志。 |
+| ManagerRuntimeState.hpp | 保存运行时组合状态：环境控制器、timer、路径、模板/会话 store、GUI 所有权的 CodexAppServerClient、刷新集合、计数器和关闭/CLI 标志；客户端仅由 Codex 页面显式连接，关闭时先取消审批并停止进程。 |
 | ManagerRuntimeHelpers.hpp | 提供引擎 subtick 常量（4）和把回调切到 GUI 线程的通用辅助函数。 |
 | ManagerEnvironmentController.hpp | 声明每屏幕 shijima::mascot::environment 的创建、更新、尺度、拖离阈值、繁殖和活动窗口设置。 |
 | ManagerEnvironmentController.cc | 实现屏幕几何、工作区/地板/天花板/光标、active window、窗口推动策略、detach、scale 和多屏环境更新。 |
@@ -27,11 +29,16 @@ ManagerEnvironmentSync 更新环境 → MascotSessionStore 反向遍历 ShijimaW
 | ManagerMascotRuntime.cc | 加载/刷新/删除模板，spawn、随机 spawn、Codex 通知、主 tick、繁殖请求和兼容 facade。 |
 | ManagerImportWorkflow.cc | 同步或 QtConcurrent 异步导入 mascot 文件、模板目录和 legacy archive，处理窗口拖放、进度对话框、主线程回调和首次显示延迟导入。 |
 | ManagerLifecycle.cc | singleton 构造/终止、timer、tray/API 关闭、保存组合、顶层 mascot 清理和 GUI 线程同步入口。 |
+| CodexAppServerClient（由 core/codex 提供） | 单个显式连接的 app-server QProcess、thread/turn 状态、approval/input pending、Plan/reply reducer 和 fail-closed 关闭流程；runtime 只负责装配与生命周期，不解析协议字段。 |
 
 ## 生命周期与线程边界
 
 - Manager、ShijimaWidget、引擎 manager 和 QSettings 归 GUI 线程所有。
 - IPC/HTTP/导入 worker 只能通过 dispatchToMainThread 或 onTickSync 请求 GUI 操作。
+- CodexAppServerClient 与其审批/Plan 信号归 GUI 线程；Manager 关闭时 best-effort cancel 待处理请求并停止 app-server，不自动重启或召唤桌宠。
+- Codex app-server client、Manager、QSettings、审批 store 和页面均由 GUI 线程拥有；
+  app-server signal 到 QWidget 使用 queued connection。连接按钮之外不得启动进程，
+  关闭先停止新请求并 best-effort cancel pending，再 terminate/kill，不自动重启。
 - 关闭顺序通常是停止新请求和 timer → 停止 tray/API → 删除 mascot 会话/窗口 → 注销模板和引擎资源 → 释放 UI。
 - MascotSessionStore 的延迟销毁是为了避免在当前 tick 遍历中立即 delete；修改删除逻辑必须保留反向遍历和提交阶段。
 

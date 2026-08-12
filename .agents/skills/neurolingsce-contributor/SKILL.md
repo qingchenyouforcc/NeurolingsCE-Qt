@@ -14,7 +14,11 @@ project handoff documents.
 1. Read `AGENTS.md` at the repository root.
 2. Read `AGENT.md` for the architecture handoff and current constraints.
 3. For Codex companion work, read `.agents/plans/codex-companion-integration.md`.
-4. Inspect the relevant existing implementation before editing; preserve
+4. For Codex app-server work, also read
+   `.agents/plans/codex-app-server-approvals-and-plan-mode.md` before editing;
+   it is the source of truth for the JSON-RPC, approval, Plan and lifecycle
+   contracts.
+5. Inspect the relevant existing implementation before editing; preserve
    unrelated working-tree changes.
 
 The project is C++17/Qt 6. First-party code is under `src/app/`, public
@@ -40,6 +44,16 @@ metadata in `CMakeLists.txt`/`cmake/`.
 - Codex stage one: `CodexActivity`, `CodexConfigManager`, the
   `show_codex_notification` local command, and the `codex/` QSettings keys.
   Only `agent-turn-complete` is rendered; unknown events succeed silently.
+- Codex app-server stage two: `CodexAppServerModels`,
+  `CodexAppServerProtocol`, and `CodexAppServerClient` own stdio JSONL,
+  JSON-RPC request/response correlation, approval/input stores and Plan
+  reduction. Keep this protocol separate from the stage-one unknown-event
+  parser. The client is GUI-thread owned and starts only after an explicit
+  user action; it must never observe or auto-approve another Codex session.
+- Codex UI: `ManagerCodexPage` owns the single active thread view, pending
+  approval/input cards, Plan/reply controls and bounded display text. Approval
+  buttons belong on the manager page, not in `SpeechBubbleWidget`; bubbles are
+  reminders only and must not steal focus or execute a decision.
 
 ## Thread and safety boundaries
 
@@ -52,9 +66,18 @@ metadata in `CMakeLists.txt`/`cmake/`.
 - On Windows, payload text must come from `QCoreApplication::arguments()`,
   which reconstructs the Unicode command line. Do not decode the CRT's narrow
   `argv` as UTF-8 for Codex messages; that corrupts Chinese and emoji.
-- Do not automatically approve Codex requests. app-server is a future,
-  separately managed client session; never assume it can observe the ChatGPT
-  desktop task.
+- Do not automatically approve Codex requests. app-server is a separately
+  managed client session; never assume it can observe the ChatGPT desktop task.
+- app-server request IDs must remain original JSON string/safe integer values;
+  do not coerce them to `int` or associate a response by thread/turn/item ID.
+  Unknown server requests return `-32601`, malformed known requests return
+  `-32602`, and protocol/size errors fail closed into `Blocked`.
+- Keep app-server stdout JSONL separate from bounded stderr diagnostics. Enforce
+  4 MiB per line and 8 MiB incomplete-buffer limits, reject duplicate/late
+  approval clicks, and cancel pending requests before terminating the process.
+- Never persist app-server user/assistant text, commands, cwd, diff, approval
+  reason or Plan body. `acceptForSession` is memory-only and must not become a
+  QSettings policy. Unknown approval classes cannot fall through to accept.
 - Config changes are opt-in from the settings page only. Use the managed
   markers and `QSaveFile`; back up before every actual write, refuse to
   overwrite an unmanaged `notify`, and remove only NeurolingsCE's block.
@@ -92,6 +115,11 @@ metadata in `CMakeLists.txt`/`cmake/`.
 - Settings: independent toggle, confirmation, keyboard navigation, template
   selection, test notification, light/dark/high-DPI layout, and no silent
   startup/installer configuration writes.
+- App-server: build `NeurolingsCE`, `NeurolingsCECli` and
+  `NeurolingsCECodexTests` explicitly on Windows/Linux/macOS Debug CI, then
+  run `ctest --output-on-failure`; set `QT_QPA_PLATFORM=offscreen` on Linux.
+  Release packaging remains a build-only workflow and must not duplicate the
+  complete Debug test suite.
 
 ## Cross-platform CI regressions
 

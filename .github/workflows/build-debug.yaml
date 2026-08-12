@@ -46,7 +46,6 @@ jobs:
             qt_arch: clang_64
             qt_install_name: macos
             qt_modules: "qtmultimedia qtimageformats"
-            build_args: --target macapp
             artifact_suffix: arm64
             artifact_path: build/macos/
 
@@ -111,7 +110,25 @@ jobs:
       - name: Build with CMake
         shell: bash
         run: |
-          cmake --build build --parallel --config Debug ${{ matrix.platform.build_args || '' }}
+          # Keep the Debug verification contract explicit: the GUI, dedicated
+          # CLI and app-server protocol tests must all be buildable on every
+          # matrix runner. macapp is a packaging wrapper and is built below.
+          cmake --build build --parallel --config Debug \
+            --target NeurolingsCE NeurolingsCECli NeurolingsCECodexTests
+
+      - name: Build macOS app bundle
+        if: matrix.platform.host == 'mac'
+        shell: bash
+        run: |
+          cmake --build build --parallel --config Debug --target macapp
+
+      - name: Run CTest
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.host }}" = "linux" ]; then
+            export QT_QPA_PLATFORM=offscreen
+          fi
+          ctest --test-dir build -C Debug --output-on-failure
 
       - name: Package macOS .app
         if: matrix.platform.host == 'mac'

@@ -6,7 +6,7 @@ ui 把 Manager 和 Shijima 引擎状态呈现为 Qt 窗口、页面、托盘、�
 
 | 子目录 | 作用 |
 |---|---|
-| interface | 主窗口导航、主页、创建/转换、组合、设置和关于页面。 |
+| interface | 主窗口导航、主页、创建/转换、组合、Codex app-server、设置和关于页面。 |
 | mascot | 单只 mascot 的 QWidget 生命周期、渲染和鼠标交互。 |
 | menus | mascot 右键菜单和上下文动作。 |
 | widgets | speech bubble、Codex Markdown 安全清洗/渲染、文本截断和排版。 |
@@ -26,6 +26,8 @@ ui 把 Manager 和 Shijima 引擎状态呈现为 Qt 窗口、页面、托盘、�
 ## 关键 UI 数据流
 
 - ManagerWindowSetup 负责“组装”，ManagerUiActions 负责“用户动作”，runtime 负责“状态改变”。
+- `ManagerCodexPage` 负责单个显式 app-server thread 的连接、Plan/reply、审批列表和
+  requestUserInput；连接前不启动进程，审批按钮不放入 speech bubble。
 - ShijimaWidget 从 runtime 会话获得引擎状态；Rendering 只画当前帧，Interaction 只处理输入和上下文动作。
 - 任何耗时导入、更新或网络操作应离开 GUI 线程，并通过已有进度/回调回到页面。
 - 主题、语言和可访问性改变后，页面和 speech bubble 都要通过既有 retranslate/theme 路径刷新。
