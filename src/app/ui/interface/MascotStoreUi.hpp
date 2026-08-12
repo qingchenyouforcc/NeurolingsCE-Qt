@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <QPointer>
 #include <QString>
 
 class QComboBox;
+class QDialog;
 class QFrame;
 class QLabel;
 class QLineEdit;
@@ -53,6 +55,7 @@ struct MascotStoreUi {
     QPushButton *installButton = nullptr;
     QPushButton *cancelButton = nullptr;
     QWidget *loginHintLabel = nullptr;
+    QPointer<QDialog> loginDialog;
     bool indexRefreshing = false;
     bool githubLoginConfigured = false;
 };

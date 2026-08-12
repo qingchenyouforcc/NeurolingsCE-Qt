@@ -37,9 +37,11 @@
 #include <QAbstractItemView>
 #include <QClipboard>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDir>
 #include <QDialog>
 #include <QFrame>
+#include <QHash>
 #include <QGuiApplication>
 #include <QLabel>
 #include <QLineEdit>
@@ -50,6 +52,7 @@
 #include <QPainter>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QSet>
 #include <QSignalBlocker>
@@ -73,8 +76,98 @@ namespace {
 
 int const kMascotIdRole = Qt::UserRole;
 
-QString createTr(char const *sourceText) {
-    return QCoreApplication::translate("ShijimaManager", sourceText);
+QString createTr(char const *sourceText, int n = -1) {
+    return QCoreApplication::translate("ShijimaManager", sourceText,
+        nullptr, n);
+}
+
+QString localizedStoreError(QString const& errorCode, QString const& detail)
+{
+    if (errorCode == QStringLiteral("mascotstore.network")) {
+        return createTr("The store network request failed.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.timeout")) {
+        return createTr("The store request timed out.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.http")) {
+        return detail.isEmpty()
+            ? createTr("The store returned an HTTP error.")
+            : createTr("The store returned an HTTP error: %1").arg(detail);
+    }
+    if (errorCode == QStringLiteral("mascotstore.cache.empty")) {
+        return createTr("The mascot store cache is empty.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.cache.corrupt")) {
+        return createTr("The mascot store cache is corrupt.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.index.invalid")) {
+        return createTr("The mascot registry response is invalid.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.download.invalid_url")) {
+        return createTr("The downloaded mascot URL is invalid.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.download.cache")) {
+        return createTr("Could not cache the downloaded mascot.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.download.sha256_mismatch")) {
+        return createTr("The downloaded mascot failed SHA-256 verification.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.download.write")) {
+        return createTr("Could not write the downloaded mascot to disk.");
+    }
+    if (errorCode == QStringLiteral("mascotstore.download.canceled")) {
+        return createTr("Download canceled.");
+    }
+    return detail.isEmpty() ? createTr("The registry request failed.") : detail;
+}
+
+QString localizedGitHubError(QString const& errorCode, QString const& detail)
+{
+    char const *source = "GitHub request failed.";
+    bool keepDetail = true;
+    if (errorCode == QStringLiteral("github.not_configured")) {
+        source = "GitHub login is not configured by the maintainer.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.device_code_network") ||
+        errorCode == QStringLiteral("github.poll_network") ||
+        errorCode == QStringLiteral("github.user_fetch_failed"))
+    {
+        source = "Could not reach GitHub.";
+    }
+    else if (errorCode == QStringLiteral("github.device_code_invalid") ||
+        errorCode == QStringLiteral("github.poll_invalid") ||
+        errorCode == QStringLiteral("github.user_invalid"))
+    {
+        source = "GitHub returned an invalid response.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.device_flow_disabled")) {
+        source = "GitHub Device Flow is disabled. Enable it in the app settings and try again.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.device_code_error")) {
+        source = "GitHub rejected the device code request.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.access_denied")) {
+        source = "GitHub authorization was denied.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.device_code_expired")) {
+        source = "The GitHub verification code expired; start again.";
+        keepDetail = false;
+    }
+    else if (errorCode == QStringLiteral("github.poll_failed")) {
+        source = "GitHub polling failed.";
+    }
+
+    QString result = createTr(source);
+    if (keepDetail && !detail.trimmed().isEmpty()) {
+        result += QLatin1Char('\n') + createTr("GitHub details: %1")
+            .arg(redactSensitiveText(detail));
+    }
+    return result;
 }
 
 void setStoreCardSelected(QListWidgetItem *item, bool selected)
@@ -91,6 +184,46 @@ void setStoreCardSelected(QListWidgetItem *item, bool selected)
     card->style()->unpolish(card);
     card->style()->polish(card);
 }
+
+void resizeStoreEntryCards(QListWidget *list)
+{
+    if (list == nullptr) {
+        return;
+    }
+    int availableWidth = list->viewport()->width();
+    if (availableWidth <= 0) {
+        return;
+    }
+    int cardWidth = qMax(0, availableWidth - 4);
+    for (int row = 0; row < list->count(); ++row) {
+        auto *item = list->item(row);
+        auto *card = list->itemWidget(item);
+        if (card == nullptr) {
+            continue;
+        }
+        // Give the wrapped labels the same width they will have when the
+        // view lays out the item. Without this pass QListWidget keeps its
+        // default one-line row height and clips the card contents.
+        card->setFixedWidth(cardWidth);
+        card->adjustSize();
+        QSize hint = card->sizeHint();
+        hint.setWidth(availableWidth);
+        hint.setHeight(qMax(hint.height(), card->minimumHeight()));
+        item->setSizeHint(hint);
+    }
+}
+
+class StoreEntryList final : public QListWidget {
+public:
+    using QListWidget::QListWidget;
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QListWidget::resizeEvent(event);
+        resizeStoreEntryCards(this);
+    }
+};
 
 class StorePushButton final : public ElaPushButton {
 public:
@@ -251,8 +384,12 @@ QWidget *createStoreEntryCard(MascotStoreEntry const& entry, QWidget *parent)
     titleRow->setSpacing(8);
     auto *name = new QLabel(entry.name, card);
     name->setObjectName(QStringLiteral("storeEntryName"));
+    name->setWordWrap(true);
+    name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto *version = new QLabel(QStringLiteral("v%1").arg(entry.version), card);
     version->setObjectName(QStringLiteral("storeEntryMeta"));
+    version->setWordWrap(true);
+    version->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
     titleRow->addWidget(name, 1);
     titleRow->addWidget(version, 0, Qt::AlignRight | Qt::AlignTop);
     layout->addLayout(titleRow);
@@ -269,9 +406,21 @@ QWidget *createStoreEntryCard(MascotStoreEntry const& entry, QWidget *parent)
             facets.append(category);
         }
     }
-    QString meta = facets.isEmpty()
-        ? createTr("Community mascot")
-        : facets.join(QStringLiteral(" · "));
+    QStringList metadata;
+    if (entry.authors.isEmpty()) {
+        metadata.append(createTr("Community mascot"));
+    }
+    else {
+        metadata.append(createTr("By %1").arg(entry.authors.join(
+            QStringLiteral(", "))));
+    }
+    if (!facets.isEmpty()) {
+        metadata.append(facets.join(QStringLiteral(" · ")));
+    }
+    if (!entry.license.isEmpty()) {
+        metadata.append(entry.license);
+    }
+    QString meta = metadata.join(QStringLiteral("  ·  "));
     if (entry.download.size > 0) {
         meta += QStringLiteral("  ·  ") +
             QLocale().formattedDataSize(entry.download.size);
@@ -279,11 +428,12 @@ QWidget *createStoreEntryCard(MascotStoreEntry const& entry, QWidget *parent)
     auto *metaLabel = new QLabel(meta, card);
     metaLabel->setObjectName(QStringLiteral("storeEntryMeta"));
     metaLabel->setWordWrap(true);
+    metaLabel->setAccessibleName(createTr("Mascot metadata"));
     layout->addWidget(metaLabel);
     return card;
 }
 
-void showUserCodeDialog(QWidget *parent, QString const& userCode,
+QDialog *showUserCodeDialog(QWidget *parent, QString const& userCode,
     QUrl const& verificationUrl)
 {
     QDialog *dialog = new QDialog(parent);
@@ -313,6 +463,7 @@ void showUserCodeDialog(QWidget *parent, QString const& userCode,
     QObject::connect(closeButton, &QPushButton::clicked, dialog, &QDialog::accept);
     layout->addWidget(closeButton);
     dialog->show();
+    return dialog;
 }
 
 }  // namespace
@@ -390,7 +541,7 @@ void ShijimaManager::setupStorePage() {
     auto *listSurfaceLayout = new QVBoxLayout(listSurface);
     listSurfaceLayout->setContentsMargins(8, 8, 8, 8);
     listSurfaceLayout->setSpacing(4);
-    storeUi->entryList = new QListWidget(listSurface);
+    storeUi->entryList = new StoreEntryList(listSurface);
     storeUi->entryList->setObjectName(QStringLiteral("storeList"));
     storeUi->entryList->setSelectionMode(QAbstractItemView::SingleSelection);
     storeUi->entryList->setSelectionBehavior(QAbstractItemView::SelectItems);
@@ -538,6 +689,20 @@ void ShijimaManager::setupStorePage() {
         ui->storeStatusBanner->update();
     };
 
+    auto closeLoginDialog = [this]() {
+        auto *ui = m_ui->storeUi.get();
+        QPointer<QDialog> dialog = ui->loginDialog;
+        ui->loginDialog = nullptr;
+        if (dialog == nullptr) {
+            return;
+        }
+        // State/error handlers own the flow cancellation. Block finished so
+        // closing a dialog as a result of a successful login cannot race the
+        // signed-out path used by the user's explicit Close action.
+        QSignalBlocker blocker(dialog);
+        dialog->reject();
+    };
+
     auto updateEntryActions = [this]() {
         auto *ui = m_ui->storeUi.get();
         QListWidgetItem *item = ui->entryList->currentItem();
@@ -589,13 +754,18 @@ void ShijimaManager::setupStorePage() {
             if (restoredRow >= 0) {
                 list->setCurrentRow(restoredRow);
             }
+            else if (list->count() > 0) {
+                // Keep the first result keyboard-reachable and make the
+                // action buttons useful immediately after a refresh.
+                list->setCurrentRow(0);
+            }
+            resizeStoreEntryCards(list);
         }
         bool hasEntries = list->count() > 0;
         list->setVisible(hasEntries);
         ui->emptyStateWidget->setVisible(!hasEntries);
         int resultCount = list->count();
-        ui->resultCountLabel->setText(createTr("%1 mascots")
-            .arg(resultCount));
+        ui->resultCountLabel->setText(createTr("%n mascot(s)", resultCount));
         for (int row = 0; row < list->count(); ++row) {
             setStoreCardSelected(list->item(row),
                 list->item(row) == list->currentItem());
@@ -690,8 +860,7 @@ void ShijimaManager::setupStorePage() {
                         "The mascot store is not configured by the maintainer.");
                 }
                 else {
-                    error = state.error.isEmpty()
-                        ? createTr("The registry request failed.") : state.error;
+                    error = localizedStoreError(state.errorCode, state.error);
                 }
                 setStoreStatus(createTr("Store unavailable: %1").arg(error),
                     QStringLiteral("error"));
@@ -745,14 +914,16 @@ void ShijimaManager::setupStorePage() {
                     QStringLiteral("success"));
                 reloadMascots({ installedName.toStdString() });
             }
-            else if (errorCode == QStringLiteral("mascotstore.download.canceled")) {
-                setStoreStatus(createTr("Download canceled."),
-                    QStringLiteral("info"));
-            }
             else {
-                setStoreStatus(
-                    createTr("Install failed (%1): %2")
-                        .arg(errorCode, error), QStringLiteral("error"));
+                if (errorCode == QStringLiteral("mascotstore.download.canceled")) {
+                    setStoreStatus(localizedStoreError(errorCode, error),
+                        QStringLiteral("info"));
+                }
+                else {
+                    setStoreStatus(createTr("Install failed: %1")
+                        .arg(localizedStoreError(errorCode, error)),
+                        QStringLiteral("error"));
+                }
             }
             Q_UNUSED(id);
             updateEntryActions();
@@ -796,8 +967,9 @@ void ShijimaManager::setupStorePage() {
         });
 
     connect(m_githubAuth.get(), &GitHubAuthManager::stateChanged, this,
-        [this]() {
+        [this, closeLoginDialog]() {
             if (m_githubAuth->isSignedIn()) {
+                closeLoginDialog();
                 m_ui->storeUi->loginButton->setText(createTr("Sign out"));
                 m_ui->storeUi->submitButton->setEnabled(true);
                 QString status = createTr("Signed in as %1")
@@ -825,24 +997,54 @@ void ShijimaManager::setupStorePage() {
             }
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::deviceCodeReady, this,
-        [this](QString userCode, QUrl verificationUrl) {
-            showUserCodeDialog(this, userCode, verificationUrl);
+        [this, closeLoginDialog](QString userCode, QUrl verificationUrl) {
+            closeLoginDialog();
+            QDialog *dialog = showUserCodeDialog(this, userCode,
+                verificationUrl);
+            m_ui->storeUi->loginDialog = dialog;
+            connect(dialog, &QDialog::finished, this,
+                [this, dialog](int) {
+                    auto *ui = m_ui->storeUi.get();
+                    if (ui->loginDialog != dialog) {
+                        return;
+                    }
+                    ui->loginDialog = nullptr;
+                    // A user-initiated close is a cancellation. signOut()
+                    // aborts all outstanding requests and updates the state
+                    // before the next login attempt, without blocking the UI.
+                    if (m_githubAuth != nullptr &&
+                        !m_githubAuth->isSignedIn()) {
+                        m_githubAuth->signOut();
+                    }
+                });
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::signedOut, this,
-        [this, setStoreStatus]() {
+        [this, closeLoginDialog, setStoreStatus]() {
+            closeLoginDialog();
             setStoreStatus(createTr("Signed out of GitHub."),
                 QStringLiteral("info"));
         });
     connect(m_githubAuth.get(), &GitHubAuthManager::errorOccurred, this,
-        [this, setStoreStatus](QString code, QString message) {
+        [this, closeLoginDialog, setStoreStatus](QString code,
+            QString message) {
+            closeLoginDialog();
             QString status = createTr("GitHub error (%1): %2")
-                .arg(code, redactSensitiveText(message));
+                .arg(code, localizedGitHubError(code, message));
             setStoreStatus(status, QStringLiteral("error"));
             m_ui->storeUi->loginStatusLabel->setText(status);
         });
     connect(m_ui->storeUi->loginButton, &QPushButton::clicked, this,
         [this]() {
             if (m_githubAuth->isSignedIn()) {
+                m_githubAuth->signOut();
+            }
+            else if (m_githubAuth->state() ==
+                    GitHubAuthManager::State::WaitingForDeviceCode ||
+                m_githubAuth->state() ==
+                    GitHubAuthManager::State::AwaitingAuthorization)
+            {
+                // Clicking the account action while a device flow is active
+                // is an explicit cancellation rather than a second flow.
                 m_githubAuth->signOut();
             }
             else {
