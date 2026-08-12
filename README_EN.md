@@ -36,7 +36,7 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
 ## Mascot Store, GitHub Login, And Codex
 
-NeurolingsCE 0.5.2 uses the public Staging registry by default:
+NeurolingsCE 0.5.3 uses the public Staging registry by default:
 
 ```text
 https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json
@@ -66,7 +66,7 @@ readable title instead of exposing the raw JSON; it never auto-approves a reques
 
 ## Highlights Since 0.3.3
 
-Current `main` has moved past the `0.5.2` release line and includes additional updater and startup improvements:
+Current `main` has moved past the `0.5.3` release line and includes additional updater and startup improvements:
 
 - Added a mascot combinations page for saving the currently running mascot group and restoring the group from the previous close.
 - Double-clicking a template can now spawn the matching mascot directly.

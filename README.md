@@ -37,7 +37,7 @@
 
 ## 商店、GitHub 登录与 Codex
 
-0.5.2 默认使用公开的 Staging registry：
+0.5.3 默认使用公开的 Staging registry：
 
 ```text
 https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json
@@ -62,7 +62,7 @@ Codex notify 集成会处理新会话标题事件。若 Codex 将标题和简介
 
 ## 0.3.3 以来的主要更新
 
-当前 `main` 相比 `0.3.3` 已同步到 `0.5.2` 版本线，并继续补充了更新检查与启动体验：
+当前 `main` 相比 `0.3.3` 已同步到 `0.5.3` 版本线，并继续补充了更新检查与启动体验：
 
 - 新增桌宠组合页，可保存当前运行中的多只桌宠，并恢复上次关闭前的组合。
 - 模板列表支持双击生成匹配桌宠，减少选择和召唤步骤。

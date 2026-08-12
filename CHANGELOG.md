@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.3] - 2026-08-12
+
+### 🔧 Changed / 改进与优化
+
+- **Localization** - Completed the Simplified Chinese catalog for manager pages, store/submission flows, update diagnostics, accessibility labels, and Qt standard dialogs / **本地化** - 完善管理器页面、商店/投稿流程、更新诊断、可访问性标签及 Qt 标准对话框的简体中文翻译
+- **Release metadata** - Synchronized the 0.5.3 version across the source-of-truth configuration and platform manifests / **发布元数据** - 将 0.5.3 版本同步到单一事实配置和各平台清单
+
+---
+
 ## [0.5.2] - 2026-08-12
 
 ### ✨ Added / 新增功能
@@ -349,6 +358,9 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.5.3]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Simplified Chinese localization and release metadata / 简体中文本地化与发布元数据
+
 ### [0.5.2]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Mascot Store registry and cards, GitHub login lifecycle, Codex title handling, and release maintenance / **桌宠商店 registry 与卡片、GitHub 登录生命周期、Codex 标题处理及发布维护**
 
@@ -387,6 +399,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.5.3]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.1...0.5.0
