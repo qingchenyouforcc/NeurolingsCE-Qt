@@ -16,7 +16,6 @@
 | core | 应用核心服务和跨层数据契约 | core/README.md |
 | runtime | ShijimaManager 的生命周期、屏幕环境、模板和会话 | runtime/README.md |
 | ui | 主窗口、页面、托盘、mascot 控件、菜单和对话框 | ui/README.md |
-| tests | 核心协议、包安全、脚本、气泡格式化测试 | tests/README.md |
 
 core 下的引擎目录另有一组更细的导航：
 
