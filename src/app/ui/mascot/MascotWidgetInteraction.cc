@@ -341,6 +341,12 @@ void ShijimaWidget::showSpeechBubble() {
     // Create bubble widget if needed
     if (m_speechBubble == nullptr) {
         m_speechBubble = new SpeechBubbleWidget();
+        connect(m_speechBubble, &SpeechBubbleWidget::codexActivated,
+            this, []() {
+                if (auto *manager = ShijimaManager::defaultManager()) {
+                    manager->showCodexPage();
+                }
+            });
     }
 
     // Calculate anchor position (top-center of the mascot widget in screen coords)
@@ -354,6 +360,12 @@ void ShijimaWidget::showCodexNotification(QString const& message,
 {
     if (m_speechBubble == nullptr) {
         m_speechBubble = new SpeechBubbleWidget();
+        connect(m_speechBubble, &SpeechBubbleWidget::codexActivated,
+            this, []() {
+                if (auto *manager = ShijimaManager::defaultManager()) {
+                    manager->showCodexPage();
+                }
+            });
     }
     QPoint anchorPos = mapToGlobal(QPoint(width() / 2, 0));
     m_speechBubble->showCodexBubble(message, anchorPos, title);

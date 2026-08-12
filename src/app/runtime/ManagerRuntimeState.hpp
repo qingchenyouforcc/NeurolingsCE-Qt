@@ -26,6 +26,10 @@
 #include "ManagerEnvironmentController.hpp"
 #include "MascotTemplateStore.hpp"
 #include "MascotSessionStore.hpp"
+#include "shijima-qt/CodexAppServerModels.hpp"
+#include "shijima-qt/CodexAppServerClient.hpp"
+#include <QHash>
+#include <QDateTime>
 
 class MascotData;
 class QScreen;
@@ -40,6 +44,11 @@ struct ShijimaManagerRuntimeState {
     QSet<QString> listItemsToRefresh;
     QString importOnShowPath;
     MascotSessionStore sessions;
+    // The app-server client is owned by the GUI manager.  It is constructed
+    // during manager setup but only starts a process after an explicit user
+    // action from the Codex page.
+    std::unique_ptr<CodexAppServerClient> codexClient;
+    QHash<QString, QDateTime> codexBubbleDedupe;
     QString mascotsPath;
     QString mascotCachePath;
     bool cliRuntimeMode = false;

@@ -19,6 +19,7 @@
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/CodexActivity.hpp"
 #include "shijima-qt/CodexConfigManager.hpp"
+#include "shijima-qt/CodexAppServerClient.hpp"
 #include "../../core/update/GitHubUpdateManager.hpp"
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
@@ -37,6 +38,7 @@
 #include <QFrame>
 #include <QFormLayout>
 #include <QFileInfo>
+#include <QFileDialog>
 #include <QHash>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -722,6 +724,87 @@ void ShijimaManager::setupSettingsPage() {
             tr("Test Codex message"),
             tr("Preview the title, excerpt, and eight-second queue behavior."),
             button));
+    }
+
+    addSettingsSection(settingsLayout, settingsContent,
+        tr("Codex interaction"),
+        tr("Use a private Codex app-server session for plans, replies, and explicit approvals. "
+            "Enabling this section does not start a process."));
+
+    {
+        bool initial = m_settings->value(QStringLiteral("codex/appServerEnabled"), false).toBool();
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, this, [this](bool checked) {
+            m_settings->setValue(QStringLiteral("codex/appServerEnabled"), checked);
+            if (!checked && m_runtime->codexClient != nullptr) {
+                m_runtime->codexClient->cancelPendingRequests();
+                m_runtime->codexClient->stop();
+            }
+            updateCodexPageState();
+        });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Enable Codex interaction"),
+            tr("Enable the Codex page and approval workflow; connect explicitly from that page."),
+            toggle));
+    }
+
+    {
+        auto *edit = new QLineEdit(
+            m_settings->value(QStringLiteral("codex/appServerExecutable")).toString(), settingsContent);
+        edit->setPlaceholderText(tr("Use the codex executable found on PATH"));
+        edit->setMinimumWidth(260);
+        auto *browse = new SettingsPushButton(tr("Browse..."), settingsContent);
+        auto *rowWidget = new QWidget(settingsContent);
+        auto *rowLayout = new QHBoxLayout(rowWidget);
+        rowLayout->setContentsMargins(0, 0, 0, 0);
+        rowLayout->addWidget(edit, 1);
+        rowLayout->addWidget(browse);
+        edit->setAccessibleName(tr("Codex app-server executable"));
+        edit->setAccessibleDescription(tr("Optional absolute path to the Codex executable."));
+        connect(edit, &QLineEdit::editingFinished, this, [this, edit]() {
+            QString path = edit->text().trimmed();
+            m_settings->setValue(QStringLiteral("codex/appServerExecutable"), path);
+            if (m_runtime->codexClient != nullptr) m_runtime->codexClient->setExecutable(path);
+        });
+        connect(browse, &ElaPushButton::clicked, this, [this, edit]() {
+            QString path = QFileDialog::getOpenFileName(this,
+                tr("Choose Codex executable"), edit->text().trimmed());
+            if (path.isEmpty()) return;
+            edit->setText(path);
+            m_settings->setValue(QStringLiteral("codex/appServerExecutable"), path);
+            if (m_runtime->codexClient != nullptr) m_runtime->codexClient->setExecutable(path);
+        });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Codex executable"),
+            tr("Optional absolute executable path. .cmd and .bat wrappers are not accepted."),
+            rowWidget));
+    }
+
+    {
+        bool initial = m_settings->value(QStringLiteral("codex/approvalBubbleEnabled"), true).toBool();
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, this, [this](bool checked) {
+            m_settings->setValue(QStringLiteral("codex/approvalBubbleEnabled"), checked);
+        });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Approval reminders"),
+            tr("Show a short reminder in a running mascot bubble; decisions stay on the Codex page."),
+            toggle));
+    }
+
+    {
+        bool initial = m_settings->value(QStringLiteral("codex/planBubbleEnabled"), true).toBool();
+        auto *toggle = new SettingsToggleSwitch(settingsContent);
+        toggle->setIsToggled(initial);
+        connect(toggle, &ElaToggleSwitch::toggled, this, [this](bool checked) {
+            m_settings->setValue(QStringLiteral("codex/planBubbleEnabled"), checked);
+        });
+        settingsLayout->addWidget(createSettingsRow(settingsContent,
+            tr("Plan and completion bubbles"),
+            tr("Show final plan and reply summaries in the existing mascot bubble."),
+            toggle));
     }
 
     {

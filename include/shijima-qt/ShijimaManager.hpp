@@ -20,6 +20,7 @@
 
 #include <QString>
 #include "shijima-qt/CodexActivity.hpp"
+#include "shijima-qt/CodexAppServerModels.hpp"
 #include "shijima-qt/MascotStoreIndex.hpp"
 #include <QList>
 #include <QMap>
@@ -60,6 +61,7 @@ class MascotStoreNetwork;
 class MascotSubmissionClient;
 class ShijimaHttpApi;
 class ShijimaLocalApi;
+class CodexAppServerClient;
 struct ShijimaManagerRuntimeState;
 struct ShijimaManagerUiState;
 
@@ -74,6 +76,11 @@ public:
     QString const& mascotsPath();
     ShijimaWidget *spawn(std::string const& name);
     bool showCodexNotification(CodexActivity const& activity);
+    bool showCodexAppServerBubble(QString const& title, QString const& message,
+        QString const& dedupeKey = {});
+    // Navigate to the in-process app-server page.  This is intentionally a
+    // UI-only action; it never starts a Codex process by itself.
+    void showCodexPage();
     void killAll();
     void killAll(QString const& name);
     void killAllButOne(ShijimaWidget *widget);
@@ -127,6 +134,7 @@ private:
     void setupCreatePage();
     void setupCombinationsPage();
     void setupSettingsPage();
+    void setupCodexPage();
     void setupAboutPage();
     void setupStorePage();
     void showAboutDialog();
@@ -157,6 +165,11 @@ private:
     void startStartupUpdateCheck();
     void showStartupUpdateNotification(QString const& version);
     QScreen *mascotScreen();
+    void updateCodexPageState();
+    void updateCodexPagePlan(CodexPlanSnapshot const& snapshot);
+    void updateCodexPageApprovals();
+    void updateCodexPageInputs();
+    void showCodexDiagnostic(QString const& message);
     std::unique_ptr<ShijimaManagerRuntimeState> m_runtime;
     std::unique_ptr<ShijimaManagerUiState> m_ui;
     std::unique_ptr<QSettings> m_settings;

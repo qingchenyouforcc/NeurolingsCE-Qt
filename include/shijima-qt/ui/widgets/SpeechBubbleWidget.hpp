@@ -54,8 +54,14 @@ public:
     static QStringList loadBubbleTexts(const QString &mascotPath = QString());
     static QString randomBubbleText(const QString &mascotPath = QString());
 
+signals:
+    // Codex bubbles are reminders only; activating one lets the owner bring
+    // the manager page forward without embedding approval controls here.
+    void codexActivated();
+
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     void showContent(Content const& content, QPoint const& anchorScreenPos,

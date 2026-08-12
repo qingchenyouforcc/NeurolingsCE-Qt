@@ -23,6 +23,7 @@ void ShijimaManager::setupNavigation() {
     setupStorePage();
     setupCreatePage();
     setupCombinationsPage();
+    setupCodexPage();
     setupSettingsPage();
     setupAboutPage();
 }

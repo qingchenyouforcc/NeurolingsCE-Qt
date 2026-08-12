@@ -25,6 +25,7 @@
 #include "shijima-qt/MascotSubmissionClient.hpp"
 #include "shijima-qt/ShijimaHttpApi.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
+#include "shijima-qt/CodexAppServerClient.hpp"
 
 #include "ManagerRuntimeState.hpp"
 #include "../ui/ManagerUiState.hpp"
@@ -67,6 +68,10 @@ QString const& ShijimaManager::mascotsPath() {
 
 ShijimaManager::~ShijimaManager() {
     APP_LOG_INFO("lifecycle") << "Destroying ShijimaManager";
+    if (m_runtime != nullptr && m_runtime->codexClient != nullptr) {
+        m_runtime->codexClient->cancelPendingRequests();
+        m_runtime->codexClient->stop();
+    }
     disconnect(qApp, &QGuiApplication::screenAdded,
         this, &ShijimaManager::screenAdded);
     disconnect(qApp, &QGuiApplication::screenRemoved,
@@ -102,6 +107,13 @@ void ShijimaManager::shutdownForQuit() {
 
     m_localApi->stop();
     m_httpApi->stop();
+    // Stop the explicitly managed app-server before destroying mascot/UI
+    // state. Pending approvals are cancelled best-effort by the client and
+    // no process restart is attempted during shutdown.
+    if (m_runtime->codexClient != nullptr) {
+        m_runtime->codexClient->cancelPendingRequests();
+        m_runtime->codexClient->stop();
+    }
 
     // Close mascots manually because they are top-level widgets, not child
     // objects owned by the manager window.

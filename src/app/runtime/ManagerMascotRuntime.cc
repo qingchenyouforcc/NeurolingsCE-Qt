@@ -632,10 +632,78 @@ bool ShijimaManager::showCodexNotification(CodexActivity const& activity) {
     // The content is used only for this in-memory bubble and is never written
     // to settings or logs.  Bound it before entering the UI queue.
     auto excerpt = compactCodexBubbleSource(message);
+    QString dedupeKey;
+    if (!activity.threadId.isEmpty() && !activity.turnId.isEmpty()) {
+        dedupeKey = activity.threadId + QLatin1Char('\x1f') + activity.turnId;
+    }
+    if (!dedupeKey.isEmpty()) {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        for (auto it = m_runtime->codexBubbleDedupe.begin();
+            it != m_runtime->codexBubbleDedupe.end();) {
+            if (it.value().secsTo(now) > 60) it = m_runtime->codexBubbleDedupe.erase(it);
+            else ++it;
+        }
+        if (m_runtime->codexBubbleDedupe.contains(dedupeKey)) return true;
+        while (m_runtime->codexBubbleDedupe.size() >= 64) {
+            auto oldest = m_runtime->codexBubbleDedupe.begin();
+            for (auto it = m_runtime->codexBubbleDedupe.begin();
+                it != m_runtime->codexBubbleDedupe.end(); ++it) {
+                if (it.value() < oldest.value()) oldest = it;
+            }
+            m_runtime->codexBubbleDedupe.erase(oldest);
+        }
+        m_runtime->codexBubbleDedupe.insert(dedupeKey, now);
+    }
     target->showCodexNotification(excerpt.text, title);
     APP_LOG_INFO("codex") << "Codex notification displayed state=\""
         << codexActivityStateName(activity.state).toStdString()
         << " template=\"" << target->mascotName().toStdString() << "\"";
+    return true;
+}
+
+bool ShijimaManager::showCodexAppServerBubble(QString const& title,
+    QString const& message, QString const& dedupeKey)
+{
+    // App-server events are interactive session state.  They may remind an
+    // already running companion, but must never summon a mascot implicitly.
+    QString configured = m_settings->value(
+        QStringLiteral("codex/companionTemplate"), kDefaultMascotTemplate)
+        .toString().trimmed();
+    if (configured.isEmpty()) configured = kDefaultMascotTemplate;
+    if (!m_runtime->templates.loadedMascots().contains(configured)) {
+        configured = kDefaultMascotTemplate;
+    }
+    ShijimaWidget *target = nullptr;
+    for (auto mascot : m_runtime->sessions.mascots()) {
+        if (mascot != nullptr && !mascot->markedForDeletion() &&
+            mascot->mascotName() == configured)
+        {
+            target = mascot;
+            break;
+        }
+    }
+    if (target == nullptr) {
+        return false;
+    }
+    if (!dedupeKey.isEmpty()) {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        for (auto it = m_runtime->codexBubbleDedupe.begin();
+            it != m_runtime->codexBubbleDedupe.end();) {
+            if (it.value().secsTo(now) > 60) it = m_runtime->codexBubbleDedupe.erase(it);
+            else ++it;
+        }
+        if (m_runtime->codexBubbleDedupe.contains(dedupeKey)) return true;
+        while (m_runtime->codexBubbleDedupe.size() >= 64) {
+            auto oldest = m_runtime->codexBubbleDedupe.begin();
+            for (auto it = m_runtime->codexBubbleDedupe.begin();
+                it != m_runtime->codexBubbleDedupe.end(); ++it) {
+                if (it.value() < oldest.value()) oldest = it;
+            }
+            m_runtime->codexBubbleDedupe.erase(oldest);
+        }
+        m_runtime->codexBubbleDedupe.insert(dedupeKey, now);
+    }
+    target->showCodexNotification(message.trimmed(), title.trimmed());
     return true;
 }
 

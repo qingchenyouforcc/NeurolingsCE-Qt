@@ -26,6 +26,7 @@
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/ShijimaHttpApi.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
+#include "shijima-qt/CodexAppServerClient.hpp"
 #include "../core/update/GitHubUpdateManager.hpp"
 
 #include "../runtime/ManagerRuntimeState.hpp"
@@ -66,6 +67,9 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_httpApi(std::make_unique<ShijimaHttpApi>(this)),
     m_localApi(std::make_unique<ShijimaLocalApi>(this))
 {
+    m_runtime->codexClient = std::make_unique<CodexAppServerClient>(this);
+    m_runtime->codexClient->setExecutable(
+        m_settings->value(QStringLiteral("codex/appServerExecutable")).toString());
     m_runtime->cliRuntimeMode =
         qApp->property("neurolingsce.cliRuntime").toBool();
     m_runtime->silentStartupMode =

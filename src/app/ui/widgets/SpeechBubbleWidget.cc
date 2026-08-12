@@ -30,6 +30,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
+#include <QMouseEvent>
 
 namespace {
 
@@ -326,6 +327,16 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
         int bodyFlags = Qt::TextWordWrap | Qt::AlignCenter;
         painter.drawText(textRect, bodyFlags, m_text);
     }
+}
+
+void SpeechBubbleWidget::mousePressEvent(QMouseEvent *event) {
+    if (m_currentCodex && m_active && event != nullptr &&
+        event->button() == Qt::LeftButton) {
+        emit codexActivated();
+        event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
 }
 
 #include "SpeechBubbleWidget.moc"

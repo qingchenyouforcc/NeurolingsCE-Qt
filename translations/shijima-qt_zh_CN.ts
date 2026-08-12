@@ -1019,6 +1019,122 @@ Copy this line into the configuration manually if desired:
         <translation>预览标题、回复摘录以及八秒队列显示效果。</translation>
     </message>
     <message>
+        <source>Codex interaction</source>
+        <translation>Codex 交互</translation>
+    </message>
+    <message>
+        <source>Use a private Codex app-server session for plans, replies, and explicit approvals. Enabling this section does not start a process.</source>
+        <translation>使用专属 Codex app-server 会话处理计划、回复和明确审批。启用此分区不会启动进程。</translation>
+    </message>
+    <message>
+        <source>Enable Codex interaction</source>
+        <translation>启用 Codex 交互</translation>
+    </message>
+    <message>
+        <source>Enable the Codex page and approval workflow; connect explicitly from that page.</source>
+        <translation>启用 Codex 页面和审批流程；请在该页面中手动连接。</translation>
+    </message>
+    <message>
+        <source>Codex executable</source>
+        <translation>Codex 可执行文件</translation>
+    </message>
+    <message>
+        <source>Optional absolute executable path. .cmd and .bat wrappers are not accepted.</source>
+        <translation>可选的绝对可执行文件路径。不接受 .cmd 或 .bat 包装脚本。</translation>
+    </message>
+    <message>
+        <source>Approval reminders</source>
+        <translation>审批提醒</translation>
+    </message>
+    <message>
+        <source>Plan and completion bubbles</source>
+        <translation>计划和完成气泡</translation>
+    </message>
+    <message>
+        <source>Connect Codex</source>
+        <translation>连接 Codex</translation>
+    </message>
+    <message>
+        <source>Disconnect</source>
+        <translation>断开连接</translation>
+    </message>
+    <message>
+        <source>New session</source>
+        <translation>新建会话</translation>
+    </message>
+    <message>
+        <source>Resume recent</source>
+        <translation>恢复最近会话</translation>
+    </message>
+    <message>
+        <source>Approvals</source>
+        <translation>审批</translation>
+    </message>
+    <message>
+        <source>Command</source>
+        <translation>命令</translation>
+    </message>
+    <message>
+        <source>File change</source>
+        <translation>文件修改</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>网络</translation>
+    </message>
+    <message>
+        <source>Allow once</source>
+        <translation>仅允许本次</translation>
+    </message>
+    <message>
+        <source>Allow for session</source>
+        <translation>本会话允许</translation>
+    </message>
+    <message>
+        <source>Decline</source>
+        <translation>拒绝并继续</translation>
+    </message>
+    <message>
+        <source>Decline and stop</source>
+        <translation>拒绝并停止</translation>
+    </message>
+    <message>
+        <source>Plan</source>
+        <translation>计划</translation>
+    </message>
+    <message>
+        <source>Implement this plan</source>
+        <translation>按此计划实施</translation>
+    </message>
+    <message>
+        <source>Modify plan</source>
+        <translation>修改计划</translation>
+    </message>
+    <message>
+        <source>Abort task</source>
+        <translation>中止任务</translation>
+    </message>
+    <message>
+        <source>Codex needs input</source>
+        <translation>Codex 需要输入</translation>
+    </message>
+    <message>
+        <source>Codex · Plan completed</source>
+        <translation>Codex · 计划已完成</translation>
+    </message>
+    <message>
+        <source>Codex · Completed</source>
+        <translation>Codex · 已完成</translation>
+    </message>
+    <message>
+        <source>Codex · Confirmation needed</source>
+        <translation>Codex · 需要确认</translation>
+    </message>
+    <message>
+        <source>Codex · Input needed</source>
+        <translation>Codex · 需要输入</translation>
+    </message>
+    <message>
         <source>New session has no content to display.</source>
         <translation>新会话没有可显示的内容。</translation>
     </message>
