@@ -34,13 +34,39 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 - [Latest Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [All Releases](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
 
+## Mascot Store, GitHub Login, And Codex
+
+NeurolingsCE 0.5.2 uses the public Staging registry by default:
+
+```text
+https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json
+```
+
+The store currently lists six official `.mascot` packages: Cerber, Eviling, Neuron,
+Tuteling, Vedaling, and Weuron, each marked `CC-BY-NC-SA-4.0`. The bundled Default
+Mascot comes from upstream Shijima-Qt and is intentionally not listed as an original
+user package. Store cards
+keep each entry's name, version, summary, source, size, license, and download/install
+state readable; downloads are SHA-256 checked before installation. This is a public
+Staging content source, not a production catalog.
+
+GitHub login in the store uses the public GitHub App Device Flow. Authorize the URL
+and one-time code shown by the dialog in a browser; after authorization the progress
+dialog closes and the account state refreshes. Cancellation, expiry, and network
+errors remain explicit. Access tokens are stored only in the platform secure
+credential store; maintainer tokens and secrets are never shipped in the client.
+
+The Codex notify integration handles new-session title events. When Codex returns a
+title and summary as JSON, the client extracts only allow-listed fields and renders a
+readable title instead of exposing the raw JSON; it never auto-approves a request.
+
 ## Documentation
 
 📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
 
 ## Highlights Since 0.3.3
 
-Current `main` has moved past the `0.5.1` release line and includes additional updater and startup improvements:
+Current `main` has moved past the `0.5.2` release line and includes additional updater and startup improvements:
 
 - Added a mascot combinations page for saving the currently running mascot group and restoring the group from the previous close.
 - Double-clicking a template can now spawn the matching mascot directly.
@@ -49,7 +75,10 @@ Current `main` has moved past the `0.5.1` release line and includes additional u
 - Update checks now read a static `latest.json` from GitHub Pages instead of calling the GitHub REST releases API from every client.
 - Downloaded update artifacts are verified with SHA-256, and release asset names are sanitized before writing to the local cache.
 - Windows now supports start-at-login, silent startup, and restoring the previous or selected mascot combination at login.
-- CI now includes macOS Intel/Apple Silicon builds, and debug builds run core tests.
+- CI now includes macOS Intel/Apple Silicon builds and validates the supported GUI/CLI build targets; the deprecated standalone test targets have been removed.
+- The default store profile now uses the public Staging registry, with six official mascot packages and readable card details.
+- GitHub Device Flow authorization now closes its dialog on success and refreshes the signed-in account state.
+- New-session Codex title payloads are adapted from JSON into allow-listed readable title/summary text.
 
 ## Create
 

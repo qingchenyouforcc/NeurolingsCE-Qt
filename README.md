@@ -35,13 +35,34 @@
 - [最新版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [所有版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
 
+## 商店、GitHub 登录与 Codex
+
+0.5.2 默认使用公开的 Staging registry：
+
+```text
+https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json
+```
+
+商店当前列出六个官方 `.mascot` 包：Cerber、Eviling、Neuron、Tuteling、Vedaling
+和 Weuron，均标记为 `CC-BY-NC-SA-4.0`。内置的 Default Mascot 来自上游 Shijima-Qt，
+不作为用户原创包列入该列表。
+商店卡片会分别展示名称、版本、简介、来源、大小、许可证及下载/安装状态；下载完成后先
+校验 SHA-256，再安装到本地模板库。该地址是公开 Staging 内容源，不代表生产目录。
+
+商店中的 GitHub 登录使用公开 GitHub App 的 Device Flow：按窗口显示的 URL 和验证码在
+浏览器中授权，成功后登录弹窗会自动关闭并刷新账号状态。取消、过期或网络错误会保留明确
+反馈；访问令牌只写入系统安全凭据存储，客户端不包含维护者 token 或 secret。
+
+Codex notify 集成会处理新会话标题事件。若 Codex 将标题和简介作为 JSON 消息返回，客户端
+只提取允许的字段并显示可读标题，不会把原始 JSON 直接显示，也不会自动批准请求。
+
 ## 文档
 
 📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
 
 ## 0.3.3 以来的主要更新
 
-当前 `main` 相比 `0.3.3` 已同步到 `0.5.1` 版本线，并继续补充了更新检查与启动体验：
+当前 `main` 相比 `0.3.3` 已同步到 `0.5.2` 版本线，并继续补充了更新检查与启动体验：
 
 - 新增桌宠组合页，可保存当前运行中的多只桌宠，并恢复上次关闭前的组合。
 - 模板列表支持双击生成匹配桌宠，减少选择和召唤步骤。
@@ -50,7 +71,10 @@
 - 更新检查改为请求 GitHub Pages 上的静态 `latest.json`，避免客户端直连 GitHub API 触发限流。
 - 更新下载支持 SHA-256 校验；发布 asset 名称会先清理再写入本地缓存。
 - Windows 支持开机自启、静默启动，以及启动时恢复上次或指定桌宠组合。
-- CI 增加 macOS Intel/Apple Silicon 构建，debug 构建会运行核心测试。
+- CI 增加 macOS Intel/Apple Silicon 构建，并验证受支持的 GUI/CLI 构建目标；废弃的独立测试目标已移除。
+- 商店默认切换到公开 Staging registry，补充六个官方桌宠包及可读的卡片详情。
+- 修复 GitHub Device Flow 授权完成后的弹窗生命周期，并刷新登录账号状态。
+- 修复 Codex 新会话标题返回 JSON 时的适配，只显示允许的标题/简介字段。
 
 ## 制作
 

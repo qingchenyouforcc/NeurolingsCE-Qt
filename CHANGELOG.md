@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.2] - 2026-08-12
+
+### ✨ Added / 新增功能
+
+- **Mascot Store registry** - The default public staging registry now exposes six official mascot packages (Cerber, Eviling, Neuron, Tuteling, Vedaling, and Weuron; each marked CC BY-NC-SA-4.0); the bundled upstream Default Mascot is intentionally not listed / **桌宠商店 registry** - 默认公开 staging registry 现在提供六个官方桌宠包（Cerber、Eviling、Neuron、Tuteling、Vedaling、Weuron，均标记为 CC BY-NC-SA-4.0）；内置的上游 Default Mascot 按版权边界不列入商店
+- **Store card details** - Store entries now use distinct selectable cards with name, version, summary, source, size, license, and download/install status kept readable at different window sizes / **商店卡片详情** - 商店条目改为边界清晰、可选择的卡片，在不同窗口尺寸下保持名称、版本、简介、来源、大小、许可证及下载/安装状态可读
+- **GitHub Device Flow lifecycle** - GitHub App login now reports success, cancellation, expiry, and errors clearly, closes its progress dialog after authorization, and refreshes the account state / **GitHub Device Flow 生命周期** - GitHub App 登录现在明确反馈成功、取消、过期和错误，授权完成后自动关闭进度弹窗并刷新账号状态
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed the client store path to use the maintained public Staging Pages index instead of the retired submission endpoint / 修复客户端商店路径，改用维护中的公开 Staging Pages 索引，不再依赖已失效的投稿端点
+- Fixed new-session Codex notifications that exposed a JSON title object verbatim; allow-listed title and description fields are now rendered as readable notification text / 修复 Codex 新会话通知直接显示 JSON 标题对象的问题，现在只提取允许的标题和简介字段并显示为可读通知
+
+### 🔧 Changed / 改进与优化
+
+- **Codex integration** - Preserved the notify trust boundary: payloads remain bounded and no sensitive fields are displayed or automatically approved / **Codex 集成** - 保持 notify 信任边界：限制载荷大小，不显示敏感字段，也不自动批准请求
+- **Build maintenance** - Removed the deprecated `NeurolingsCETests` and `NeurolingsCEBubbleTests` targets and their obsolete CI/CTest registrations / **构建维护** - 移除废弃的 `NeurolingsCETests` 与 `NeurolingsCEBubbleTests` 目标及过时的 CI/CTest 注册
+- **Release metadata** - Synchronized 0.5.2 version metadata and platform manifests / **发布元数据** - 同步 0.5.2 版本元数据及各平台清单
+
+---
+
 ## [0.5.1] - 2026-08-06
 
 ### ✨ Added / 新增功能
@@ -328,6 +349,9 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.5.2]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Mascot Store registry and cards, GitHub login lifecycle, Codex title handling, and release maintenance / **桌宠商店 registry 与卡片、GitHub 登录生命周期、Codex 标题处理及发布维护**
+
 ### [0.5.1]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Codex companion, import, update workflow, and Windows stability improvements / Codex companion、导入、更新工作流与 Windows 稳定性改进
 
@@ -363,6 +387,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.5.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.4.0...0.4.1
