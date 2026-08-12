@@ -24,8 +24,10 @@
 
 `include/shijima-qt/MascotStoreConfig.hpp` 保存维护者提供的编译期占位符：
 索引 URL、投稿服务 URL、GitHub App Client ID。CMake 支持
-`NEUROLINGSCE_STORE_PROFILE=custom|staging|disabled`，也可从同名环境变量
-注入这些公开值；默认 `custom` 不推断任何 URL 或 gh CLI 登录状态。
-`staging` 只用于显式的 synthetic staging E2E，不能作为生产内容源；
-`disabled` 会在配置阶段清空所有 Store 值。未配置时 UI 清空旧缓存条目，
+`NEUROLINGSCE_STORE_PROFILE=staging|custom|disabled`，也可从同名环境变量
+注入这些公开值；默认 `staging` 使用维护中的公开 Staging Pages 索引和
+Login App Client ID，不推断 gh CLI 登录状态。`custom` 不推断任何 URL，
+`disabled` 显式关闭商店。
+`staging` 指向当前公开的 NeurolingsCE-Mascots-Staging 内容源，不能作为生产
+仓库内容源；`disabled` 会在配置阶段清空所有 Store 值。未配置时 UI 清空旧缓存条目，
 并分别提示商店和 GitHub 登录不可用，不会把其他构建 profile 的缓存显示成当前商店。

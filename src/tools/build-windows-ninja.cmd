@@ -26,7 +26,7 @@ rem             (default: D:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6)
 rem   VCVARS64  explicit path to vcvars64.bat; otherwise vswhere / common
 rem             VS 2022 locations are probed.
 rem   NEUROLINGSCE_STORE_PROFILE
-rem             custom (default), staging, or disabled
+rem             staging (default), custom, or disabled
 rem   NEUROLINGSCE_MASCOT_INDEX_URL / NEUROLINGSCE_SUBMISSION_SERVICE_URL /
 rem   NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID
 rem             public Store configuration forwarded to CMake; values are

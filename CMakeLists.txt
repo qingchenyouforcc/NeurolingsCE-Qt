@@ -166,11 +166,11 @@ option(SHIJIMA_WITH_DEFAULT_MASCOT "Embed DefaultMascot assets" ON)
 option(SHIJIMA_WITH_LICENSES_TEXT "Embed licenses text" ON)
 
 # Store values are public build-time configuration, never secrets.  The
-# default custom profile remains disabled until a maintainer supplies values
-# through -D arguments or the matching environment variables.  The explicit
-# staging profile is intentionally opt-in and points only at the synthetic
-# staging registry used by the end-to-end tests.
-set(NEUROLINGSCE_STORE_PROFILE "custom" CACHE STRING
+# default staging profile points at the maintained public staging registry;
+# custom and disabled remain available for production mirrors or offline
+# builds.  Submission service credentials and Publisher App secrets never
+# enter the client build.
+set(NEUROLINGSCE_STORE_PROFILE "staging" CACHE STRING
     "Mascot Store profile: custom, staging, or disabled")
 set_property(CACHE NEUROLINGSCE_STORE_PROFILE PROPERTY STRINGS
     custom staging disabled)
@@ -219,7 +219,7 @@ if(NEUROLINGSCE_STORE_PROFILE STREQUAL "disabled")
   set(NEUROLINGSCE_GITHUB_LOGIN_CLIENT_ID "" CACHE STRING "" FORCE)
 elseif(NEUROLINGSCE_STORE_PROFILE STREQUAL "staging")
   # Selecting staging is deterministic: do not let a previously configured
-  # production cache leak into the synthetic E2E profile. Environment values
+  # production cache leak into the public staging profile. Environment values
   # above remain the explicit override for local test mirrors.
   set(NEUROLINGSCE_MASCOT_INDEX_URL "${_neurolingsce_store_index_default}"
     CACHE STRING "Public Mascot store index URL (GitHub Pages index-v1.json)"
@@ -237,8 +237,8 @@ elseif(NEUROLINGSCE_STORE_PROFILE STREQUAL "staging")
       "Public submission service base URL" FORCE)
   endif()
 else()
-  # A profile switch from staging must not leave its synthetic cache visible
-  # under the default custom profile. Keep explicit custom values intact.
+  # A profile switch from staging must not leave its staging cache visible
+  # under a custom profile. Keep explicit custom values intact.
   if(_neurolingsce_store_previous_profile STREQUAL "staging")
     if(NEUROLINGSCE_MASCOT_INDEX_URL STREQUAL
         "${_neurolingsce_store_staging_index}")
