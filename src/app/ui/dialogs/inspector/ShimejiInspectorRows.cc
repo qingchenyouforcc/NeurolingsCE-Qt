@@ -21,6 +21,7 @@
 #include "ShimejiInspectorFormatting.hpp"
 #include <QFormLayout>
 #include <QLabel>
+#include <QSizePolicy>
 #include "ElaTheme.h"
 
 void ShimejiInspectorDialog::registerRows() {
@@ -62,18 +63,27 @@ void ShimejiInspectorDialog::registerRows() {
 void ShimejiInspectorDialog::addRow(QString const& label,
     std::function<std::string(shijima::mascot::manager &)> tick)
 {
-    auto themeMode = eTheme->getThemeMode();
-    QString primaryColor = ElaThemeColor(themeMode, PrimaryNormal).name();
-    QString textColor = ElaThemeColor(themeMode, BasicText).name();
-    QString baseBg = ElaThemeColor(themeMode, BasicBase).name();
-
     auto labelWidget = new QLabel { label };
-    labelWidget->setStyleSheet(QString("font-weight: bold; color: %1;").arg(primaryColor));
+    labelWidget->setWordWrap(true);
     auto dataWidget = new QLabel {};
-    dataWidget->setStyleSheet(
-        QString("font-family: 'Consolas', 'Cascadia Mono', 'Source Code Pro', monospace;"
-        "color: %1; padding: 2px 4px;"
-        "background-color: %2; border-radius: 3px;").arg(textColor, baseBg));
+    dataWidget->setMinimumWidth(240);
+    dataWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    dataWidget->setWordWrap(true);
+    dataWidget->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto applyTheme = [labelWidget, dataWidget](
+        ElaThemeType::ThemeMode mode) {
+        QString primaryColor = ElaThemeColor(mode, PrimaryNormal).name();
+        QString textColor = ElaThemeColor(mode, BasicText).name();
+        QString baseBg = ElaThemeColor(mode, BasicBase).name();
+        labelWidget->setStyleSheet(QString(
+            "font-weight: bold; color: %1;").arg(primaryColor));
+        dataWidget->setStyleSheet(QString(
+            "font-family: 'Consolas', 'Cascadia Mono', 'Source Code Pro', monospace;"
+            "color: %1; padding: 2px 4px; background-color: %2;"
+            "border-radius: 3px;").arg(textColor, baseBg));
+    };
+    applyTheme(eTheme->getThemeMode());
+    connect(eTheme, &ElaTheme::themeModeChanged, this, applyTheme);
     m_tickCallbacks.push_back([this, dataWidget, tick]() {
         auto newText = tick(shijimaParent()->mascot());
         dataWidget->setText(QString::fromStdString(newText));

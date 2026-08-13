@@ -48,7 +48,6 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QLocale>
-#include <QMessageBox>
 #include <QScreen>
 #include <QSettings>
 #include <QStandardPaths>
@@ -232,10 +231,8 @@ ShijimaManager::ShijimaManager(QWidget *parent):
             APP_LOG_ERROR("http") << (detail.isEmpty()
                 ? error.toStdString() : detail.toStdString());
             QTimer::singleShot(0, this, [this, error]() {
-                QMessageBox::warning(
-                    this,
-                    tr("HTTP API Failed"),
-                    error);
+                ShijimaManagerUiInternal::showThemedWarning(
+                    this, tr("HTTP API Failed"), error);
             });
         }
     }
@@ -309,7 +306,6 @@ void ShijimaManager::showStartupUpdateNotification(QString const& version)
             .arg(QStringLiteral("v%1").arg(version)),
         m_ui->trayController.get(),
         [this]() {
-            setManagerVisible(true);
-            showAboutDialog();
+            showAboutPage();
         });
 }

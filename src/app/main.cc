@@ -23,7 +23,6 @@
 #include <QFileInfo>
 #include <QIcon>
 #include <QLibraryInfo>
-#include <QMessageBox>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QLocale>
@@ -33,6 +32,7 @@
 #include <shijima/log.hpp>
 #include "Platform/Platform.hpp"
 #include "shijima-qt/ShijimaManager.hpp"
+#include "ui/ManagerUiHelpers.hpp"
 #include "shijima-qt/AssetLoader.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
 #include "shijima-qt/cli.hpp"
@@ -331,12 +331,10 @@ int main(int argc, char **argv) {
             AppLog::shutdown();
             return 1;
         }
-        QMessageBox *msg = new QMessageBox {};
-        msg->setText(QCoreApplication::translate("main", APP_NAME " failed to start. Reason: ") +
-            QString::fromUtf8(ex.what()));
-        msg->setStandardButtons(QMessageBox::StandardButton::Close);
-        msg->setAttribute(Qt::WA_DeleteOnClose);
-        msg->show();
+        ShijimaManagerUiInternal::showThemedInformationAsync(nullptr,
+            QCoreApplication::translate("main", APP_NAME " failed to start"),
+            QCoreApplication::translate("main", "Reason: ") +
+                QString::fromUtf8(ex.what()));
     }
     int ret = app.exec();
     APP_LOG_INFO("shutdown") << "Application event loop exited code=" << ret;

@@ -26,6 +26,7 @@ class QColor;
 class QListWidget;
 class ManagerTrayController;
 class ShijimaManager;
+class QWidget;
 
 namespace ShijimaManagerUiInternal {
 
@@ -37,5 +38,22 @@ void setupTrayIcon(ShijimaManager *manager,
 void teardownTrayIcon(std::unique_ptr<ManagerTrayController>& controller);
 void showTrayMessage(QString const& title, QString const& message,
     ManagerTrayController *controller, std::function<void()> onClick = {});
+
+// Blocking prompts use the project's ElaDialog/ElaPushButton chrome so close,
+// warning and confirmation surfaces remain readable in every theme.  The
+// helpers intentionally keep a conservative keyboard default: questions
+// start on the cancel action and never make the affirmative action default.
+bool showThemedQuestion(QWidget *parent, QString const& title,
+    QString const& message, QString const& acceptText = {},
+    QString const& cancelText = {}, bool destructive = false);
+void showThemedInformation(QWidget *parent, QString const& title,
+    QString const& message);
+void showThemedWarning(QWidget *parent, QString const& title,
+    QString const& message);
+void showThemedInformationAsync(QWidget *parent, QString const& title,
+    QString const& message);
+bool showThemedTextInput(QWidget *parent, QString const& title,
+    QString const& label, QString const& initial, QString *result,
+    QString const& acceptText = {}, QString const& cancelText = {});
 
 }

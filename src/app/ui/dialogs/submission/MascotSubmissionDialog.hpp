@@ -20,10 +20,10 @@
 
 #include <QDialog>
 
-class QCheckBox;
+class ElaCheckBox;
+class ElaLineEdit;
+class ElaPlainTextEdit;
 class QLabel;
-class QLineEdit;
-class QPlainTextEdit;
 class QPushButton;
 class GitHubAuthManager;
 class MascotSubmissionClient;
@@ -44,15 +44,16 @@ private:
 
     GitHubAuthManager *m_auth = nullptr;
     MascotSubmissionClient *m_client = nullptr;
-    QLineEdit *m_packagePath = nullptr;
-    QLineEdit *m_id = nullptr;
-    QLineEdit *m_name = nullptr;
-    QLineEdit *m_version = nullptr;
-    QLineEdit *m_summary = nullptr;
-    QPlainTextEdit *m_description = nullptr;
-    QLineEdit *m_license = nullptr;
-    QLineEdit *m_maintainers = nullptr;
-    QCheckBox *m_rightsConfirmed = nullptr;
+    ElaLineEdit *m_packagePath = nullptr;
+    QPushButton *m_pickButton = nullptr;
+    ElaLineEdit *m_id = nullptr;
+    ElaLineEdit *m_name = nullptr;
+    ElaLineEdit *m_version = nullptr;
+    ElaLineEdit *m_summary = nullptr;
+    ElaPlainTextEdit *m_description = nullptr;
+    ElaLineEdit *m_license = nullptr;
+    ElaLineEdit *m_maintainers = nullptr;
+    ElaCheckBox *m_rightsConfirmed = nullptr;
     QLabel *m_statusLabel = nullptr;
     QPushButton *m_submitButton = nullptr;
     QLabel *m_prLink = nullptr;

@@ -200,8 +200,20 @@
         <translation>请在浏览器打开的 GitHub 页面中输入此代码：</translation>
     </message>
     <message>
+        <source>GitHub verification code</source>
+        <translation>GitHub 验证码</translation>
+    </message>
+    <message>
         <source>Copy code</source>
         <translation>复制代码</translation>
+    </message>
+    <message>
+        <source>Copy the GitHub verification code to the clipboard.</source>
+        <translation>将 GitHub 验证码复制到剪贴板。</translation>
+    </message>
+    <message>
+        <source>Close the GitHub authorization dialog.</source>
+        <translation>关闭 GitHub 授权对话框。</translation>
     </message>
     <message>
         <source>Refreshing store...</source>
@@ -938,6 +950,329 @@
         <source>Codex</source>
         <translation>Codex</translation>
     </message>
+    <!-- Codex app-server page -->
+    <message>
+        <source>Connect to a private Codex app-server session and review plans, replies, and approvals.</source>
+        <translation>连接到专属 Codex app-server 会话，查看计划、回复和审批。</translation>
+    </message>
+    <message>
+        <source>Session</source>
+        <translation>会话</translation>
+    </message>
+    <message>
+        <source>One explicitly managed thread at a time. Nothing starts until you choose Connect.</source>
+        <translation>一次只管理一个明确选择的线程。点击“连接 Codex”前不会启动任何进程。</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <source>Thread</source>
+        <translation>线程</translation>
+    </message>
+    <message>
+        <source>Workspace</source>
+        <translation>工作区</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>回合</translation>
+    </message>
+    <message>
+        <source>Connection</source>
+        <translation>连接</translation>
+    </message>
+    <message>
+        <source>Start, stop, or explicitly choose which saved thread to use.</source>
+        <translation>启动或停止服务，并明确选择要使用的已保存线程。</translation>
+    </message>
+    <message>
+        <source>Review each request before choosing a decision. Nothing is approved automatically.</source>
+        <translation>请在作出决定前逐项查看请求。不会自动批准任何操作。</translation>
+    </message>
+    <message>
+        <source>No pending approvals. Requests that need your decision will appear here.</source>
+        <translation>当前没有待处理审批。需要你决定的请求会显示在这里。</translation>
+    </message>
+    <message>
+        <source>Plan and response</source>
+        <translation>计划和回复</translation>
+    </message>
+    <message>
+        <source>Plan steps and the latest final response stay here for review.</source>
+        <translation>计划步骤和最新最终回复会保留在这里供查看。</translation>
+    </message>
+    <message>
+        <source>No plan or final response yet. Start a turn to see it here.</source>
+        <translation>还没有计划或最终回复。开始一个回合后会显示在这里。</translation>
+    </message>
+    <message>
+        <source>Send a message to the current thread, or steer an active turn.</source>
+        <translation>向当前线程发送消息，或引导正在进行的回合。</translation>
+    </message>
+    <message>
+        <source>Stopped</source>
+        <translation>已停止</translation>
+    </message>
+    <message>
+        <source>Starting</source>
+        <translation>正在启动</translation>
+    </message>
+    <message>
+        <source>Initializing</source>
+        <translation>正在初始化</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <source>Running</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <source>Needs input</source>
+        <translation>需要输入</translation>
+    </message>
+    <message>
+        <source>Blocked</source>
+        <translation>已阻止</translation>
+    </message>
+    <message>
+        <source>Stopping</source>
+        <translation>正在停止</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>未知</translation>
+    </message>
+    <message>
+        <source>No active thread</source>
+        <translation>没有活动线程</translation>
+    </message>
+    <message>
+        <source>No workspace selected</source>
+        <translation>未选择工作区</translation>
+    </message>
+    <message>
+        <source>No active turn</source>
+        <translation>没有活动回合</translation>
+    </message>
+    <message>
+        <source>Plan supported</source>
+        <translation>支持计划模式</translation>
+    </message>
+    <message>
+        <source>Default only</source>
+        <translation>仅支持默认模式</translation>
+    </message>
+    <message>
+        <source>Command: %1</source>
+        <translation>命令：%1</translation>
+    </message>
+    <message>
+        <source>Type: %1</source>
+        <translation>类型：%1</translation>
+    </message>
+    <message>
+        <source>Reason: %1</source>
+        <translation>原因：%1</translation>
+    </message>
+    <message>
+        <source>Working directory: %1</source>
+        <translation>工作目录：%1</translation>
+    </message>
+    <message>
+        <source>Host: %1</source>
+        <translation>主机：%1</translation>
+    </message>
+    <message>
+        <source>Protocol: %1</source>
+        <translation>协议：%1</translation>
+    </message>
+    <message>
+        <source>Port: %1</source>
+        <translation>端口：%1</translation>
+    </message>
+    <message>
+        <source>Actions: %1</source>
+        <translation>操作数：%1</translation>
+    </message>
+    <message>
+        <source>Changed files: %1</source>
+        <translation>修改的文件：%1</translation>
+    </message>
+    <message>
+        <source>Further actions are hidden.</source>
+        <translation>更多操作已隐藏。</translation>
+    </message>
+    <message>
+        <source>Further details are hidden.</source>
+        <translation>更多详情已隐藏。</translation>
+    </message>
+    <message>
+        <source>Content truncated.</source>
+        <translation>内容已截断。</translation>
+    </message>
+    <message>
+        <source>Confirmation required</source>
+        <translation>需要确认</translation>
+    </message>
+    <message>
+        <source>No recent Codex thread is saved.</source>
+        <translation>没有已保存的最近 Codex 线程。</translation>
+    </message>
+    <message>
+        <source>Enter a message before sending.</source>
+        <translation>发送前请输入消息。</translation>
+    </message>
+    <message>
+        <source>Enable Codex interaction in Settings before connecting.</source>
+        <translation>连接前请先在“设置”中启用 Codex 交互。</translation>
+    </message>
+    <message>
+        <source>Please begin implementing the confirmed plan.</source>
+        <translation>请开始实施已确认的计划。</translation>
+    </message>
+    <message>
+        <source>Allow only this operation.</source>
+        <translation>仅允许此操作。</translation>
+    </message>
+    <message>
+        <source>Allow this operation for the current app-server session.</source>
+        <translation>在当前 app-server 会话中允许此操作。</translation>
+    </message>
+    <message>
+        <source>Reject this operation and let the agent continue.</source>
+        <translation>拒绝此操作并让代理继续。</translation>
+    </message>
+    <message>
+        <source>Reject this operation and interrupt the current turn.</source>
+        <translation>拒绝此操作并中断当前回合。</translation>
+    </message>
+    <message>
+        <source>Start the Codex app-server after an explicit click.</source>
+        <translation>点击后启动 Codex app-server。</translation>
+    </message>
+    <message>
+        <source>Create a new app-server thread.</source>
+        <translation>创建新的 app-server 线程。</translation>
+    </message>
+    <message>
+        <source>Resume the explicitly saved recent thread.</source>
+        <translation>恢复明确保存的最近线程。</translation>
+    </message>
+    <message>
+        <source>Choose Default or Plan mode for the next turn.</source>
+        <translation>选择下一回合使用默认模式或计划模式。</translation>
+    </message>
+    <message>
+        <source>Enter a message to send to the current thread.</source>
+        <translation>输入要发送到当前线程的消息。</translation>
+    </message>
+    <message>
+        <source>Send the message or steer the active turn.</source>
+        <translation>发送消息或引导活动回合。</translation>
+    </message>
+    <message>
+        <source>Start a Default mode turn using the confirmed plan.</source>
+        <translation>使用已确认的计划开始默认模式回合。</translation>
+    </message>
+    <message>
+        <source>Ask Codex to revise the current plan.</source>
+        <translation>要求 Codex 修改当前计划。</translation>
+    </message>
+    <message>
+        <source>Interrupt the active Codex turn.</source>
+        <translation>中断活动 Codex 回合。</translation>
+    </message>
+    <message>
+        <source>Other...</source>
+        <translation>其他…</translation>
+    </message>
+    <message>
+        <source>Question</source>
+        <translation>问题</translation>
+    </message>
+    <message>
+        <source>Approval</source>
+        <translation>审批</translation>
+    </message>
+    <message>
+        <source>Ask Codex something...</source>
+        <translation>询问 Codex…</translation>
+    </message>
+    <message>
+        <source>Codex message</source>
+        <translation>Codex 消息</translation>
+    </message>
+    <message>
+        <source>Codex mode</source>
+        <translation>Codex 模式</translation>
+    </message>
+    <message>
+        <source>Codex plan steps</source>
+        <translation>Codex 计划步骤</translation>
+    </message>
+    <message>
+        <source>Pending Codex approvals</source>
+        <translation>待处理的 Codex 审批</translation>
+    </message>
+    <message>
+        <source>Select a pending request before choosing a decision.</source>
+        <translation>请先选择待处理请求，再选择决定。</translation>
+    </message>
+    <message>
+        <source>Please answer the question in the Codex page.</source>
+        <translation>请在 Codex 页面回答问题。</translation>
+    </message>
+    <message>
+        <source>This approval is no longer available.</source>
+        <translation>此审批已不可用。</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>发送</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>默认</translation>
+    </message>
+    <message>
+        <source>Message</source>
+        <translation>消息</translation>
+    </message>
+    <message>
+        <source>[%1] %2</source>
+        <translation>[%1] %2</translation>
+    </message>
+    <message>
+        <source>%1 — %2</source>
+        <translation>%1 — %2</translation>
+    </message>
+    <message>
+        <source>%1
+Pending approvals: %2</source>
+        <translation>%1
+待处理审批：%2</translation>
+    </message>
+    <message>
+        <source>• %1</source>
+        <translation>• %1</translation>
+    </message>
+    <message>
+        <source>  %1</source>
+        <translation>  %1</translation>
+    </message>
+    <message>
+        <source>  %1 %2</source>
+        <translation>  %1 %2</translation>
+    </message>
+    <message>
+        <source>: </source>
+        <translation>： </translation>
+    </message>
     <message>
         <source>Show Codex completion messages through a dedicated mascot bubble. Codex approval requests are not handled by this integration.</source>
         <translation>通过专属桌宠气泡显示 Codex 完成消息。本集成不处理 Codex 审批请求。</translation>
@@ -1043,6 +1378,30 @@ Copy this line into the configuration manually if desired:
         <translation>可选的绝对可执行文件路径。不接受 .cmd 或 .bat 包装脚本。</translation>
     </message>
     <message>
+        <source>Use the codex executable found on PATH</source>
+        <translation>使用 PATH 中找到的 codex 可执行文件</translation>
+    </message>
+    <message>
+        <source>Browse...</source>
+        <translation>浏览…</translation>
+    </message>
+    <message>
+        <source>Choose Codex executable</source>
+        <translation>选择 Codex 可执行文件</translation>
+    </message>
+    <message>
+        <source>Codex app-server executable</source>
+        <translation>Codex app-server 可执行文件</translation>
+    </message>
+    <message>
+        <source>Optional absolute path to the Codex executable.</source>
+        <translation>可选的 Codex 可执行文件绝对路径。</translation>
+    </message>
+    <message>
+        <source>Show a short reminder in a running mascot bubble; decisions stay on the Codex page.</source>
+        <translation>在运行中的桌宠气泡中显示简短提醒；决定仍在 Codex 页面完成。</translation>
+    </message>
+    <message>
         <source>Approval reminders</source>
         <translation>审批提醒</translation>
     </message>
@@ -1117,6 +1476,14 @@ Copy this line into the configuration manually if desired:
     <message>
         <source>Codex needs input</source>
         <translation>Codex 需要输入</translation>
+    </message>
+    <message>
+        <source>Cancel answering this question.</source>
+        <translation>取消回答此问题。</translation>
+    </message>
+    <message>
+        <source>Submit the selected answers.</source>
+        <translation>提交所选答案。</translation>
     </message>
     <message>
         <source>Codex · Plan completed</source>
@@ -1276,28 +1643,56 @@ Copy this line into the configuration manually if desired:
         <translation>关于</translation>
     </message>
     <message>
-        <source>About NeurolingsCE</source>
-        <translation>关于 NeurolingsCE</translation>
+        <source>NeurolingsCE</source>
+        <translation>NeurolingsCE</translation>
     </message>
     <message>
         <source>A cross-platform shimeji desktop pet runner.</source>
         <translation>跨平台桌面桌宠应用。</translation>
     </message>
     <message>
-        <source>Author</source>
-        <translation>作者</translation>
+        <source>Copyright © 2025 pixelomer and contributors.</source>
+        <translation>版权所有 © 2025 pixelomer 及贡献者。</translation>
     </message>
     <message>
-        <source>Based on</source>
-        <translation>基于</translation>
+        <source>Project: %1</source>
+        <translation>项目：%1</translation>
     </message>
     <message>
-        <source>Project</source>
-        <translation>项目</translation>
+        <source>Qingchen You</source>
+        <translation>轻尘呦</translation>
     </message>
     <message>
-        <source>Chat QQ</source>
-        <translation>交流QQ群</translation>
+        <source>Upstream: %1</source>
+        <translation>上游项目：%1</translation>
+    </message>
+    <message>
+        <source>Shijima-Qt</source>
+        <translation>Shijima-Qt</translation>
+    </message>
+    <message>
+        <source>pixelomer</source>
+        <translation>pixelomer</translation>
+    </message>
+    <message>
+        <source> by %1</source>
+        <translation>，作者：%1</translation>
+    </message>
+    <message>
+        <source>GitHub: %1</source>
+        <translation>GitHub：%1</translation>
+    </message>
+    <message>
+        <source>QQ Group: %1</source>
+        <translation>QQ群：%1</translation>
+    </message>
+    <message>
+        <source>License: %1</source>
+        <translation>许可证：%1</translation>
+    </message>
+    <message>
+        <source>GPLv3</source>
+        <translation>GPLv3</translation>
     </message>
     <message>
         <source>View Licenses</source>
@@ -1308,8 +1703,64 @@ Copy this line into the configuration manually if desired:
         <translation>报告问题</translation>
     </message>
     <message>
-        <source>Close</source>
-        <translation>关闭</translation>
+        <source>OK</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <source>Project &amp; Support</source>
+        <translation>项目与支持</translation>
+    </message>
+    <message>
+        <source>Release Notes</source>
+        <translation>发布说明</translation>
+    </message>
+    <message>
+        <source>Copy Version Info</source>
+        <translation>复制版本信息</translation>
+    </message>
+    <message>
+        <source>Copy the current and latest version information.</source>
+        <translation>复制当前版本和最新版本信息。</translation>
+    </message>
+    <message>
+        <source>Version information copied.</source>
+        <translation>版本信息已复制。</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE %1 (latest: %2)</source>
+        <translation>NeurolingsCE %1（最新：%2）</translation>
+    </message>
+    <message>
+        <source>Expand or collapse %1</source>
+        <translation>展开或折叠 %1</translation>
+    </message>
+    <message>
+        <source>Check GitHub for a newer NeurolingsCE release.</source>
+        <translation>检查 GitHub 上是否有更新的 NeurolingsCE 版本。</translation>
+    </message>
+    <message>
+        <source>Open the release notes in your browser.</source>
+        <translation>在浏览器中打开发布说明。</translation>
+    </message>
+    <message>
+        <source>Download or install the selected update.</source>
+        <translation>下载或安装所选更新。</translation>
+    </message>
+    <message>
+        <source>Ignore this release until a newer version is available.</source>
+        <translation>忽略此版本，直到有更新版本可用。</translation>
+    </message>
+    <message>
+        <source>Temporarily hide this update reminder.</source>
+        <translation>暂时隐藏此更新提醒。</translation>
+    </message>
+    <message>
+        <source>Open the NeurolingsCE issue tracker.</source>
+        <translation>打开 NeurolingsCE 问题跟踪器。</translation>
+    </message>
+    <message>
+        <source>View the licenses for NeurolingsCE and its dependencies.</source>
+        <translation>查看 NeurolingsCE 及其依赖项的许可证。</translation>
     </message>
     <message>
         <source>Updates</source>
@@ -1495,12 +1946,24 @@ Copy this line into the configuration manually if desired:
         <translation>欢迎使用 NeurolingsCE！将桌宠压缩包拖放到管理器窗口即可开始。您也可以通过选择 文件 &gt; 导入 来导入压缩包。</translation>
     </message>
     <message>
+        <source>Welcome to NeurolingsCE</source>
+        <translation>欢迎使用 NeurolingsCE</translation>
+    </message>
+    <message>
+        <source>Get started by dragging and dropping a shimeji archive to the manager window. You can also import archives by selecting File &gt; Import.</source>
+        <translation>将桌宠压缩包拖放到管理器窗口即可开始。您也可以通过选择 文件 &gt; 导入 来导入压缩包。</translation>
+    </message>
+    <message>
         <source>Close NeurolingsCE</source>
         <translation>关闭 NeurolingsCE</translation>
     </message>
     <message>
         <source>Do you want to close NeurolingsCE?</source>
         <translation>确定要关闭 NeurolingsCE 吗？</translation>
+    </message>
+    <message>
+        <source>Keep open</source>
+        <translation>保持打开</translation>
     </message>
     <message>
         <source>No mascot selected</source>
@@ -1907,6 +2370,93 @@ Copy this line into the configuration manually if desired:
     </message>
 </context>
 <context>
+    <name>CompactFluentColorDialog</name>
+    <message>
+        <source>Select Color</source>
+        <translation>选择颜色</translation>
+    </message>
+    <message>
+        <source>Color map</source>
+        <translation>颜色面板</translation>
+    </message>
+    <message>
+        <source>Selected color preview</source>
+        <translation>当前颜色预览</translation>
+    </message>
+    <message>
+        <source>HEX</source>
+        <translation>HEX</translation>
+    </message>
+    <message>
+        <source>#RRGGBB</source>
+        <translation>#RRGGBB</translation>
+    </message>
+    <message>
+        <source>Hex color value</source>
+        <translation>十六进制颜色值</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>红色</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>绿色</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>蓝色</translation>
+    </message>
+    <message>
+        <source>Hue</source>
+        <translation>色相</translation>
+    </message>
+    <message>
+        <source>Basic colors</source>
+        <translation>基本颜色</translation>
+    </message>
+    <message>
+        <source>Custom colors</source>
+        <translation>自定义颜色</translation>
+    </message>
+    <message>
+        <source>Add current</source>
+        <translation>添加当前颜色</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>清空</translation>
+    </message>
+    <message>
+        <source>Add current color</source>
+        <translation>添加当前颜色</translation>
+    </message>
+    <message>
+        <source>Clear custom colors</source>
+        <translation>清空自定义颜色</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <source>Basic color %1</source>
+        <translation>基本颜色 %1</translation>
+    </message>
+    <message>
+        <source>Custom color %1</source>
+        <translation>自定义颜色 %1</translation>
+    </message>
+    <message>
+        <source>No custom colors yet</source>
+        <translation>暂无自定义颜色</translation>
+    </message>
+</context>
+<context>
     <name>SpeechBubbleWidget</name>
     <message>
         <source>Codex · Completed</source>
@@ -1957,10 +2507,25 @@ Copy this line into the configuration manually if desired:
     </message>
 </context>
 <context>
+    <name>ForcedProgressDialog</name>
+    <message>
+        <source>Progress</source>
+        <translation>进度</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+</context>
+<context>
     <name>ShijimaLicensesDialog</name>
     <message>
         <source>Licenses</source>
         <translation>许可证</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
     </message>
 </context>
 <context>
@@ -1978,6 +2543,10 @@ Copy this line into the configuration manually if desired:
         <translation>桌宠描述</translation>
     </message>
     <message>
+        <source>Description</source>
+        <translation>描述</translation>
+    </message>
+    <message>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
@@ -1987,6 +2556,46 @@ Copy this line into the configuration manually if desired:
     <message>
         <source>Submit a Mascot</source>
         <translation>提交桌宠</translation>
+    </message>
+    <message>
+        <source>Share a validated .mascot package with the community registry.</source>
+        <translation>将已验证的 .mascot 桌宠包分享至社区目录。</translation>
+    </message>
+    <message>
+        <source>Package</source>
+        <translation>桌宠包</translation>
+    </message>
+    <message>
+        <source>Choose the validated .mascot package to upload.</source>
+        <translation>选择要上传的已验证 .mascot 桌宠包。</translation>
+    </message>
+    <message>
+        <source>No package selected</source>
+        <translation>尚未选择桌宠包</translation>
+    </message>
+    <message>
+        <source>Metadata</source>
+        <translation>元数据</translation>
+    </message>
+    <message>
+        <source>Add the public information that will appear in the registry.</source>
+        <translation>填写将在社区目录中公开显示的信息。</translation>
+    </message>
+    <message>
+        <source>1.0.0</source>
+        <translation>1.0.0</translation>
+    </message>
+    <message>
+        <source>MIT</source>
+        <translation>MIT</translation>
+    </message>
+    <message>
+        <source>Rights and authorship</source>
+        <translation>发布权与作者信息</translation>
+    </message>
+    <message>
+        <source>Confirm that you are allowed to publish this work under the declared license.</source>
+        <translation>请确认你有权依据所声明的许可证发布此作品。</translation>
     </message>
     <message>
         <source>Mascot package</source>
@@ -1999,6 +2608,10 @@ Copy this line into the configuration manually if desired:
     <message>
         <source>Path to the .mascot package to submit.</source>
         <translation>要提交的 .mascot 包路径。</translation>
+    </message>
+    <message>
+        <source>Select a .mascot package to submit.</source>
+        <translation>选择要提交的 .mascot 桌宠包。</translation>
     </message>
     <message>
         <source>Choose .mascot...</source>
@@ -2055,6 +2668,14 @@ Copy this line into the configuration manually if desired:
     <message>
         <source>Close</source>
         <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <source>Ready to submit.</source>
+        <translation>准备提交。</translation>
     </message>
     <message>
         <source>Submitted. Review PR %1.</source>
@@ -2259,6 +2880,10 @@ Copy this line into the configuration manually if desired:
     <message>
         <source>NeurolingsCE failed to start. Reason: </source>
         <translation>NeurolingsCE 启动失败。原因：</translation>
+    </message>
+    <message>
+        <source>Reason: </source>
+        <translation>原因：</translation>
     </message>
 </context>
 </TS>

@@ -62,13 +62,16 @@ struct ShijimaManagerUiState {
     QPushButton *deleteCombinationButton = nullptr;
     QWidget *settingsPage = nullptr;
     QWidget *codexPage = nullptr;
+    QWidget *aboutPage = nullptr;
     QString codexKey;
     QLabel *codexStateLabel = nullptr;
     QLabel *codexThreadLabel = nullptr;
     QLabel *codexTurnLabel = nullptr;
+    QLabel *codexWorkspaceLabel = nullptr;
     QLabel *codexPlanLabel = nullptr;
     QLabel *codexFinalLabel = nullptr;
     QLabel *codexDiagnosticLabel = nullptr;
+    QWidget *codexDiagnosticCard = nullptr;
     QListWidget *codexPlanSteps = nullptr;
     QListWidget *codexApprovalList = nullptr;
     QLabel *codexApprovalDetailLabel = nullptr;

@@ -137,7 +137,7 @@ private:
     void setupCodexPage();
     void setupAboutPage();
     void setupStorePage();
-    void showAboutDialog();
+    void showAboutPage();
     void showMascotStoreDetail(MascotStoreEntry const* entry);
     void importAction();
     void deleteAction();

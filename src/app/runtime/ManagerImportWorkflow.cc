@@ -24,7 +24,6 @@
 #include "ManagerRuntimeHelpers.hpp"
 #include <exception>
 #include <QDragEnterEvent>
-#include <QMessageBox>
 #include <QMimeData>
 #include <QDropEvent>
 #include <QPushButton>
@@ -76,19 +75,16 @@ void ShijimaManager::importWithDialog(QList<QString> const& paths) {
             dialog->close();
 
             QString msg;
-            QMessageBox::Icon icon;
             if (changed.size() > 0) {
                 msg = tr("Imported %n mascot(s).", "", (int)changed.size());
-                icon = QMessageBox::Icon::Information;
+                ShijimaManagerUiInternal::showThemedInformation(
+                    this, tr("Import"), msg);
             }
             else {
                 msg = tr("Could not import any mascots from the specified archive(s).");
-                icon = QMessageBox::Icon::Warning;
+                ShijimaManagerUiInternal::showThemedWarning(
+                    this, tr("Import"), msg);
             }
-
-            QMessageBox msgBox { icon, tr("Import"), msg,
-                QMessageBox::StandardButton::Ok, this };
-            msgBox.exec();
         });
     });
 }
@@ -108,13 +104,11 @@ void ShijimaManager::showEvent(QShowEvent *event) {
         importWithDialog({ path });
     }
     else if (m_runtime->templates.loadedMascots().size() == 1) {
-        auto msgBox = new QMessageBox { this };
-        msgBox->setText(tr("Welcome to NeurolingsCE! Get started by dragging and dropping a "
+        ShijimaManagerUiInternal::showThemedInformationAsync(this,
+            tr("Welcome to NeurolingsCE"),
+            tr("Get started by dragging and dropping a "
             "shimeji archive to the manager window. You can also import archives "
             "by selecting File > Import."));
-        msgBox->addButton(QMessageBox::StandardButton::Ok);
-        msgBox->setAttribute(Qt::WA_DeleteOnClose);
-        msgBox->show();
     }
 }
 

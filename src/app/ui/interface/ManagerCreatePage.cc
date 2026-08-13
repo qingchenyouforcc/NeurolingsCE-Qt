@@ -20,6 +20,7 @@
 #include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/SecurityLimits.hpp"
 #include "../ManagerUiState.hpp"
+#include "../ManagerUiHelpers.hpp"
 
 #include <QBoxLayout>
 #include <QFileDialog>
@@ -32,8 +33,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPainter>
+#include <QPalette>
 #include <QPlainTextEdit>
 #include <QResizeEvent>
 #include <QScrollArea>
@@ -49,6 +50,9 @@
 #include <utility>
 
 #include "ElaPushButton.h"
+#include "ElaPlainTextEdit.h"
+#include "ElaScrollArea.h"
+#include "ElaScrollBar.h"
 #include "ElaText.h"
 #include "ElaTheme.h"
 #include "ElaToolButton.h"
@@ -425,32 +429,91 @@ void addCreateStepHeader(QVBoxLayout *layout, QWidget *parent,
 
 void applyCreateTheme(QWidget *createPage)
 {
+    if (createPage == nullptr) {
+        return;
+    }
     auto mode = eTheme->getThemeMode();
+    QColor surface = ElaThemeColor(mode, BasicBase);
+    QColor field = ElaThemeColor(mode, DialogLayoutArea);
+    QColor disabledSurface = ElaThemeColor(mode, BasicDisable);
+    QColor border = ElaThemeColor(mode, BasicBorder);
+    QColor text = ElaThemeColor(mode, BasicText);
+    QColor muted = ElaThemeColor(mode, BasicDetailsText);
+    QColor disabledText = ElaThemeColor(mode, BasicTextDisable);
+    QColor selected = ElaThemeColor(mode, PrimaryNormal);
+    selected.setAlpha(48);
     createPage->setStyleSheet(QString(
+        "#createPage { color: %5; background: transparent; }"
+        "#createPage QLabel { color: %5; background: transparent; }"
+        "#createPage QLabel[muted=\"true\"] { color: %6; }"
+        "#createPage QLabel[createStepLabel=\"true\"] {"
+        "  color: %7; font-weight: 600;"
+        "}"
+        "#createPage QLabel[createStepTitle=\"true\"] {"
+        "  color: %5; font-weight: 600;"
+        "}"
+        "#createPage QLabel[infoJsonError=\"true\"] {"
+        "  color: %8; font-weight: 600;"
+        "}"
+        "#createPage QScrollArea, #createPage QScrollArea > QWidget,"
+        "#createPage QScrollArea > QWidget > QWidget {"
+        "  background: transparent; border: none;"
+        "}"
         "#CreatePanel {"
-        "  background-color: %1;"
-        "  border: 1px solid %2;"
+        "  background-color: %1; color: %5;"
+        "  border: 1px solid %4;"
         "  border-radius: 8px;"
         "}"
-        "QLabel[muted=\"true\"] { color: %3; }"
-        "QLabel[createStepLabel=\"true\"] {"
-        "  color: %4;"
-        "  font-weight: 600;"
+        "#CreatePanel QLabel { color: %5; background: transparent; }"
+        "#CreatePanel QLabel[muted=\"true\"] { color: %6; }"
+        "#CreatePanel QLabel[createStepLabel=\"true\"] {"
+        "  color: %7; font-weight: 600;"
         "}"
-        "QLabel[createStepTitle=\"true\"] {"
-        "  color: %5;"
-        "  font-weight: 600;"
+        "#CreatePanel QLabel[createStepTitle=\"true\"] {"
+        "  color: %5; font-weight: 600;"
         "}"
-        "QLabel[infoJsonError=\"true\"] {"
-        "  color: %6;"
-        "  font-weight: 600;"
+        "#CreatePanel QLabel[infoJsonError=\"true\"] {"
+        "  color: %8; font-weight: 600;"
         "}"
-    ).arg(ElaThemeColor(mode, WindowBase).name(),
-        ElaThemeColor(mode, BasicBorder).name(),
-        ElaThemeColor(mode, BasicDetailsText).name(),
-        ElaThemeColor(mode, PrimaryNormal).name(),
-        ElaThemeColor(mode, BasicText).name(),
-        ElaThemeColor(mode, StatusDanger).name()));
+        "#CreatePanel QLineEdit, #CreatePanel QPlainTextEdit,"
+        "#CreatePanel QListWidget {"
+        "  background-color: %2; color: %5;"
+        "  border: 1px solid %4; border-radius: 7px;"
+        "  selection-background-color: %7;"
+        "  selection-color: %5;"
+        "}"
+        "#CreatePanel QLineEdit:disabled, #CreatePanel QPlainTextEdit:disabled,"
+        "#CreatePanel QListWidget:disabled {"
+        "  background-color: %3; color: %9;"
+        "}"
+    ).arg(surface.name(QColor::HexArgb), field.name(QColor::HexArgb),
+        disabledSurface.name(QColor::HexArgb), border.name(QColor::HexArgb),
+        text.name(QColor::HexArgb), muted.name(QColor::HexArgb),
+        selected.name(QColor::HexArgb), ElaThemeColor(mode, StatusDanger).name(QColor::HexArgb),
+        disabledText.name(QColor::HexArgb)));
+
+    auto applyPalette = [field, disabledSurface, text, muted, disabledText,
+        selected](QWidget *widget) {
+        QPalette palette = widget->palette();
+        palette.setColor(QPalette::Base, field);
+        palette.setColor(QPalette::Text, text);
+        palette.setColor(QPalette::PlaceholderText, muted);
+        palette.setColor(QPalette::Highlight, selected);
+        palette.setColor(QPalette::HighlightedText, text);
+        palette.setColor(QPalette::Disabled, QPalette::Base, disabledSurface);
+        palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, disabledText);
+        widget->setPalette(palette);
+    };
+    for (auto *widget : createPage->findChildren<QLineEdit *>()) {
+        applyPalette(widget);
+    }
+    for (auto *widget : createPage->findChildren<QPlainTextEdit *>()) {
+        applyPalette(widget);
+    }
+    for (auto *widget : createPage->findChildren<QListWidget *>()) {
+        applyPalette(widget);
+    }
 }
 
 QString candidateSupportingDetails(LegacyMascotCandidate const& candidate)
@@ -532,10 +595,11 @@ QString resultSummary(QList<LegacyMascotConversionResult> const& results)
 void ShijimaManager::setupCreatePage()
 {
     m_ui->createPage = new QWidget(this);
+    m_ui->createPage->setObjectName(QStringLiteral("createPage"));
     auto *pageLayout = new QVBoxLayout(m_ui->createPage);
     pageLayout->setContentsMargins(0, 0, 0, 0);
 
-    auto *scrollArea = new QScrollArea(m_ui->createPage);
+    auto *scrollArea = new ElaScrollArea(m_ui->createPage);
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -598,6 +662,9 @@ void ShijimaManager::setupCreatePage()
     candidateList->setMinimumHeight(150);
     candidateList->setSelectionMode(QListWidget::SingleSelection);
     candidateList->setEnabled(false);
+    candidateList->setVerticalScrollBar(new ElaScrollBar(candidateList));
+    candidateList->setHorizontalScrollBar(new ElaScrollBar(candidateList));
+    candidateList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     candidateList->setAccessibleName(tr("Mascots in archive"));
     candidateList->setAccessibleDescription(
         tr("Check the mascots that should be converted."));
@@ -605,7 +672,7 @@ void ShijimaManager::setupCreatePage()
     candidateLayout->addWidget(candidateList, 1);
     auto *infoJsonLabel = new QLabel(tr("info.json"), candidatePanel);
     candidateLayout->addWidget(infoJsonLabel);
-    auto *infoJsonEditor = new QPlainTextEdit(candidatePanel);
+    auto *infoJsonEditor = new ElaPlainTextEdit(candidatePanel);
     infoJsonEditor->setEnabled(false);
     infoJsonEditor->setMinimumHeight(180);
     infoJsonEditor->setLineWrapMode(QPlainTextEdit::NoWrap);
@@ -739,7 +806,7 @@ void ShijimaManager::setupCreatePage()
 
     auto *resultLabel = new QLabel(tr("Conversion results"), outputPanel);
     outputLayout->addWidget(resultLabel);
-    auto *resultText = new QPlainTextEdit(outputPanel);
+    auto *resultText = new ElaPlainTextEdit(outputPanel);
     resultText->setReadOnly(true);
     resultText->setMinimumHeight(90);
     resultText->setPlaceholderText(tr("Conversion results will appear here."));
@@ -846,7 +913,8 @@ void ShijimaManager::setupCreatePage()
             checkButton, chooseZipButton, resultText, updateConvertAvailability]() {
             QString path = zipEdit->text().trimmed();
             if (path.isEmpty()) {
-                QMessageBox::warning(this, tr("Create"), tr("Choose a .zip archive first."));
+                ShijimaManagerUiInternal::showThemedWarning(this, tr("Create"),
+                    tr("Choose a .zip archive first."));
                 return;
             }
             checkButton->setEnabled(false);
@@ -940,11 +1008,13 @@ void ShijimaManager::setupCreatePage()
             QString archivePath = zipEdit->text().trimmed();
             QString outputPath = outputEdit->text().trimmed();
             if (archivePath.isEmpty()) {
-                QMessageBox::warning(this, tr("Create"), tr("Choose a .zip archive first."));
+                ShijimaManagerUiInternal::showThemedWarning(this, tr("Create"),
+                    tr("Choose a .zip archive first."));
                 return;
             }
             if (outputPath.isEmpty()) {
-                QMessageBox::warning(this, tr("Create"), tr("Choose an output folder first."));
+                ShijimaManagerUiInternal::showThemedWarning(this, tr("Create"),
+                    tr("Choose an output folder first."));
                 return;
             }
 
@@ -956,7 +1026,7 @@ void ShijimaManager::setupCreatePage()
                     item->checkState() == Qt::Checked)
                 {
                     if (!item->data(kCandidateInfoJsonValidRole).toBool()) {
-                        QMessageBox::warning(this, tr("Create"),
+                        ShijimaManagerUiInternal::showThemedWarning(this, tr("Create"),
                             tr("Fix invalid info.json content before generating."));
                         return;
                     }
@@ -969,7 +1039,8 @@ void ShijimaManager::setupCreatePage()
                 }
             }
             if (selectedNames.isEmpty()) {
-                QMessageBox::warning(this, tr("Create"), tr("Select at least one mascot to convert."));
+                ShijimaManagerUiInternal::showThemedWarning(this, tr("Create"),
+                    tr("Select at least one mascot to convert."));
                 return;
             }
 

@@ -19,12 +19,13 @@
 // 
 
 #include <QDialog>
-#include <QPlainTextEdit>
+
+#include "ElaPlainTextEdit.h"
 
 class ShijimaLicensesDialog : public QDialog {
     Q_OBJECT
 public:
     ShijimaLicensesDialog(QWidget *parent);
 private:
-    QPlainTextEdit m_textEdit;
+    ElaPlainTextEdit m_textEdit;
 };

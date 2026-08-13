@@ -43,16 +43,18 @@
 #include <QFrame>
 #include <QHash>
 #include <QGuiApplication>
+#include <QFont>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
-#include <QMessageBox>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QPalette>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScreen>
 #include <QScrollBar>
 #include <QSet>
 #include <QSignalBlocker>
@@ -68,7 +70,11 @@
 #include <memory>
 
 #include "ElaIcon.h"
+#include "ElaComboBox.h"
+#include "ElaDialog.h"
+#include "ElaLineEdit.h"
 #include "ElaPushButton.h"
+#include "ElaScrollBar.h"
 #include "ElaText.h"
 #include "ElaTheme.h"
 
@@ -252,6 +258,8 @@ void configureStoreButton(QPushButton *button, QString const& description)
     button->setAccessibleDescription(description);
     button->setToolTip(description);
     button->setFocusPolicy(Qt::StrongFocus);
+    button->setAutoDefault(false);
+    button->setDefault(false);
 }
 
 void configureStorePrimaryButton(StorePushButton *button,
@@ -266,6 +274,28 @@ void configureStorePrimaryButton(StorePushButton *button,
     button->setDarkHoverColor(ElaThemeColor(ElaThemeType::Dark, PrimaryHover));
     button->setDarkPressColor(ElaThemeColor(ElaThemeType::Dark, PrimaryPress));
     button->setDarkTextColor(ElaThemeColor(ElaThemeType::Dark, BasicTextInvert));
+}
+
+void configureStoreDangerButton(StorePushButton *button,
+    QString const& description)
+{
+    configureStoreButton(button, description);
+    button->setLightDefaultColor(ElaThemeColor(
+        ElaThemeType::Light, StatusDanger));
+    button->setLightHoverColor(ElaThemeColor(
+        ElaThemeType::Light, StatusDanger));
+    button->setLightPressColor(ElaThemeColor(
+        ElaThemeType::Light, StatusDanger));
+    button->setLightTextColor(ElaThemeColor(
+        ElaThemeType::Light, BasicTextInvert));
+    button->setDarkDefaultColor(ElaThemeColor(
+        ElaThemeType::Dark, StatusDanger));
+    button->setDarkHoverColor(ElaThemeColor(
+        ElaThemeType::Dark, StatusDanger));
+    button->setDarkPressColor(ElaThemeColor(
+        ElaThemeType::Dark, StatusDanger));
+    button->setDarkTextColor(ElaThemeColor(
+        ElaThemeType::Dark, BasicTextInvert));
 }
 
 void applyStoreTheme(QWidget *storePage)
@@ -309,18 +339,6 @@ void applyStoreTheme(QWidget *storePage)
         "}"
         "#storeStatusBanner[state=\"error\"] { border-color: %8; }"
         "#storeStatusBanner[state=\"busy\"] { border-color: %6; }"
-        "#storeToolbar QLineEdit, #storeToolbar QComboBox {"
-        "  background-color: %5;"
-        "  color: %3;"
-        "  border: 1px solid %2;"
-        "  border-radius: 6px;"
-        "  padding: 6px 8px;"
-        "  min-height: 18px;"
-        "}"
-        "#storeToolbar QLineEdit:focus, #storeToolbar QComboBox:focus {"
-        "  border: 2px solid %6;"
-        "  padding: 5px 7px;"
-        "}"
         "#storeList {"
         "  background-color: transparent;"
         "  color: %3;"
@@ -354,11 +372,6 @@ void applyStoreTheme(QWidget *storePage)
         "#storeEntryName { font-weight: 600; }"
         "#storeEmptyState { background: transparent; border: none; }"
         "#storeDownloadProgress { min-height: 6px; max-height: 6px; }"
-        "QScrollBar:vertical { background: transparent; width: 8px; }"
-        "QScrollBar::handle:vertical { background: %2; min-height: 24px;"
-        " border-radius: 4px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
-        " height: 0px; }"
     ).arg(panel.name(QColor::HexArgb), border.name(QColor::HexArgb),
         text.name(QColor::HexArgb), muted.name(QColor::HexArgb),
         surface.name(QColor::HexArgb), selected.name(QColor::HexArgb),
@@ -436,32 +449,104 @@ QWidget *createStoreEntryCard(MascotStoreEntry const& entry, QWidget *parent)
 QDialog *showUserCodeDialog(QWidget *parent, QString const& userCode,
     QUrl const& verificationUrl)
 {
-    QDialog *dialog = new QDialog(parent);
+    auto *dialog = new ElaDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle(createTr("GitHub Authorization"));
-    dialog->setMinimumWidth(420);
+    dialog->setWindowButtonFlags(ElaAppBarType::CloseButtonHint);
+    dialog->setIsFixedSize(true);
+    dialog->setModal(true);
+    dialog->setMinimumWidth(360);
+    dialog->setMaximumWidth(520);
     auto *layout = new QVBoxLayout(dialog);
+    layout->setContentsMargins(22, 18, 22, 16);
+    layout->setSpacing(8);
+    auto *titleLabel = new QLabel(createTr("GitHub Authorization"), dialog);
+    QFont titleFont = titleLabel->font();
+    titleFont.setPointSizeF(qMax(11.0, titleFont.pointSizeF() + 2.0));
+    titleFont.setWeight(QFont::DemiBold);
+    titleLabel->setFont(titleFont);
+    titleLabel->setWordWrap(true);
+    layout->addWidget(titleLabel);
     auto *hint = new QLabel(createTr(
         "Enter this code on the GitHub page that opened in your browser:"));
     hint->setWordWrap(true);
     layout->addWidget(hint);
-    auto *codeLabel = new QLabel(QStringLiteral("<h2>%1</h2>")
-        .arg(userCode.toHtmlEscaped()));
+    auto *codeLabel = new QLabel(userCode, dialog);
     codeLabel->setAlignment(Qt::AlignCenter);
+    codeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    codeLabel->setAccessibleName(createTr("GitHub verification code"));
+    QFont codeFont = codeLabel->font();
+    codeFont.setPointSizeF(qMax(12.0, codeFont.pointSizeF() + 4.0));
+    codeFont.setWeight(QFont::DemiBold);
+    codeLabel->setFont(codeFont);
     layout->addWidget(codeLabel);
     auto *urlLabel = new QLabel(verificationUrl.toDisplayString());
     urlLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     urlLabel->setWordWrap(true);
+    urlLabel->setMaximumWidth(600);
     layout->addWidget(urlLabel);
-    auto *copyButton = new QPushButton(createTr("Copy code"), dialog);
+    auto *actions = new QHBoxLayout;
+    actions->setContentsMargins(0, 8, 0, 0);
+    actions->setSpacing(8);
+    actions->addStretch();
+    auto *copyButton = new StorePushButton(createTr("Copy code"), dialog);
+    configureStoreButton(copyButton, createTr(
+        "Copy the GitHub verification code to the clipboard."));
     QObject::connect(copyButton, &QPushButton::clicked, dialog,
         [userCode]() {
             QGuiApplication::clipboard()->setText(userCode);
         });
-    layout->addWidget(copyButton);
-    auto *closeButton = new QPushButton(createTr("Close"), dialog);
+    actions->addWidget(copyButton);
+    auto *closeButton = new StorePushButton(createTr("Close"), dialog);
+    configureStoreButton(closeButton, createTr(
+        "Close the GitHub authorization dialog."));
     QObject::connect(closeButton, &QPushButton::clicked, dialog, &QDialog::accept);
-    layout->addWidget(closeButton);
+    actions->addWidget(closeButton);
+    layout->addLayout(actions);
+
+    auto applyDialogTheme = [dialog, titleLabel, hint, codeLabel, urlLabel](
+        ElaThemeType::ThemeMode mode) {
+        QPalette palette = dialog->palette();
+        palette.setColor(QPalette::Window,
+            ElaThemeColor(mode, DialogBase));
+        palette.setColor(QPalette::WindowText,
+            ElaThemeColor(mode, BasicText));
+        palette.setColor(QPalette::Text,
+            ElaThemeColor(mode, BasicText));
+        palette.setColor(QPalette::Base,
+            ElaThemeColor(mode, DialogBase));
+        dialog->setPalette(palette);
+        titleLabel->setPalette(palette);
+        hint->setPalette(palette);
+        codeLabel->setPalette(palette);
+        urlLabel->setPalette(palette);
+    };
+    applyDialogTheme(eTheme->getThemeMode());
+    QObject::connect(eTheme, &ElaTheme::themeModeChanged, dialog,
+        applyDialogTheme);
+    QObject::connect(dialog, &ElaDialog::closeButtonClicked, dialog,
+        &QDialog::reject);
+    layout->activate();
+    dialog->adjustSize();
+    QRect available;
+    if (auto *screen = dialog->screen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    else if (auto *screen = QGuiApplication::primaryScreen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    if (available.isEmpty()) {
+        available = QRect(0, 0, 1280, 720);
+    }
+    int maxWidth = qMax(360, qMin(520, available.width() - 48));
+    int maxHeight = qMax(200, qMin(420, qRound(available.height() * 0.62)));
+    dialog->setMaximumSize(maxWidth, maxHeight);
+    QSize desired = layout->sizeHint();
+    desired.rheight() += 48;
+    desired.setWidth(qMax(desired.width(), 360));
+    desired.setHeight(qMax(desired.height(), 200));
+    dialog->resize(qBound(360, desired.width(), maxWidth),
+        qBound(200, desired.height(), maxHeight));
     dialog->show();
     return dialog;
 }
@@ -494,7 +579,7 @@ void ShijimaManager::setupStorePage() {
     auto *toolbar = new QHBoxLayout(toolbarFrame);
     toolbar->setContentsMargins(10, 8, 10, 8);
     toolbar->setSpacing(8);
-    storeUi->searchEdit = new QLineEdit(page);
+    storeUi->searchEdit = new ElaLineEdit(page);
     storeUi->searchEdit->setPlaceholderText(createTr("Search mascots..."));
     storeUi->searchEdit->setClearButtonEnabled(true);
     storeUi->searchEdit->setAccessibleName(createTr("Search mascots"));
@@ -502,7 +587,7 @@ void ShijimaManager::setupStorePage() {
         "Filter the mascot registry by name, summary, id, or author."));
     storeUi->searchEdit->setMinimumHeight(34);
     toolbar->addWidget(storeUi->searchEdit, 1);
-    storeUi->tagFilter = new QComboBox(page);
+    storeUi->tagFilter = new ElaComboBox(page);
     storeUi->tagFilter->addItem(createTr("All tags"), QString {});
     storeUi->tagFilter->setAccessibleName(createTr("Filter by tag"));
     storeUi->tagFilter->setAccessibleDescription(createTr(
@@ -546,6 +631,9 @@ void ShijimaManager::setupStorePage() {
     storeUi->entryList->setSelectionMode(QAbstractItemView::SingleSelection);
     storeUi->entryList->setSelectionBehavior(QAbstractItemView::SelectItems);
     storeUi->entryList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    storeUi->entryList->setVerticalScrollBar(new ElaScrollBar(storeUi->entryList));
+    storeUi->entryList->setHorizontalScrollBar(new ElaScrollBar(storeUi->entryList));
+    storeUi->entryList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     storeUi->entryList->setSpacing(1);
     storeUi->entryList->setWordWrap(true);
     storeUi->entryList->setUniformItemSizes(false);
@@ -580,15 +668,17 @@ void ShijimaManager::setupStorePage() {
     auto *actionRow = new QHBoxLayout;
     actionRow->setContentsMargins(2, 0, 2, 0);
     actionRow->setSpacing(8);
-    storeUi->detailButton = new QPushButton(createTr("Details"), page);
+    auto *detailButton = new StorePushButton(createTr("Details"), page);
+    storeUi->detailButton = detailButton;
     configureStoreButton(storeUi->detailButton, createTr(
         "View the selected mascot's details."));
     auto *installButton = new StorePushButton(createTr("Install"), page);
     storeUi->installButton = installButton;
     configureStorePrimaryButton(installButton, createTr(
         "Download and install the selected mascot."));
-    storeUi->cancelButton = new QPushButton(createTr("Cancel download"), page);
-    configureStoreButton(storeUi->cancelButton, createTr(
+    auto *cancelButton = new StorePushButton(createTr("Cancel download"), page);
+    storeUi->cancelButton = cancelButton;
+    configureStoreDangerButton(cancelButton, createTr(
         "Cancel the selected mascot download."));
     actionRow->addWidget(storeUi->detailButton);
     actionRow->addWidget(storeUi->installButton);
@@ -612,9 +702,10 @@ void ShijimaManager::setupStorePage() {
     auto *accountRow = new QHBoxLayout;
     accountRow->setContentsMargins(0, 0, 0, 0);
     accountRow->setSpacing(8);
-    storeUi->loginButton = new QPushButton(createTr("Sign in with GitHub"),
+    auto *loginButton = new StorePushButton(createTr("Sign in with GitHub"),
         accountSurface);
-    configureStoreButton(storeUi->loginButton, createTr(
+    storeUi->loginButton = loginButton;
+    configureStoreButton(loginButton, createTr(
         "Sign in to submit a mascot to the community registry."));
     storeUi->loginStatusLabel = new QLabel(accountSurface);
     storeUi->loginStatusLabel->setObjectName(
@@ -622,10 +713,10 @@ void ShijimaManager::setupStorePage() {
     storeUi->loginStatusLabel->setWordWrap(true);
     accountRow->addWidget(storeUi->loginButton);
     accountRow->addWidget(storeUi->loginStatusLabel, 1);
-    auto *submitButton = new QPushButton(createTr("Submit a mascot..."),
+    auto *submitButton = new StorePushButton(createTr("Submit a mascot..."),
         accountSurface);
     storeUi->submitButton = submitButton;
-    configureStoreButton(submitButton, createTr(
+    configureStorePrimaryButton(submitButton, createTr(
         "Open the mascot submission form."));
     accountRow->addWidget(submitButton);
     accountLayout->addLayout(accountRow);

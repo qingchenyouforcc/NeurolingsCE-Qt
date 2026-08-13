@@ -18,11 +18,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // 
 
-#include <QDialog>
 #include <QString>
 #include <functional>
 #include <string>
 #include <vector>
+
+#include "ElaDialog.h"
 
 class ShijimaWidget;
 class QFormLayout;
@@ -33,7 +34,7 @@ namespace shijima {
     }
 }
 
-class ShimejiInspectorDialog : public QDialog {
+class ShimejiInspectorDialog : public ElaDialog {
     Q_OBJECT
 private:
     std::vector<std::function<void()>> m_tickCallbacks;

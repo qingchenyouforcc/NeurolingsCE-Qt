@@ -185,6 +185,12 @@ static void applyHomeTheme(QWidget *homePage)
     QColor preview = eTheme->getThemeColor(mode, ElaThemeType::WindowBase);
 
     homePage->setStyleSheet(QString(
+        "#homePage {"
+        "  color: %3; background: transparent;"
+        "}"
+        "#homePage QLabel {"
+        "  color: %3; background: transparent;"
+        "}"
         "#homeActionBar, #mascotDetailsPanel, #mascotLibrarySurface {"
         "  background-color: %1;"
         "  border: 1px solid %2;"
@@ -212,6 +218,7 @@ static void applyHomeTheme(QWidget *homePage)
 
 void ShijimaManager::setupHomePage() {
     m_ui->homePage = new QWidget(this);
+    m_ui->homePage->setObjectName(QStringLiteral("homePage"));
     auto *homeLayout = new QVBoxLayout(m_ui->homePage);
     homeLayout->setContentsMargins(16, 14, 16, 14);
     homeLayout->setSpacing(12);

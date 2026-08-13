@@ -21,6 +21,7 @@
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
+#include "../ManagerUiHelpers.hpp"
 
 #include <exception>
 
@@ -28,7 +29,6 @@
 #include <QDateTime>
 #include <QBoxLayout>
 #include <QFrame>
-#include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -36,8 +36,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMap>
-#include <QMessageBox>
 #include <QLocale>
+#include <QPalette>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSettings>
@@ -343,20 +344,92 @@ void configureCombinationButton(ElaPushButton *button)
 
 QFrame *makeCombinationPanel(QWidget *parent)
 {
-    auto mode = eTheme->getThemeMode();
     auto *panel = new QFrame(parent);
     panel->setObjectName(QStringLiteral("CombinationPanel"));
-    panel->setStyleSheet(QString(
-        "#CombinationPanel {"
-        "  background-color: %1;"
-        "  border: 1px solid %2;"
-        "  border-radius: 8px;"
-        "}"
-        "QLabel[muted=\"true\"] { color: %3; }"
-    ).arg(ElaThemeColor(mode, WindowBase).name(),
-        ElaThemeColor(mode, BasicBorder).name(),
-        ElaThemeColor(mode, BasicDetailsText).name()));
     return panel;
+}
+
+void applyCombinationTheme(QWidget *page)
+{
+    auto mode = eTheme->getThemeMode();
+    QColor surface = ElaThemeColor(mode, BasicBase);
+    QColor field = ElaThemeColor(mode, DialogLayoutArea);
+    QColor disabledSurface = ElaThemeColor(mode, BasicDisable);
+    QColor border = ElaThemeColor(mode, BasicBorder);
+    QColor text = ElaThemeColor(mode, BasicText);
+    QColor muted = ElaThemeColor(mode, BasicDetailsText);
+    QColor disabledText = ElaThemeColor(mode, BasicTextDisable);
+    QColor selected = ElaThemeColor(mode, PrimaryNormal);
+    QColor selectedText = ElaThemeColor(mode, BasicTextInvert);
+
+    page->setStyleSheet(QString(
+        "#combinationsPage { color: %5; background: transparent; }"
+        "#combinationsPage QLabel { color: %5; background: transparent; }"
+        "#combinationsPage QLabel[muted=\"true\"] { color: %6; }"
+        "#CombinationPanel {"
+        "  background-color: %1; color: %5;"
+        "  border: 1px solid %4; border-radius: 10px;"
+        "}"
+        "#CombinationPanel QLabel { color: %5; background: transparent; }"
+        "#CombinationPanel QLabel[muted=\"true\"] { color: %6; }"
+        "#CombinationPanel QListWidget {"
+        "  background-color: %2; color: %5;"
+        "  border: 1px solid %4; border-radius: 7px;"
+        "  selection-background-color: %7; selection-color: %8;"
+        "}"
+        "#CombinationPanel QListWidget::item { color: %5; padding: 8px 10px; }"
+        "#CombinationPanel QListWidget::item:selected {"
+        "  background-color: %7; color: %8;"
+        "}"
+        "#CombinationPanel QListWidget:focus { border: 2px solid %7; }"
+        "#CombinationPanel QListWidget:disabled {"
+        "  background-color: %3; color: %9;"
+        "}"
+        "#CombinationPanel QScrollBar:vertical {"
+        "  background: %3; width: 10px; margin: 4px 2px;"
+        "}"
+        "#CombinationPanel QScrollBar::handle:vertical {"
+        "  background: %4; min-height: 42px; border-radius: 5px;"
+        "}"
+        "#CombinationPanel QScrollBar::handle:vertical:hover { background: %7; }"
+        "#CombinationPanel QScrollBar::add-line:vertical, "
+        "#CombinationPanel QScrollBar::sub-line:vertical { height: 0px; }"
+        "#CombinationPanel QScrollBar::add-page:vertical, "
+        "#CombinationPanel QScrollBar::sub-page:vertical { background: transparent; }"
+        "#CombinationPanel QListWidget::item:disabled {"
+        "  color: %9;"
+        "}"
+        "#CombinationPanel QScrollArea, #CombinationPanel QScrollArea > QWidget > QWidget {"
+        "  background: transparent; border: none;"
+        "}"
+    ).arg(surface.name(QColor::HexArgb), field.name(QColor::HexArgb),
+        disabledSurface.name(QColor::HexArgb), border.name(QColor::HexArgb),
+        text.name(QColor::HexArgb), muted.name(QColor::HexArgb),
+        selected.name(QColor::HexArgb), selectedText.name(QColor::HexArgb),
+        disabledText.name(QColor::HexArgb)));
+
+    auto applyPalette = [field, disabledSurface, text, muted, disabledText,
+        selected, selectedText](QWidget *widget) {
+        QPalette palette = widget->palette();
+        palette.setColor(QPalette::Base, field);
+        palette.setColor(QPalette::Text, text);
+        palette.setColor(QPalette::PlaceholderText, muted);
+        palette.setColor(QPalette::Highlight, selected);
+        palette.setColor(QPalette::HighlightedText, selectedText);
+        palette.setColor(QPalette::Disabled, QPalette::Base, disabledSurface);
+        palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, disabledText);
+        widget->setPalette(palette);
+    };
+    for (auto *widget : page->findChildren<QLineEdit *>()) {
+        applyPalette(widget);
+    }
+    for (auto *widget : page->findChildren<QPlainTextEdit *>()) {
+        applyPalette(widget);
+    }
+    for (auto *widget : page->findChildren<QListWidget *>()) {
+        applyPalette(widget);
+    }
 }
 
 }
@@ -364,6 +437,7 @@ QFrame *makeCombinationPanel(QWidget *parent)
 void ShijimaManager::setupCombinationsPage()
 {
     m_ui->combinationsPage = new QWidget(this);
+    m_ui->combinationsPage->setObjectName(QStringLiteral("combinationsPage"));
     auto *root = new QVBoxLayout(m_ui->combinationsPage);
     root->setContentsMargins(16, 14, 16, 14);
     root->setSpacing(12);
@@ -413,6 +487,7 @@ void ShijimaManager::setupCombinationsPage()
     listLayout->addWidget(listTitle);
 
     m_ui->combinationListWidget = new QListWidget(listPanel);
+    m_ui->combinationListWidget->setObjectName(QStringLiteral("combinationList"));
     m_ui->combinationListWidget->setAccessibleName(tr("Saved Combinations"));
     m_ui->combinationListWidget->setSelectionMode(QListWidget::SingleSelection);
     m_ui->combinationListWidget->setUniformItemSizes(false);
@@ -428,6 +503,7 @@ void ShijimaManager::setupCombinationsPage()
     detailsLayout->addWidget(detailsTitle);
 
     m_ui->combinationDetailsLabel = new QLabel(tr("Select a combination."), detailsPanel);
+    m_ui->combinationDetailsLabel->setObjectName(QStringLiteral("combinationDetails"));
     m_ui->combinationDetailsLabel->setAccessibleName(tr("Combination details"));
     m_ui->combinationDetailsLabel->setWordWrap(true);
     m_ui->combinationDetailsLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -485,6 +561,10 @@ void ShijimaManager::setupCombinationsPage()
     });
 
     refreshCombinationPage();
+    applyCombinationTheme(m_ui->combinationsPage);
+    connect(eTheme, &ElaTheme::themeModeChanged, m_ui->combinationsPage, [this]() {
+        applyCombinationTheme(m_ui->combinationsPage);
+    });
     addPageNode(tr("Combinations"), m_ui->combinationsPage, ElaIconType::ObjectGroup);
 }
 
@@ -565,13 +645,13 @@ void ShijimaManager::saveCurrentCombination()
     catch (std::exception const& ex) {
         APP_LOG_ERROR("combination") << "Failed to collect current combination: "
             << ex.what();
-        QMessageBox::warning(this, tr("Combinations"),
+        ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
             tr("Could not save the current combination."));
         return;
     }
     catch (...) {
         APP_LOG_ERROR("combination") << "Failed to collect current combination: unknown exception";
-        QMessageBox::warning(this, tr("Combinations"),
+        ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
             tr("Could not save the current combination."));
         return;
     }
@@ -580,7 +660,7 @@ void ShijimaManager::saveCurrentCombination()
     APP_LOG_INFO("combination") << "Save current combination requested mascotCount="
         << mascotCount;
     if (totalMascotCount(combination) == 0) {
-        QMessageBox::information(this,
+        ShijimaManagerUiInternal::showThemedInformation(this,
             tr("Combinations"),
             tr("There are no active mascots to save."));
         return;
@@ -589,16 +669,13 @@ void ShijimaManager::saveCurrentCombination()
     QString defaultName = tr("Combination %1")
         .arg(QLocale::system().toString(QDateTime::currentDateTime(),
             QLocale::ShortFormat));
-    bool ok = false;
-    QString name = QInputDialog::getText(this,
-        tr("Save Combination"),
-        tr("Combination name:"),
-        QLineEdit::Normal,
-        defaultName,
-        &ok).trimmed();
-    if (!ok) {
+    QString name;
+    if (!ShijimaManagerUiInternal::showThemedTextInput(this,
+            tr("Save Combination"), tr("Combination name:"), defaultName,
+            &name, tr("Save"), tr("Cancel"))) {
         return;
     }
+    name = name.trimmed();
     if (name.isEmpty()) {
         name = defaultName;
     }
@@ -611,7 +688,7 @@ void ShijimaManager::saveCurrentCombination()
         { QStringLiteral("combination"), combination },
     });
     if (!writeSavedCombinationArray(*m_settings, saved)) {
-        QMessageBox::warning(this,
+        ShijimaManagerUiInternal::showThemedWarning(this,
             tr("Combinations"),
             tr("Could not save the combination settings."));
         return;
@@ -635,7 +712,7 @@ void ShijimaManager::restoreSelectedCombination()
     QJsonObject combination = parseCombination(
         item->data(kCombinationPayloadRole).toString(), "selected-combination");
     if (totalMascotCount(combination) == 0) {
-        QMessageBox::information(this,
+        ShijimaManagerUiInternal::showThemedInformation(this,
             tr("Combinations"),
             tr("This combination does not contain any mascots."));
         return;
@@ -647,12 +724,12 @@ void ShijimaManager::restoreSelectedCombination()
     catch (std::exception const& ex) {
         APP_LOG_ERROR("combination") << "Failed to restore selected combination: "
             << ex.what();
-        QMessageBox::warning(this, tr("Combinations"),
+        ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
             tr("Could not restore this combination."));
     }
     catch (...) {
         APP_LOG_ERROR("combination") << "Failed to restore selected combination: unknown exception";
-        QMessageBox::warning(this, tr("Combinations"),
+        ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
             tr("Could not restore this combination."));
     }
 }
@@ -675,7 +752,7 @@ int ShijimaManager::restoreCombination(QJsonObject const& combination, bool show
         APP_LOG_ERROR("combination") << "Failed to clear running mascots before restore: "
             << ex.what();
         if (showMessages) {
-            QMessageBox::warning(this, tr("Combinations"),
+            ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
                 tr("Could not clear the current mascots before restoring."));
         }
         return 0;
@@ -683,7 +760,7 @@ int ShijimaManager::restoreCombination(QJsonObject const& combination, bool show
     catch (...) {
         APP_LOG_ERROR("combination") << "Failed to clear running mascots before restore: unknown exception";
         if (showMessages) {
-            QMessageBox::warning(this, tr("Combinations"),
+            ShijimaManagerUiInternal::showThemedWarning(this, tr("Combinations"),
                 tr("Could not clear the current mascots before restoring."));
         }
         return 0;
@@ -748,13 +825,13 @@ int ShijimaManager::restoreCombination(QJsonObject const& combination, bool show
         << requestedTotal << " attempted=" << attempted << " restored=" << restored
         << " missing=" << missing.size() << " failed=" << failed.size();
     if (showMessages && !missing.isEmpty()) {
-        QMessageBox::warning(this,
+        ShijimaManagerUiInternal::showThemedWarning(this,
             tr("Combinations"),
             combinationTr("Restored %n mascot(s). Missing templates: %1", restored)
                 .arg(missing.join(QStringLiteral(", "))));
     }
     else if (showMessages && !failed.isEmpty()) {
-        QMessageBox::warning(this,
+        ShijimaManagerUiInternal::showThemedWarning(this,
             tr("Combinations"),
             combinationTr("Restored %n mascot(s). Some mascots could not be started: %1",
                 restored)
@@ -822,9 +899,10 @@ void ShijimaManager::deleteSelectedCombination()
         return;
     }
 
-    if (QMessageBox::question(this,
+    if (!ShijimaManagerUiInternal::showThemedQuestion(this,
         tr("Delete Combination"),
-        tr("Delete this saved combination?")) != QMessageBox::Yes)
+        tr("Delete this saved combination?"), tr("Delete"), tr("Cancel"),
+        true))
     {
         return;
     }
@@ -838,7 +916,7 @@ void ShijimaManager::deleteSelectedCombination()
         }
     }
     if (!writeSavedCombinationArray(*m_settings, updated)) {
-        QMessageBox::warning(this,
+        ShijimaManagerUiInternal::showThemedWarning(this,
             tr("Delete Combination"),
             tr("Could not update the saved combinations."));
         return;

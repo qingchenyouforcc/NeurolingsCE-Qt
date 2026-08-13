@@ -18,26 +18,83 @@
 
 #include "shijima-qt/ui/dialogs/inspector/ShimejiInspectorDialog.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
+#include <QFrame>
 #include <QFormLayout>
+#include <QGuiApplication>
+#include <QPalette>
+#include <QScreen>
+#include <QSizePolicy>
+#include <QVBoxLayout>
+#include "ElaScrollArea.h"
 #include "ElaTheme.h"
 
 ShimejiInspectorDialog::ShimejiInspectorDialog(ShijimaWidget *parent):
-    QDialog(parent), m_formLayout(new QFormLayout)
+    ElaDialog(parent), m_formLayout(nullptr)
 {
-    setWindowFlags((windowFlags() | Qt::CustomizeWindowHint |
-        Qt::WindowCloseButtonHint) &
-        ~(Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint));
+    setWindowButtonFlags(ElaAppBarType::CloseButtonHint);
+    setIsFixedSize(false);
+    setMinimumSize(440, 240);
     setWindowTitle(tr("Inspector — %1").arg(parent->mascotName()));
-    setStyleSheet(QString("QDialog { background-color: %1; }")
-        .arg(ElaThemeColor(eTheme->getThemeMode(), DialogBase).name()));
-    setLayout(m_formLayout);
+    auto *content = new QWidget(this);
+    m_formLayout = new QFormLayout(content);
     m_formLayout->setFormAlignment(Qt::AlignLeft);
     m_formLayout->setLabelAlignment(Qt::AlignRight);
     m_formLayout->setHorizontalSpacing(16);
-    m_formLayout->setVerticalSpacing(6);
-    m_formLayout->setContentsMargins(16, 16, 16, 16);
+    m_formLayout->setVerticalSpacing(5);
+    m_formLayout->setContentsMargins(2, 2, 2, 2);
+    auto *scroll = new ElaScrollArea(this);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setWidgetResizable(true);
+    scroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    scroll->setWidget(content);
+    auto *rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(22, 16, 22, 16);
+    rootLayout->setSpacing(0);
+    rootLayout->addWidget(scroll);
+
+    auto applyTheme = [this](ElaThemeType::ThemeMode mode) {
+        QPalette palette = this->palette();
+        palette.setColor(QPalette::Window,
+            ElaThemeColor(mode, DialogBase));
+        palette.setColor(QPalette::WindowText,
+            ElaThemeColor(mode, BasicText));
+        palette.setColor(QPalette::Text,
+            ElaThemeColor(mode, BasicText));
+        this->setPalette(palette);
+    };
+    applyTheme(eTheme->getThemeMode());
+    connect(eTheme, &ElaTheme::themeModeChanged, this, applyTheme);
+    connect(this, &ElaDialog::closeButtonClicked, this, &QDialog::reject);
 
     registerRows();
+    content->adjustSize();
+    rootLayout->activate();
+    adjustSize();
+    QRect available;
+    if (auto *screen = this->screen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    else if (auto *screen = QGuiApplication::primaryScreen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    if (available.isEmpty()) {
+        available = QRect(0, 0, 1280, 720);
+    }
+    int maxWidth = qMax(440, qMin(760, available.width() - 48));
+    int maxHeight = qMax(240, qMin(560, qRound(available.height() * 0.72)));
+    setMaximumSize(maxWidth, maxHeight);
+    int naturalScrollHeight = qBound(180, content->sizeHint().height(),
+        qMin(420, qRound(available.height() * 0.52)));
+    scroll->setMinimumHeight(naturalScrollHeight);
+    scroll->setMaximumHeight(naturalScrollHeight);
+    QSize desired = rootLayout->sizeHint();
+    desired.rheight() += 48;
+    desired.setWidth(qMax(desired.width(), 440));
+    desired.setHeight(qMax(desired.height(), 240));
+    resize(qBound(440, desired.width(), maxWidth),
+        qBound(240, desired.height(), maxHeight));
 }
 
 ShijimaWidget *ShimejiInspectorDialog::shijimaParent() {

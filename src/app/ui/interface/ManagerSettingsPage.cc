@@ -20,16 +20,17 @@
 #include "shijima-qt/CodexActivity.hpp"
 #include "shijima-qt/CodexConfigManager.hpp"
 #include "shijima-qt/CodexAppServerClient.hpp"
+#include "shijima-qt/ui/dialogs/settings/CompactFluentColorDialog.hpp"
 #include "../../core/update/GitHubUpdateManager.hpp"
 #include "../../runtime/ManagerRuntimeState.hpp"
 #include "../ManagerUiState.hpp"
 #include "../ManagerUiHelpers.hpp"
 #include <QAction>
-#include <QColorDialog>
+#include <QColor>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QCursor>
 #include <QDialog>
-#include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QDir>
 #include <QJsonArray>
@@ -40,22 +41,33 @@
 #include <QFileInfo>
 #include <QFileDialog>
 #include <QHash>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPainter>
+#include <QPalette>
 #include <QLocale>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QScrollBar>
+#include <QScreen>
 #include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStyleOptionFocusRect>
 #include <QVariant>
 #include <QVBoxLayout>
+#include "ElaComboBox.h"
+#include "ElaContentDialog.h"
+#include "ElaDoubleSpinBox.h"
+#include "ElaLineEdit.h"
 #include "ElaPushButton.h"
+#include "ElaRadioButton.h"
+#include "ElaScrollArea.h"
+#include "ElaSlider.h"
+#include "ElaSpinBox.h"
 #include "ElaText.h"
 #include "ElaTheme.h"
 #include "ElaToggleSwitch.h"
@@ -180,9 +192,19 @@ QString localizedCodexConfigError(QString const& error)
 }
 
 struct SettingsColors {
+    QString windowBg;
     QString panelBg;
     QString panelBorder;
+    QString text;
     QString details;
+    QString fieldBg;
+    QString disabledBg;
+    QString disabledText;
+    QString hover;
+    QString press;
+    QString primary;
+    QString primaryHover;
+    QString primaryText;
     QString scrollTrack;
     QString scrollThumb;
     QString scrollThumbHover;
@@ -193,8 +215,18 @@ SettingsColors themedSettingsColors()
     auto mode = eTheme->getThemeMode();
     return SettingsColors {
         ElaThemeColor(mode, WindowBase).name(),
+        ElaThemeColor(mode, BasicBase).name(),
         ElaThemeColor(mode, BasicBorder).name(),
+        ElaThemeColor(mode, BasicText).name(),
         ElaThemeColor(mode, BasicDetailsText).name(),
+        ElaThemeColor(mode, DialogLayoutArea).name(),
+        ElaThemeColor(mode, BasicDisable).name(),
+        ElaThemeColor(mode, BasicTextDisable).name(),
+        ElaThemeColor(mode, BasicHover).name(),
+        ElaThemeColor(mode, BasicPress).name(),
+        ElaThemeColor(mode, PrimaryNormal).name(),
+        ElaThemeColor(mode, PrimaryHover).name(),
+        ElaThemeColor(mode, BasicTextInvert).name(),
         ElaThemeColor(mode, BasicBase).name(),
         ElaThemeColor(mode, BasicBorder).name(),
         ElaThemeColor(mode, PrimaryNormal).name(),
@@ -218,6 +250,7 @@ QString formatNumber(double value, int decimals)
 ElaText *makeSectionTitle(QWidget *parent, QString const& text)
 {
     auto *title = new ElaText(text, parent);
+    title->setObjectName(QStringLiteral("settingsSectionTitle"));
     title->setTextPixelSize(20);
     title->setWordWrap(false);
     title->setStyleSheet(QStringLiteral("#ElaText { background-color: transparent; border: none; }"));
@@ -226,11 +259,9 @@ ElaText *makeSectionTitle(QWidget *parent, QString const& text)
 
 QLabel *makeSectionDescription(QWidget *parent, QString const& text)
 {
-    auto colors = themedSettingsColors();
     auto *label = new QLabel(text, parent);
+    label->setObjectName(QStringLiteral("settingsSectionDescription"));
     label->setWordWrap(true);
-    label->setStyleSheet(QStringLiteral(
-        "background-color: transparent; border: none; color: %1;").arg(colors.details));
     return label;
 }
 
@@ -240,17 +271,10 @@ QWidget *createSettingsRow(QWidget *parent, QString const& title,
     control->setAccessibleName(title);
     control->setAccessibleDescription(subtitle);
 
-    auto colors = themedSettingsColors();
     auto *area = new QFrame(parent);
     area->setObjectName(QStringLiteral("SettingsRowCard"));
+    area->setProperty("settingsRowCard", true);
     area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-    area->setStyleSheet(QString(
-        "#SettingsRowCard {"
-        "  background-color: %1;"
-        "  border: 1px solid %2;"
-        "  border-radius: 14px;"
-        "}"
-    ).arg(colors.panelBg, colors.panelBorder));
 
     auto *row = new QHBoxLayout(area);
     row->setContentsMargins(18, 14, 18, 14);
@@ -260,14 +284,14 @@ QWidget *createSettingsRow(QWidget *parent, QString const& title,
     textColumn->setSpacing(4);
 
     auto *titleLabel = new ElaText(title, area);
+    titleLabel->setProperty("settingsRowTitle", true);
     titleLabel->setTextPixelSize(15);
     titleLabel->setWordWrap(false);
     titleLabel->setStyleSheet(QStringLiteral("#ElaText { background-color: transparent; border: none; }"));
 
     auto *subtitleLabel = new QLabel(subtitle, area);
+    subtitleLabel->setProperty("settingsRowSubtitle", true);
     subtitleLabel->setWordWrap(true);
-    subtitleLabel->setStyleSheet(QStringLiteral(
-        "background-color: transparent; border: none; color: %1;").arg(colors.details));
 
     textColumn->addWidget(titleLabel);
     textColumn->addWidget(subtitleLabel);
@@ -490,40 +514,232 @@ void populateStartupCombinationCombo(QComboBox *combo, QSettings const& settings
     combo->setCurrentIndex(index >= 0 ? index : 1);
 }
 
+void applySettingsControlPalette(QWidget *root, SettingsColors const& colors)
+{
+    QColor window = QColor(colors.windowBg);
+    QColor field = QColor(colors.fieldBg);
+    QColor disabled = QColor(colors.disabledBg);
+    QColor text = QColor(colors.text);
+    QColor disabledText = QColor(colors.disabledText);
+    QColor primary = QColor(colors.primary);
+    QColor primaryText = QColor(colors.primaryText);
+
+    auto apply = [&](QWidget *widget) {
+        QPalette palette = widget->palette();
+        palette.setColor(QPalette::Window, window);
+        palette.setColor(QPalette::WindowText, text);
+        palette.setColor(QPalette::Base, field);
+        palette.setColor(QPalette::AlternateBase, window);
+        palette.setColor(QPalette::Text, text);
+        palette.setColor(QPalette::Button, field);
+        palette.setColor(QPalette::ButtonText, text);
+        palette.setColor(QPalette::Highlight, primary);
+        palette.setColor(QPalette::HighlightedText, primaryText);
+        palette.setColor(QPalette::PlaceholderText, QColor(colors.details));
+        palette.setColor(QPalette::Disabled, QPalette::WindowText, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::Base, disabled);
+        palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::Button, disabled);
+        palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, disabledText);
+        widget->setPalette(palette);
+    };
+
+    for (auto *widget : root->findChildren<QLineEdit *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QComboBox *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QSpinBox *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QDoubleSpinBox *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QSlider *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QRadioButton *>()) {
+        apply(widget);
+    }
+    for (auto *widget : root->findChildren<QScrollBar *>()) {
+        apply(widget);
+    }
+}
+
+void applySettingsSurfacePalette(QWidget *surface, SettingsColors const& colors)
+{
+    if (surface == nullptr) {
+        return;
+    }
+
+    QPalette palette = surface->palette();
+    QColor background = QColor(colors.windowBg);
+    QColor text = QColor(colors.text);
+    palette.setColor(QPalette::Window, background);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, background);
+    palette.setColor(QPalette::AlternateBase, background);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, background);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::Highlight, QColor(colors.primary));
+    palette.setColor(QPalette::HighlightedText, QColor(colors.primaryText));
+    palette.setColor(QPalette::Disabled, QPalette::Window, background);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText,
+        QColor(colors.disabledText));
+    palette.setColor(QPalette::Disabled, QPalette::Base, background);
+    palette.setColor(QPalette::Disabled, QPalette::Text,
+        QColor(colors.disabledText));
+    surface->setPalette(palette);
+    surface->setAutoFillBackground(true);
+}
+
+void configureSettingsSpinBox(ElaSpinBox *spinBox)
+{
+    spinBox->setButtonMode(ElaSpinBoxType::PMSide);
+    spinBox->setFocusPolicy(Qt::StrongFocus);
+}
+
+void configureSettingsDoubleSpinBox(ElaDoubleSpinBox *spinBox)
+{
+    spinBox->setButtonMode(ElaSpinBoxType::PMSide);
+    spinBox->setFocusPolicy(Qt::StrongFocus);
+}
+
+void configureSettingsComboBox(ElaComboBox *comboBox)
+{
+    comboBox->setFocusPolicy(Qt::StrongFocus);
+    comboBox->setMaxVisibleItems(6);
+}
+
+void applySettingsDialogSurface(QWidget *content, SettingsColors const& colors)
+{
+    if (content == nullptr) {
+        return;
+    }
+    content->setObjectName(QStringLiteral("settingsDialogContent"));
+    content->setAutoFillBackground(true);
+    QPalette palette = content->palette();
+    QColor background = QColor(colors.windowBg);
+    QColor text = QColor(colors.text);
+    palette.setColor(QPalette::Window, background);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, background);
+    palette.setColor(QPalette::AlternateBase, background);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, background);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::Disabled, QPalette::Window, background);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText,
+        QColor(colors.disabledText));
+    content->setPalette(palette);
+    content->setStyleSheet(QString(
+        "#settingsDialogContent { background-color: %1; color: %2; }"
+        "#settingsDialogContent QLabel { background: transparent; color: %2; }"
+    ).arg(colors.windowBg, colors.text));
+}
+
+void prepareSettingsContentDialog(ElaContentDialog *dialog, QWidget *content,
+    QString const& title, int minimumWidth)
+{
+    SettingsColors colors = themedSettingsColors();
+    dialog->setWindowTitle(title);
+    dialog->setMinimumWidth(minimumWidth);
+    dialog->setCentralWidget(content);
+    dialog->setLeftButtonText(settingsTr("Cancel"));
+    dialog->setMiddleButtonText(QString());
+    dialog->setRightButtonText(settingsTr("OK"));
+    for (auto *button : dialog->findChildren<ElaPushButton *>()) {
+        if (button->text().isEmpty()) {
+            button->setVisible(false);
+            button->setEnabled(false);
+        }
+    }
+    applySettingsDialogSurface(content, colors);
+    applySettingsControlPalette(dialog, colors);
+    // ElaContentDialog starts with a toolkit default size. Recalculate from
+    // the actual editor content and clamp to the current screen so short forms
+    // do not open as tall blank panes or extend past a small display.
+    dialog->adjustSize();
+    QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+    if (screen == nullptr) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    QRect available = screen == nullptr
+        ? QRect(0, 0, 520, 420)
+        : screen->availableGeometry().adjusted(16, 16, -16, -16);
+    int maxWidth = qMin(520, available.width());
+    int maxHeight = qMin(480, available.height());
+    int minWidth = qMin(minimumWidth, maxWidth);
+    QSize natural = dialog->sizeHint();
+    dialog->resize(
+        qBound(minWidth, natural.width(), maxWidth),
+        qMin(natural.height(), maxHeight));
+    QObject::connect(eTheme, &ElaTheme::themeModeChanged, dialog,
+        [dialog, content]() {
+            SettingsColors current = themedSettingsColors();
+            applySettingsDialogSurface(content, current);
+            applySettingsControlPalette(dialog, current);
+        });
+}
+
+QString settingsControlStyle(SettingsColors const& colors, QString const& scope)
+{
+    return QString(
+        "%1 { color: %2; background-color: %6; border: none; }"
+        "%1 QAbstractScrollArea::viewport { background-color: %6; border: none; }"
+        "%1 QWidget#settingsViewport, %1 QWidget#settingsContent { "
+        "background-color: %6; color: %2; }"
+        "%1 #SettingsRowCard {"
+        "  background-color: %3; color: %2; border: 1px solid %4; border-radius: 14px;"
+        "}"
+        "%1 #settingsSectionTitle, %1 *[settingsRowTitle=\"true\"] {"
+        "  color: %2; background: transparent; border: none;"
+        "}"
+        "%1 #settingsSectionDescription, %1 QLabel[settingsRowSubtitle=\"true\"] {"
+        "  color: %5; background: transparent; border: none;"
+        "}"
+        // ElaWidgetTools controls own their paint/style.  Do not apply
+        // QStyleSheetStyle selectors to them: doing so replaces the Fluent
+        // spin/combobox/scrollbar primitives with Qt's native arrows.
+    ).arg(scope)
+        .arg(colors.text)
+        .arg(colors.panelBg)
+        .arg(colors.panelBorder)
+        .arg(colors.details)
+        .arg(colors.windowBg);
+}
+
+void applySettingsTheme(QWidget *settingsPage)
+{
+    if (settingsPage == nullptr) {
+        return;
+    }
+    SettingsColors colors = themedSettingsColors();
+    settingsPage->setStyleSheet(settingsControlStyle(colors, QStringLiteral("#settingsPage")));
+    applySettingsSurfacePalette(settingsPage, colors);
+    applySettingsSurfacePalette(settingsPage->findChild<QWidget *>(
+        QStringLiteral("settingsViewport")), colors);
+    applySettingsSurfacePalette(settingsPage->findChild<QWidget *>(
+        QStringLiteral("settingsContent")), colors);
+    applySettingsControlPalette(settingsPage, colors);
+}
+
 }
 
 void ShijimaManager::setupSettingsPage() {
-    auto *settingsScrollArea = new QScrollArea(this);
+    auto *settingsScrollArea = new ElaScrollArea(this);
+    settingsScrollArea->setObjectName(QStringLiteral("settingsPage"));
     settingsScrollArea->setWidgetResizable(true);
     settingsScrollArea->setFrameShape(QFrame::NoFrame);
     settingsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto colors = themedSettingsColors();
-    settingsScrollArea->setStyleSheet(QString(
-        "QScrollArea { background: transparent; border: none; }"
-        "QScrollArea > QWidget > QWidget { background: transparent; }"
-        "QScrollBar:vertical {"
-        "  background: transparent;"
-        "  width: 10px;"
-        "  margin: 4px 2px 4px 0px;"
-        "}"
-        "QScrollBar::handle:vertical {"
-        "  background: %1;"
-        "  min-height: 48px;"
-        "  border-radius: 5px;"
-        "}"
-        "QScrollBar::handle:vertical:hover {"
-        "  background: %2;"
-        "}"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
-        "  height: 0px;"
-        "}"
-        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
-        "  background: %3;"
-        "  border-radius: 5px;"
-        "}"
-    ).arg(colors.scrollThumb, colors.scrollThumbHover, colors.scrollTrack));
+    settingsScrollArea->viewport()->setObjectName(QStringLiteral("settingsViewport"));
+    settingsScrollArea->viewport()->setAutoFillBackground(true);
 
     auto *settingsContent = new QWidget(settingsScrollArea);
+    settingsContent->setObjectName(QStringLiteral("settingsContent"));
     settingsContent->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     auto *settingsLayout = new QVBoxLayout(settingsContent);
     settingsLayout->setContentsMargins(16, 14, 16, 14);
@@ -592,7 +808,8 @@ void ShijimaManager::setupSettingsPage() {
         static const QString key = "speechBubbleClickCount";
         int initial = m_settings->value(key, 1).toInt();
 
-        auto *spinBox = new QSpinBox(settingsContent);
+        auto *spinBox = new ElaSpinBox(settingsContent);
+        configureSettingsSpinBox(spinBox);
         spinBox->setRange(1, 10);
         spinBox->setValue(initial);
         spinBox->setMinimumWidth(88);
@@ -624,9 +841,8 @@ void ShijimaManager::setupSettingsPage() {
                         "Allow NeurolingsCE to update the Codex user configuration?\n\n"
                         "Path: %1\nCommand: %2")
                         .arg(configPath, codexNotifyCommand(executable));
-                    if (QMessageBox::question(this, tr("Enable Codex notifications"),
-                        prompt, QMessageBox::Yes | QMessageBox::No,
-                        QMessageBox::Yes) != QMessageBox::Yes)
+                    if (!ShijimaManagerUiInternal::showThemedQuestion(
+                        this, tr("Enable Codex notifications"), prompt))
                     {
                         toggle->blockSignals(true);
                         toggle->setIsToggled(false);
@@ -643,7 +859,8 @@ void ShijimaManager::setupSettingsPage() {
                             message += tr("\n\nCopy this line into the configuration manually if desired:\n%1")
                                 .arg(result.snippet);
                         }
-                        QMessageBox::warning(this, tr("Codex notifications"), message);
+                        ShijimaManagerUiInternal::showThemedWarning(
+                            this, tr("Codex notifications"), message);
                         return;
                     }
                     m_settings->setValue(QStringLiteral("codex/enabled"), true);
@@ -655,7 +872,8 @@ void ShijimaManager::setupSettingsPage() {
                     toggle->blockSignals(true);
                     toggle->setIsToggled(true);
                     toggle->blockSignals(false);
-                    QMessageBox::warning(this, tr("Codex notifications"),
+                    ShijimaManagerUiInternal::showThemedWarning(
+                        this, tr("Codex notifications"),
                         localizedCodexConfigError(result.error));
                     return;
                 }
@@ -668,7 +886,8 @@ void ShijimaManager::setupSettingsPage() {
     }
 
     {
-        auto *combo = new QComboBox(settingsContent);
+        auto *combo = new ElaComboBox(settingsContent);
+        configureSettingsComboBox(combo);
         QString configured = m_settings->value(
             QStringLiteral("codex/companionTemplate"), codexDefaultTemplateName())
             .toString();
@@ -707,7 +926,8 @@ void ShijimaManager::setupSettingsPage() {
         button->setMinimumHeight(qMax(36, button->sizeHint().height()));
         connect(button, &ElaPushButton::clicked, this, [this]() {
             if (!m_settings->value(QStringLiteral("codex/enabled"), false).toBool()) {
-                QMessageBox::information(this, tr("Codex notifications"),
+                ShijimaManagerUiInternal::showThemedInformation(
+                    this, tr("Codex notifications"),
                     tr("Enable Codex message bubbles first."));
                 return;
             }
@@ -716,7 +936,8 @@ void ShijimaManager::setupSettingsPage() {
             activity.state = CodexActivityState::Ready;
             activity.lastAssistantMessage = tr("This is a Codex test notification.");
             if (!showCodexNotification(activity)) {
-                QMessageBox::warning(this, tr("Codex notifications"),
+                ShijimaManagerUiInternal::showThemedWarning(
+                    this, tr("Codex notifications"),
                     tr("No mascot was available to display the test notification."));
             }
         });
@@ -750,8 +971,9 @@ void ShijimaManager::setupSettingsPage() {
     }
 
     {
-        auto *edit = new QLineEdit(
-            m_settings->value(QStringLiteral("codex/appServerExecutable")).toString(), settingsContent);
+        auto *edit = new ElaLineEdit(settingsContent);
+        edit->setText(m_settings->value(
+            QStringLiteral("codex/appServerExecutable")).toString());
         edit->setPlaceholderText(tr("Use the codex executable found on PATH"));
         edit->setMinimumWidth(260);
         auto *browse = new SettingsPushButton(tr("Browse..."), settingsContent);
@@ -818,18 +1040,17 @@ void ShijimaManager::setupSettingsPage() {
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             static const QString key = "detachThreshold";
             int threshold = static_cast<int>(m_runtime->environment.detachThreshold());
-            QDialog dialog(this);
-            dialog.setWindowTitle(tr("Detach Speed"));
-            dialog.setMinimumWidth(360);
+            ElaContentDialog dialog(this);
+            auto *content = new QWidget(&dialog);
+            auto *layout = new QVBoxLayout(content);
+            layout->addWidget(new QLabel(tr("Threshold (px/tick):"), content));
 
-            auto *layout = new QVBoxLayout(&dialog);
-            layout->addWidget(new QLabel(tr("Threshold (px/tick):"), &dialog));
-
-            auto *slider = new QSlider(Qt::Horizontal, &dialog);
+            auto *slider = new ElaSlider(Qt::Horizontal, content);
             slider->setRange(0, 200);
             slider->setValue(threshold);
 
-            auto *spin = new QSpinBox(&dialog);
+            auto *spin = new ElaSpinBox(content);
+            configureSettingsSpinBox(spin);
             spin->setRange(0, 200);
             spin->setValue(threshold);
 
@@ -839,12 +1060,7 @@ void ShijimaManager::setupSettingsPage() {
             layout->addWidget(slider);
             layout->addWidget(spin);
 
-            auto *buttons = new QDialogButtonBox(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-            layout->addWidget(buttons);
-
+            prepareSettingsContentDialog(&dialog, content, tr("Detach Speed"), 360);
             if (dialog.exec() == QDialog::Accepted) {
                 m_runtime->environment.setDetachThreshold(spin->value());
                 m_settings->setValue(key, m_runtime->environment.detachThreshold());
@@ -895,12 +1111,13 @@ void ShijimaManager::setupSettingsPage() {
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
-            QColorDialog dialog { this };
+            CompactFluentColorDialog dialog { this };
             dialog.setCurrentColor(m_ui->sandboxBackground);
             if (dialog.exec() == QDialog::Accepted) {
-                m_ui->sandboxBackground = dialog.selectedColor();
+                QColor selectedColor = dialog.currentColor();
+                m_ui->sandboxBackground = selectedColor;
                 m_settings->setValue("windowedModeBackground",
-                    ShijimaManagerUiInternal::colorToString(dialog.selectedColor()));
+                    ShijimaManagerUiInternal::colorToString(selectedColor));
                 updateSandboxBackground();
                 updateSettingsSummary(summaryLabel, btn,
                     backgroundSummaryForSettings(m_ui->sandboxBackground));
@@ -921,18 +1138,18 @@ void ShijimaManager::setupSettingsPage() {
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
             static const QString key = "userScale";
             double scale = m_runtime->environment.userScale();
-            QDialog dialog { this };
-            dialog.setWindowTitle(tr("Custom Scale"));
-            dialog.setMinimumWidth(360);
-            auto *mainLayout = new QVBoxLayout(&dialog);
+            ElaContentDialog dialog(this);
+            auto *content = new QWidget(&dialog);
+            auto *mainLayout = new QVBoxLayout(content);
 
-            mainLayout->addWidget(new QLabel(tr("Adjust Scale:"), &dialog));
+            mainLayout->addWidget(new QLabel(tr("Adjust Scale:"), content));
 
-            auto *slider = new QSlider(Qt::Horizontal, &dialog);
+            auto *slider = new ElaSlider(Qt::Horizontal, content);
             slider->setRange(100, 10000);
             slider->setValue(static_cast<int>(scale * 1000));
 
-            auto *spin = new QDoubleSpinBox(&dialog);
+            auto *spin = new ElaDoubleSpinBox(content);
+            configureSettingsDoubleSpinBox(spin);
             spin->setRange(0.1, 10.0);
             spin->setDecimals(3);
             spin->setSingleStep(0.05);
@@ -955,12 +1172,7 @@ void ShijimaManager::setupSettingsPage() {
             mainLayout->addWidget(slider);
             mainLayout->addWidget(spin);
 
-            auto *buttons = new QDialogButtonBox(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-            mainLayout->addWidget(buttons);
-
+            prepareSettingsContentDialog(&dialog, content, tr("Custom Scale"), 360);
             if (dialog.exec() == QDialog::Accepted) {
                 m_settings->setValue(key, m_runtime->environment.userScale());
                 updateSettingsSummary(summaryLabel, btn,
@@ -980,13 +1192,11 @@ void ShijimaManager::setupSettingsPage() {
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
-            QDialog dialog(this);
-            dialog.setWindowTitle(tr("Select Language"));
-            dialog.setMinimumWidth(320);
-
-            auto *layout = new QVBoxLayout(&dialog);
-            auto *btnEn = new QRadioButton(tr("English"), &dialog);
-            auto *btnZh = new QRadioButton(tr("Simplified Chinese"), &dialog);
+            ElaContentDialog dialog(this);
+            auto *content = new QWidget(&dialog);
+            auto *layout = new QVBoxLayout(content);
+            auto *btnEn = new ElaRadioButton(tr("English"), content);
+            auto *btnZh = new ElaRadioButton(tr("Simplified Chinese"), content);
 
             if (m_ui->currentLanguage == QStringLiteral("zh_CN")) {
                 btnZh->setChecked(true);
@@ -998,12 +1208,7 @@ void ShijimaManager::setupSettingsPage() {
             layout->addWidget(btnEn);
             layout->addWidget(btnZh);
 
-            auto *buttons = new QDialogButtonBox(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-            layout->addWidget(buttons);
-
+            prepareSettingsContentDialog(&dialog, content, tr("Select Language"), 320);
             if (dialog.exec() == QDialog::Accepted) {
                 updateSettingsSummary(summaryLabel, btn, languageSummaryForSettings(
                     btnZh->isChecked() ? QStringLiteral("zh_CN") : QStringLiteral("en")));
@@ -1034,7 +1239,8 @@ void ShijimaManager::setupSettingsPage() {
                     toggle->blockSignals(true);
                     toggle->setIsToggled(!checked);
                     toggle->blockSignals(false);
-                    QMessageBox::warning(this, tr("Startup"), errorMessage);
+                    ShijimaManagerUiInternal::showThemedWarning(
+                        this, tr("Startup"), errorMessage);
                 }
                 updateSettingsSummary(summaryLabel, toggle, startupLaunchSummary());
             });
@@ -1064,25 +1270,19 @@ void ShijimaManager::setupSettingsPage() {
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
-            QDialog dialog(this);
-            dialog.setWindowTitle(tr("Startup Combination"));
-            dialog.setMinimumWidth(420);
-
-            auto *layout = new QVBoxLayout(&dialog);
+            ElaContentDialog dialog(this);
+            auto *content = new QWidget(&dialog);
+            auto *layout = new QVBoxLayout(content);
             layout->addWidget(new QLabel(
                 tr("Choose which combination to restore during silent startup."),
-                &dialog));
+                content));
 
-            auto *combo = new QComboBox(&dialog);
+            auto *combo = new ElaComboBox(content);
+            configureSettingsComboBox(combo);
             populateStartupCombinationCombo(combo, *m_settings);
             layout->addWidget(combo);
 
-            auto *buttons = new QDialogButtonBox(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-            layout->addWidget(buttons);
-
+            prepareSettingsContentDialog(&dialog, content, tr("Startup Combination"), 420);
             if (dialog.exec() == QDialog::Accepted) {
                 QString data = combo->currentData().toString();
                 QString mode = data.section(QLatin1Char(':'), 0, 0);
@@ -1123,20 +1323,19 @@ void ShijimaManager::setupSettingsPage() {
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, btn, summaryLabel]() {
-            QDialog dialog(this);
-            dialog.setWindowTitle(tr("Update Proxy"));
-            dialog.setMinimumWidth(420);
-
-            auto *layout = new QVBoxLayout(&dialog);
+            ElaContentDialog dialog(this);
+            auto *content = new QWidget(&dialog);
+            auto *layout = new QVBoxLayout(content);
             layout->addWidget(new QLabel(
                 tr("This proxy is only used for GitHub update checks and downloads."),
-                &dialog));
+                content));
 
             auto *form = new QFormLayout;
             form->setLabelAlignment(Qt::AlignLeft);
             form->setFormAlignment(Qt::AlignTop);
 
-            auto *modeCombo = new QComboBox(&dialog);
+            auto *modeCombo = new ElaComboBox(content);
+            configureSettingsComboBox(modeCombo);
             modeCombo->addItem(tr("Use system proxy"), QStringLiteral("system"));
             modeCombo->addItem(tr("Direct connection"), QStringLiteral("direct"));
             modeCombo->addItem(tr("HTTP proxy"), QStringLiteral("http"));
@@ -1149,15 +1348,16 @@ void ShijimaManager::setupSettingsPage() {
             }
             modeCombo->setCurrentIndex(currentIndex);
 
-            auto *hostEdit = new QLineEdit(
-                m_settings->value("update/proxyHost").toString(), &dialog);
-            auto *portSpin = new QSpinBox(&dialog);
+            auto *hostEdit = new ElaLineEdit(content);
+            hostEdit->setText(m_settings->value("update/proxyHost").toString());
+            auto *portSpin = new ElaSpinBox(content);
+            configureSettingsSpinBox(portSpin);
             portSpin->setRange(1, 65535);
             portSpin->setValue(m_settings->value("update/proxyPort", 8080).toInt());
-            auto *userEdit = new QLineEdit(
-                m_settings->value("update/proxyUsername").toString(), &dialog);
-            auto *passwordEdit = new QLineEdit(
-                m_settings->value("update/proxyPassword").toString(), &dialog);
+            auto *userEdit = new ElaLineEdit(content);
+            userEdit->setText(m_settings->value("update/proxyUsername").toString());
+            auto *passwordEdit = new ElaLineEdit(content);
+            passwordEdit->setText(m_settings->value("update/proxyPassword").toString());
             passwordEdit->setEchoMode(QLineEdit::Password);
 
             form->addRow(tr("Mode"), modeCombo);
@@ -1178,12 +1378,7 @@ void ShijimaManager::setupSettingsPage() {
             updateFieldState();
             connect(modeCombo, &QComboBox::currentIndexChanged, &dialog, updateFieldState);
 
-            auto *buttons = new QDialogButtonBox(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-            connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-            connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-            layout->addWidget(buttons);
-
+            prepareSettingsContentDialog(&dialog, content, tr("Update Proxy"), 460);
             if (dialog.exec() == QDialog::Accepted) {
                 m_settings->setValue("update/proxyMode", modeCombo->currentData().toString());
                 m_settings->setValue("update/proxyHost", hostEdit->text().trimmed());
@@ -1202,5 +1397,9 @@ void ShijimaManager::setupSettingsPage() {
     }
 
     settingsLayout->addStretch();
+    applySettingsTheme(settingsScrollArea);
+    connect(eTheme, &ElaTheme::themeModeChanged, settingsScrollArea, [settingsScrollArea]() {
+        applySettingsTheme(settingsScrollArea);
+    });
     addFooterNode(tr("Settings"), m_ui->settingsPage, m_ui->settingsKey, 0, ElaIconType::GearComplex);
 }

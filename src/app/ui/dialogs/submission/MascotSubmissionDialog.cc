@@ -24,23 +24,38 @@
 #include "shijima-qt/Secrets.hpp"
 
 #include <QBoxLayout>
-#include <QCheckBox>
 #include <QCoreApplication>
-#include <QDesktopServices>
 #include <QFileDialog>
+#include <QFrame>
+#include <QFormLayout>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
-#include <QMessageBox>
+#include <QPalette>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QResizeEvent>
+#include <QScreen>
+#include <QSizePolicy>
 #include <QStringList>
+#include <QStyleOptionFocusRect>
+#include <QVBoxLayout>
 
 #include <QUuid>
+
+#include "ElaCheckBox.h"
+#include "ElaLineEdit.h"
+#include "ElaPlainTextEdit.h"
+#include "ElaPushButton.h"
+#include "ElaScrollArea.h"
+#include "ElaText.h"
+#include "ElaTheme.h"
 
 namespace {
 
@@ -175,6 +190,225 @@ QString localizedValidationError(QString const& error)
     return error;
 }
 
+void drawSubmissionFocusFrame(QWidget *widget)
+{
+    if (!widget->hasFocus()) {
+        return;
+    }
+
+    QStyleOptionFocusRect option;
+    option.initFrom(widget);
+    option.rect = widget->rect().adjusted(3, 3, -3, -3);
+    QPainter painter(widget);
+    widget->style()->drawPrimitive(
+        QStyle::PE_FrameFocusRect, &option, &painter, widget);
+}
+
+class SubmissionPushButton final : public ElaPushButton {
+public:
+    using ElaPushButton::ElaPushButton;
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        ElaPushButton::paintEvent(event);
+        drawSubmissionFocusFrame(this);
+    }
+
+private:
+    Q_DISABLE_COPY_MOVE(SubmissionPushButton)
+};
+
+constexpr int kCompactSubmissionPathRowWidth = 520;
+
+QRect submissionAvailableGeometry(QWidget *widget)
+{
+    QScreen *screen = widget->screen();
+    if (screen == nullptr) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    if (screen != nullptr) {
+        return screen->availableGeometry();
+    }
+    return QRect(0, 0, 1024, 768);
+}
+
+void sizeSubmissionDialog(QDialog *dialog, QLayout *layout)
+{
+    layout->activate();
+    QRect available = submissionAvailableGeometry(dialog);
+    int availableWidth = qMax(1, available.width() - 32);
+    int availableHeight = qMax(1, available.height() - 32);
+    int maxWidth = qMin(720, availableWidth);
+    int maxHeight = qMin(760, availableHeight);
+    int minWidth = qMin(520, maxWidth);
+    int minHeight = qMin(420, maxHeight);
+    QSize hint = layout->sizeHint();
+    QSize preferred(
+        qBound(minWidth, qMax(minWidth, hint.width()), maxWidth),
+        qBound(minHeight, qMax(minHeight, hint.height()), maxHeight));
+    dialog->setMinimumSize(minWidth, minHeight);
+    dialog->setMaximumSize(maxWidth, maxHeight);
+    dialog->resize(preferred);
+}
+
+class ResponsiveSubmissionPathRow final : public QWidget {
+public:
+    ResponsiveSubmissionPathRow(QWidget *pathEdit, QWidget *button,
+        QWidget *parent = nullptr):
+        QWidget(parent),
+        m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(0, 0, 0, 0);
+        m_layout->setSpacing(8);
+        m_layout->addWidget(pathEdit, 1);
+        m_layout->addWidget(button);
+        applyLayoutMode();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        applyLayoutMode();
+    }
+
+private:
+    void applyLayoutMode()
+    {
+        bool compact = width() > 0 && width() < kCompactSubmissionPathRowWidth;
+        if (m_hasLayoutMode && compact == m_compact) {
+            return;
+        }
+        m_hasLayoutMode = true;
+        m_compact = compact;
+        m_layout->setDirection(compact
+            ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    }
+
+    QBoxLayout *m_layout;
+    bool m_hasLayoutMode = false;
+    bool m_compact = false;
+
+    Q_DISABLE_COPY_MOVE(ResponsiveSubmissionPathRow)
+};
+
+QFrame *makeSubmissionCard(QWidget *parent)
+{
+    auto *card = new QFrame(parent);
+    card->setObjectName(QStringLiteral("submissionCard"));
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    return card;
+}
+
+ElaText *makeSubmissionSectionTitle(QWidget *parent, QString const& text)
+{
+    auto *title = new ElaText(text, parent);
+    title->setObjectName(QStringLiteral("submissionSectionTitle"));
+    title->setTextPixelSize(17);
+    title->setWordWrap(false);
+    title->setStyleSheet(QStringLiteral(
+        "#submissionSectionTitle { background: transparent; border: none; }"));
+    return title;
+}
+
+QLabel *makeSubmissionDescription(QWidget *parent, QString const& text)
+{
+    auto *description = new QLabel(text, parent);
+    description->setObjectName(QStringLiteral("submissionDescription"));
+    description->setWordWrap(true);
+    description->setTextFormat(Qt::PlainText);
+    return description;
+}
+
+void configureSubmissionButton(QPushButton *button, bool primary = false)
+{
+    button->setMinimumHeight(38);
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    button->setAccessibleName(button->text());
+    button->setFocusPolicy(Qt::StrongFocus);
+    button->setAutoDefault(false);
+    button->setDefault(false);
+    if (primary) {
+        auto *elaButton = qobject_cast<ElaPushButton *>(button);
+        if (elaButton != nullptr) {
+            elaButton->setLightDefaultColor(ElaThemeColor(ElaThemeType::Light, PrimaryNormal));
+            elaButton->setLightHoverColor(ElaThemeColor(ElaThemeType::Light, PrimaryHover));
+            elaButton->setLightPressColor(ElaThemeColor(ElaThemeType::Light, PrimaryPress));
+            elaButton->setLightTextColor(ElaThemeColor(ElaThemeType::Light, BasicTextInvert));
+            elaButton->setDarkDefaultColor(ElaThemeColor(ElaThemeType::Dark, PrimaryNormal));
+            elaButton->setDarkHoverColor(ElaThemeColor(ElaThemeType::Dark, PrimaryHover));
+            elaButton->setDarkPressColor(ElaThemeColor(ElaThemeType::Dark, PrimaryPress));
+            elaButton->setDarkTextColor(ElaThemeColor(ElaThemeType::Dark, BasicTextInvert));
+        }
+    }
+}
+
+void applySubmissionTheme(QWidget *dialog)
+{
+    auto mode = eTheme->getThemeMode();
+    QColor surface = ElaThemeColor(mode, DialogBase);
+    QColor card = ElaThemeColor(mode, BasicBase);
+    QColor field = ElaThemeColor(mode, DialogLayoutArea);
+    QColor disabledSurface = ElaThemeColor(mode, BasicDisable);
+    QColor border = ElaThemeColor(mode, BasicBorder);
+    QColor text = ElaThemeColor(mode, BasicText);
+    QColor muted = ElaThemeColor(mode, BasicDetailsText);
+    QColor disabledText = ElaThemeColor(mode, BasicTextDisable);
+    QColor accent = ElaThemeColor(mode, PrimaryNormal);
+
+    dialog->setStyleSheet(QString(
+        "#MascotSubmissionDialog { background-color: %1; color: %6; }"
+        "#submissionCard { background-color: %2; color: %6;"
+        " border: 1px solid %5; border-radius: 10px; }"
+        "#submissionCard QLabel { color: %6; background: transparent; }"
+        "#submissionDescription, #submissionFieldHelp { color: %7; }"
+        "#submissionScrollArea, #submissionScrollArea > QWidget > QWidget,"
+        "#submissionContent { background: transparent; border: none; }"
+        "#submissionFieldLabel { color: %6; background: transparent; }"
+        "#submissionStatus { color: %6; background: transparent; }"
+        "#submissionLink { color: %9; background: transparent; }"
+        "#submissionCard QLineEdit, #submissionCard QPlainTextEdit,"
+        "#submissionCard ElaLineEdit, #submissionCard ElaPlainTextEdit {"
+        " background-color: %3; color: %6; border: 1px solid %5;"
+        " border-radius: 7px; padding: 6px 8px; }"
+        "#submissionCard QLineEdit:focus, #submissionCard QPlainTextEdit:focus,"
+        "#submissionCard ElaLineEdit:focus, #submissionCard ElaPlainTextEdit:focus {"
+        " border: 1px solid %9; }"
+        "#submissionCard QLineEdit:disabled, #submissionCard QPlainTextEdit:disabled,"
+        "#submissionCard ElaLineEdit:disabled, #submissionCard ElaPlainTextEdit:disabled {"
+        " background-color: %4; color: %8; }"
+        "#submissionCard ElaCheckBox, #submissionCard QCheckBox {"
+        " color: %6; spacing: 8px; }"
+        "#submissionCard ElaCheckBox:focus, #submissionCard QCheckBox:focus {"
+        " border-radius: 4px; padding: 2px; }"
+    ).arg(surface.name(QColor::HexArgb), card.name(QColor::HexArgb),
+        field.name(QColor::HexArgb), disabledSurface.name(QColor::HexArgb),
+        border.name(QColor::HexArgb), text.name(QColor::HexArgb),
+        muted.name(QColor::HexArgb), disabledText.name(QColor::HexArgb),
+        accent.name(QColor::HexArgb)));
+
+    auto applyPalette = [field, disabledSurface, text, muted, disabledText,
+        accent](QWidget *widget) {
+        QPalette palette = widget->palette();
+        palette.setColor(QPalette::Base, field);
+        palette.setColor(QPalette::Text, text);
+        palette.setColor(QPalette::PlaceholderText, muted);
+        palette.setColor(QPalette::Highlight, accent);
+        palette.setColor(QPalette::HighlightedText, text);
+        palette.setColor(QPalette::Disabled, QPalette::Base, disabledSurface);
+        palette.setColor(QPalette::Disabled, QPalette::Text, disabledText);
+        palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, disabledText);
+        widget->setPalette(palette);
+    };
+    for (auto *widget : dialog->findChildren<QLineEdit *>()) {
+        applyPalette(widget);
+    }
+    for (auto *widget : dialog->findChildren<QPlainTextEdit *>()) {
+        applyPalette(widget);
+    }
+}
+
 }
 
 MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
@@ -183,78 +417,156 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     m_auth(auth),
     m_client(client)
 {
+    setObjectName(QStringLiteral("MascotSubmissionDialog"));
     setWindowTitle(tr("Submit a Mascot"));
-    setMinimumWidth(520);
+
     auto *layout = new QVBoxLayout(this);
-    layout->setSpacing(8);
+    layout->setContentsMargins(20, 16, 20, 16);
+    layout->setSpacing(10);
 
-    auto addRow = [&](QString const& labelText, QWidget *widget) {
-        auto *row = new QHBoxLayout;
-        auto *label = new QLabel(labelText, this);
-        label->setBuddy(widget);
-        label->setMinimumWidth(110);
-        widget->setAccessibleName(labelText);
-        row->addWidget(label);
-        row->addWidget(widget, 1);
-        layout->addLayout(row);
-    };
+    auto *title = new ElaText(tr("Submit a Mascot"), this);
+    title->setTextPixelSize(22);
+    title->setWordWrap(false);
+    title->setStyleSheet(QStringLiteral(
+        "#ElaText { background: transparent; border: none; }"));
+    layout->addWidget(title);
+    layout->addWidget(makeSubmissionDescription(this,
+        tr("Share a validated .mascot package with the community registry.")));
 
-    m_packagePath = new QLineEdit(this);
+    auto *scrollArea = new ElaScrollArea(this);
+    scrollArea->setObjectName(QStringLiteral("submissionScrollArea"));
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFocusPolicy(Qt::NoFocus);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *content = new QWidget(scrollArea);
+    content->setObjectName(QStringLiteral("submissionContent"));
+    auto *contentLayout = new QVBoxLayout(content);
+    contentLayout->setContentsMargins(0, 2, 0, 0);
+    contentLayout->setSpacing(10);
+    scrollArea->setWidget(content);
+    layout->addWidget(scrollArea, 1);
+
+    auto *packageCard = makeSubmissionCard(content);
+    auto *packageLayout = new QVBoxLayout(packageCard);
+    packageLayout->setContentsMargins(14, 12, 14, 12);
+    packageLayout->setSpacing(6);
+    packageLayout->addWidget(makeSubmissionSectionTitle(packageCard, tr("Package")));
+    packageLayout->addWidget(makeSubmissionDescription(packageCard,
+        tr("Choose the validated .mascot package to upload.")));
+
+    m_packagePath = new ElaLineEdit(packageCard);
     m_packagePath->setAccessibleName(tr("Mascot package path"));
     m_packagePath->setAccessibleDescription(
         tr("Path to the .mascot package to submit."));
-    auto *pickButton = new QPushButton(tr("Choose .mascot..."), this);
-    pickButton->setAccessibleName(pickButton->text());
-    auto *pathRow = new QHBoxLayout;
-    pathRow->addWidget(m_packagePath, 1);
-    pathRow->addWidget(pickButton);
-    auto *pathLabel = new QLabel(tr("Mascot package"), this);
+    m_packagePath->setPlaceholderText(tr("No package selected"));
+    m_pickButton = new SubmissionPushButton(tr("Choose .mascot..."), packageCard);
+    configureSubmissionButton(m_pickButton);
+    m_pickButton->setAccessibleDescription(
+        tr("Select a .mascot package to submit."));
+    auto *pathRow = new ResponsiveSubmissionPathRow(
+        m_packagePath, m_pickButton, packageCard);
+    auto *pathLabel = new QLabel(tr("Mascot package"), packageCard);
     pathLabel->setBuddy(m_packagePath);
-    layout->addWidget(pathLabel);
-    layout->addLayout(pathRow);
-    connect(pickButton, &QPushButton::clicked, this,
+    pathLabel->setObjectName(QStringLiteral("submissionFieldLabel"));
+    packageLayout->addWidget(pathLabel);
+    packageLayout->addWidget(pathRow);
+    connect(m_pickButton, &QPushButton::clicked, this,
         &MascotSubmissionDialog::pickPackage);
+    contentLayout->addWidget(packageCard);
 
-    m_id = new QLineEdit(this);
+    auto *metadataCard = makeSubmissionCard(content);
+    auto *metadataLayout = new QVBoxLayout(metadataCard);
+    metadataLayout->setContentsMargins(14, 12, 14, 12);
+    metadataLayout->setSpacing(6);
+    metadataLayout->addWidget(makeSubmissionSectionTitle(metadataCard, tr("Metadata")));
+    metadataLayout->addWidget(makeSubmissionDescription(metadataCard,
+        tr("Add the public information that will appear in the registry.")));
+    auto *form = new QFormLayout;
+    form->setContentsMargins(0, 2, 0, 0);
+    form->setHorizontalSpacing(14);
+    form->setVerticalSpacing(8);
+    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignTop);
+    form->setFormAlignment(Qt::AlignTop);
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
+    auto addField = [form, metadataCard](QString const& labelText,
+        QWidget *widget) {
+        auto *label = new QLabel(labelText, metadataCard);
+        label->setBuddy(widget);
+        label->setObjectName(QStringLiteral("submissionFieldLabel"));
+        widget->setAccessibleName(labelText);
+        form->addRow(label, widget);
+    };
+
+    m_id = new ElaLineEdit(metadataCard);
     m_id->setPlaceholderText(tr("lowercase-id (first publication is permanent)"));
-    addRow(tr("ID"), m_id);
-    m_name = new QLineEdit(this);
-    addRow(tr("Name"), m_name);
-    m_version = new QLineEdit(this);
-    m_version->setPlaceholderText(QStringLiteral("1.0.0"));
-    addRow(tr("Version"), m_version);
-    m_summary = new QLineEdit(this);
-    addRow(tr("Summary"), m_summary);
-    m_description = new QPlainTextEdit(this);
+    addField(tr("ID"), m_id);
+    m_name = new ElaLineEdit(metadataCard);
+    addField(tr("Name"), m_name);
+    m_version = new ElaLineEdit(metadataCard);
+    m_version->setPlaceholderText(tr("1.0.0"));
+    addField(tr("Version"), m_version);
+    m_summary = new ElaLineEdit(metadataCard);
+    addField(tr("Summary"), m_summary);
+    m_description = new ElaPlainTextEdit(metadataCard);
     m_description->setPlaceholderText(tr("Detailed description"));
-    m_description->setMaximumHeight(120);
-    addRow(tr("Description"), m_description);
-    m_license = new QLineEdit(this);
-    m_license->setPlaceholderText(QStringLiteral("MIT"));
-    addRow(tr("License (SPDX)"), m_license);
-    m_maintainers = new QLineEdit(this);
+    m_description->setMinimumHeight(96);
+    m_description->setMaximumHeight(156);
+    m_description->setTabChangesFocus(true);
+    addField(tr("Description"), m_description);
+    m_license = new ElaLineEdit(metadataCard);
+    m_license->setPlaceholderText(tr("MIT"));
+    addField(tr("License (SPDX)"), m_license);
+    m_maintainers = new ElaLineEdit(metadataCard);
     m_maintainers->setPlaceholderText(tr("github logins, comma separated"));
-    addRow(tr("Maintainers"), m_maintainers);
-    m_rightsConfirmed = new QCheckBox(
-        tr("I confirm I have the right to publish this work under the "
-           "declared license."), this);
-    m_rightsConfirmed->setAccessibleName(m_rightsConfirmed->text());
-    layout->addWidget(m_rightsConfirmed);
+    addField(tr("Maintainers"), m_maintainers);
+    metadataLayout->addLayout(form);
+    contentLayout->addWidget(metadataCard);
 
-    m_statusLabel = new QLabel(this);
+    auto *rightsCard = makeSubmissionCard(content);
+    auto *rightsLayout = new QVBoxLayout(rightsCard);
+    rightsLayout->setContentsMargins(14, 12, 14, 12);
+    rightsLayout->setSpacing(6);
+    rightsLayout->addWidget(makeSubmissionSectionTitle(rightsCard,
+        tr("Rights and authorship")));
+    rightsLayout->addWidget(makeSubmissionDescription(rightsCard,
+        tr("Confirm that you are allowed to publish this work under the declared license.")));
+    m_rightsConfirmed = new ElaCheckBox(
+        tr("I confirm I have the right to publish this work under the "
+           "declared license."), rightsCard);
+    m_rightsConfirmed->setAccessibleName(m_rightsConfirmed->text());
+    m_rightsConfirmed->setFocusPolicy(Qt::StrongFocus);
+    m_rightsConfirmed->setMinimumHeight(28);
+    rightsLayout->addWidget(m_rightsConfirmed);
+    contentLayout->addWidget(rightsCard);
+
+    auto *statusCard = makeSubmissionCard(content);
+    auto *statusLayout = new QVBoxLayout(statusCard);
+    statusLayout->setContentsMargins(14, 10, 14, 10);
+    statusLayout->setSpacing(4);
+    statusLayout->addWidget(makeSubmissionSectionTitle(statusCard, tr("Status")));
+    m_statusLabel = new QLabel(statusCard);
+    m_statusLabel->setObjectName(QStringLiteral("submissionStatus"));
     m_statusLabel->setWordWrap(true);
-    layout->addWidget(m_statusLabel);
-    m_prLink = new QLabel(this);
+    m_statusLabel->setTextFormat(Qt::PlainText);
+    m_statusLabel->setText(tr("Ready to submit."));
+    statusLayout->addWidget(m_statusLabel);
+    m_prLink = new QLabel(statusCard);
+    m_prLink->setObjectName(QStringLiteral("submissionLink"));
     m_prLink->setOpenExternalLinks(true);
     m_prLink->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    layout->addWidget(m_prLink);
+    m_prLink->setVisible(false);
+    statusLayout->addWidget(m_prLink);
+    contentLayout->addWidget(statusCard);
 
-    m_submitButton = new QPushButton(tr("Submit"), this);
-    auto *closeButton = new QPushButton(tr("Close"), this);
-    m_submitButton->setAccessibleName(m_submitButton->text());
-    closeButton->setAccessibleName(closeButton->text());
+    m_submitButton = new SubmissionPushButton(tr("Submit"), this);
+    auto *closeButton = new SubmissionPushButton(tr("Close"), this);
+    configureSubmissionButton(m_submitButton, true);
+    configureSubmissionButton(closeButton);
     auto *buttonRow = new QHBoxLayout;
-    buttonRow->addStretch(1);
+    buttonRow->setSpacing(8);
+    buttonRow->addStretch();
     buttonRow->addWidget(closeButton);
     buttonRow->addWidget(m_submitButton);
     layout->addLayout(buttonRow);
@@ -271,8 +583,11 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
                     QStringLiteral("<a href=\"%1\">%2</a>")
                         .arg(result.prUrl.toString().toHtmlEscaped(),
                              result.prUrl.toDisplayString().toHtmlEscaped()));
+                m_prLink->setVisible(true);
             }
             else {
+                m_prLink->clear();
+                m_prLink->setVisible(false);
                 m_statusLabel->setText(tr("Submission failed (%1): %2")
                     .arg(result.errorCode,
                          localizedSubmissionError(result.errorCode,
@@ -282,23 +597,46 @@ MascotSubmissionDialog::MascotSubmissionDialog(GitHubAuthManager *auth,
     connect(m_client, &MascotSubmissionClient::uploadProgress, this,
         [this](qint64 sent, qint64 total) {
             if (total > 0) {
+                m_prLink->clear();
+                m_prLink->setVisible(false);
                 m_statusLabel->setText(tr("Uploading... %1 / %2")
                     .arg(QLocale().formattedDataSize(sent),
                          QLocale().formattedDataSize(total)));
-            }
-        });
+        }
+    });
+
+    setTabOrder(m_packagePath, m_pickButton);
+    setTabOrder(m_pickButton, m_id);
+    setTabOrder(m_id, m_name);
+    setTabOrder(m_name, m_version);
+    setTabOrder(m_version, m_summary);
+    setTabOrder(m_summary, m_description);
+    setTabOrder(m_description, m_license);
+    setTabOrder(m_license, m_maintainers);
+    setTabOrder(m_maintainers, m_rightsConfirmed);
+    setTabOrder(m_rightsConfirmed, closeButton);
+    setTabOrder(closeButton, m_submitButton);
+
+    applySubmissionTheme(this);
+    connect(eTheme, &ElaTheme::themeModeChanged, this, [this]() {
+        applySubmissionTheme(this);
+    });
+    sizeSubmissionDialog(this, layout);
+    m_packagePath->setFocus();
 }
 
 void MascotSubmissionDialog::pickPackage() {
     QString path = QFileDialog::getOpenFileName(this,
         tr("Choose a .mascot package"), {},
-        QStringLiteral("NeurolingsCE packages (*.mascot)"));
+        tr("NeurolingsCE packages (*.mascot)"));
     if (!path.isEmpty()) {
         m_packagePath->setText(path);
     }
 }
 
 void MascotSubmissionDialog::submit() {
+    m_prLink->clear();
+    m_prLink->setVisible(false);
     MascotPackageReport report;
     if (!MascotPackage::validatePackage(m_packagePath->text(), report)) {
         QStringList localizedErrors;
@@ -351,4 +689,13 @@ void MascotSubmissionDialog::submit() {
 void MascotSubmissionDialog::setBusy(bool busy) {
     m_submitButton->setEnabled(!busy);
     m_packagePath->setEnabled(!busy);
+    m_pickButton->setEnabled(!busy);
+    m_id->setEnabled(!busy);
+    m_name->setEnabled(!busy);
+    m_version->setEnabled(!busy);
+    m_summary->setEnabled(!busy);
+    m_description->setEnabled(!busy);
+    m_license->setEnabled(!busy);
+    m_maintainers->setEnabled(!busy);
+    m_rightsConfirmed->setEnabled(!busy);
 }

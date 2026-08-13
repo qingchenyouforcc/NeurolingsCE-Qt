@@ -27,7 +27,9 @@ ui 把 Manager 和 Shijima 引擎状态呈现为 Qt 窗口、页面、托盘、�
 
 - ManagerWindowSetup 负责“组装”，ManagerUiActions 负责“用户动作”，runtime 负责“状态改变”。
 - `ManagerCodexPage` 负责单个显式 app-server thread 的连接、Plan/reply、审批列表和
-  requestUserInput；连接前不启动进程，审批按钮不放入 speech bubble。
+  requestUserInput；页面以可滚动的主题卡片呈现工作区/短标识状态、空状态和诊断信息，
+  连接前不启动进程，审批按钮不放入 speech bubble。
+- `ManagerAboutSection` 负责 Manager 内嵌的 About 导航页；它不创建独立 About 窗口，持久化页面注册到中心堆栈，版本/更新/项目支持内容通过可访问的单列展开卡片呈现。
 - ShijimaWidget 从 runtime 会话获得引擎状态；Rendering 只画当前帧，Interaction 只处理输入和上下文动作。
 - 任何耗时导入、更新或网络操作应离开 GUI 线程，并通过已有进度/回调回到页面。
 - 主题、语言和可访问性改变后，页面和 speech bubble 都要通过既有 retranslate/theme 路径刷新。

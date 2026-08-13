@@ -341,6 +341,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/ui/dialogs/inspector/ShimejiInspectorDialog.cc
   src/app/ui/dialogs/inspector/ShimejiInspectorRows.cc
   src/app/ui/dialogs/licenses/ShijimaLicensesDialog.cc
+  src/app/ui/dialogs/settings/CompactFluentColorDialog.cc
   src/app/ui/ManagerTrayIcon.cc
   src/app/ui/interface/ManagerAboutSection.cc
   src/app/ui/interface/ManagerCombinationsPage.cc
@@ -362,10 +363,12 @@ target_sources(NeurolingsCE PRIVATE
   src/resources/resources.qrc
 
   # Headers with Q_OBJECT (needed for AUTOMOC)
+  include/shijima-qt/ui/dialogs/common/ForcedProgressDialog.hpp
   include/shijima-qt/ShijimaManager.hpp
   include/shijima-qt/ui/mascot/ShijimaWidget.hpp
   include/shijima-qt/ui/menus/ShijimaContextMenu.hpp
   include/shijima-qt/ui/dialogs/licenses/ShijimaLicensesDialog.hpp
+  include/shijima-qt/ui/dialogs/settings/CompactFluentColorDialog.hpp
   include/shijima-qt/ui/dialogs/inspector/ShimejiInspectorDialog.hpp
   src/app/core/update/GitHubUpdateManager.hpp
   include/shijima-qt/MascotStoreCoordinator.hpp

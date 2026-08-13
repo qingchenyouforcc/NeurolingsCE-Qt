@@ -31,20 +31,352 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QFileDialog>
+#include <QFrame>
+#include <QFont>
+#include <QHBoxLayout>
 #include <QLibraryInfo>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
+#include <QPalette>
 #include <QProcess>
 #include <QPropertyAnimation>
+#include <QScrollArea>
+#include <QScreen>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QStringList>
 #include <QTimer>
 #include <QTranslator>
+#include <QVBoxLayout>
 #include <QWidget>
+#include "ElaDialog.h"
+#include "ElaLineEdit.h"
+#include "ElaPushButton.h"
+#include "ElaScrollBar.h"
 #include "ElaTheme.h"
 
 namespace ShijimaManagerUiInternal {
+
+namespace {
+
+void fitThemedDialog(ElaDialog *dialog, QSize minimumSize,
+    QSize maximumSize, qreal screenHeightRatio = 0.82)
+{
+    if (dialog == nullptr || dialog->layout() == nullptr) {
+        return;
+    }
+    QRect available;
+    if (auto *screen = dialog->screen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    else if (auto *screen = QGuiApplication::primaryScreen(); screen != nullptr) {
+        available = screen->availableGeometry();
+    }
+    if (available.isEmpty()) {
+        available = QRect(0, 0, 1280, 720);
+    }
+
+    int maxWidth = qMax(minimumSize.width(), qMin(maximumSize.width(),
+        available.width() - 48));
+    int maxHeight = qMax(minimumSize.height(), qMin(maximumSize.height(),
+        qRound(available.height() * screenHeightRatio)));
+    dialog->setMinimumSize(minimumSize);
+    dialog->setMaximumSize(maxWidth, maxHeight);
+    dialog->layout()->activate();
+    // ElaDialog starts with a framework default size.  adjustSize() lets the
+    // layout participate before we clamp to a screen-safe envelope.
+    dialog->adjustSize();
+    QSize desired = dialog->layout()->sizeHint();
+    // Leave room for ElaDialog's custom app bar, which is a child rather than
+    // a layout item.
+    desired.rheight() += 48;
+    desired.setWidth(qMax(desired.width(), minimumSize.width()));
+    desired.setHeight(qMax(desired.height(), minimumSize.height()));
+    dialog->resize(qBound(minimumSize.width(), desired.width(), maxWidth),
+        qBound(minimumSize.height(), desired.height(), maxHeight));
+}
+
+class ThemedPromptDialog final : public ElaDialog {
+public:
+    ThemedPromptDialog(QWidget *parent, QString const& title,
+        QString const& message, bool question, QString const& acceptText,
+        QString const& cancelText, bool destructive = false,
+        bool modal = true):
+        ElaDialog(parent)
+    {
+        setWindowTitle(title);
+        setWindowButtonFlags(ElaAppBarType::CloseButtonHint);
+        setIsFixedSize(true);
+        setModal(modal);
+        setMinimumWidth(360);
+        setMaximumWidth(520);
+
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(22, 18, 22, 16);
+        root->setSpacing(8);
+        auto *heading = new QLabel(title, this);
+        QFont headingFont = heading->font();
+        headingFont.setPointSizeF(qMax(11.0, headingFont.pointSizeF() + 2.0));
+        headingFont.setWeight(QFont::DemiBold);
+        heading->setFont(headingFont);
+        heading->setWordWrap(true);
+        heading->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        root->addWidget(heading);
+        auto *body = new QLabel(message, this);
+        body->setWordWrap(true);
+        body->setTextFormat(Qt::PlainText);
+        body->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        body->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        body->setMaximumWidth(470);
+        QWidget *bodySurface = body;
+        // Keep short prompts on the dialog surface.  Only unusually long
+        // diagnostics receive a scroll container, which keeps confirmations
+        // compact and avoids the opaque white rectangle seen in native boxes.
+        if (message.size() > 480 || message.count(QLatin1Char('\n')) > 8) {
+            auto *bodyScroll = new QScrollArea(this);
+            bodyScroll->setObjectName(QStringLiteral("themedPromptScroll"));
+            bodyScroll->setFrameShape(QFrame::NoFrame);
+            bodyScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+            bodyScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+            bodyScroll->setWidgetResizable(true);
+            bodyScroll->setMaximumHeight(180);
+            bodyScroll->setVerticalScrollBar(new ElaScrollBar(bodyScroll));
+            bodyScroll->setAutoFillBackground(false);
+            bodyScroll->viewport()->setAutoFillBackground(false);
+            bodyScroll->setWidget(body);
+            bodySurface = bodyScroll;
+        }
+        root->addWidget(bodySurface);
+
+        auto *buttons = new QHBoxLayout;
+        buttons->setContentsMargins(0, 8, 0, 0);
+        buttons->setSpacing(8);
+        buttons->addStretch();
+        if (question) {
+            auto *cancel = new ElaPushButton(cancelText.isEmpty()
+                ? QCoreApplication::translate("ShijimaManager", "Cancel")
+                : cancelText, this);
+            cancel->setAutoDefault(false);
+            cancel->setDefault(false);
+            cancel->setMinimumHeight(38);
+            cancel->setFocusPolicy(Qt::StrongFocus);
+            connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+            buttons->addWidget(cancel);
+
+            auto *accept = new ElaPushButton(acceptText.isEmpty()
+                ? QCoreApplication::translate("ShijimaManager", "OK")
+                : acceptText, this);
+            accept->setAutoDefault(false);
+            accept->setDefault(false);
+            accept->setMinimumHeight(38);
+            accept->setFocusPolicy(Qt::StrongFocus);
+            ElaThemeType::ThemeColor const lightRole = destructive
+                ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryNormal;
+            ElaThemeType::ThemeColor const darkRole = destructive
+                ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryNormal;
+            accept->setLightDefaultColor(eTheme->getThemeColor(
+                ElaThemeType::Light, lightRole));
+            accept->setLightHoverColor(eTheme->getThemeColor(
+                ElaThemeType::Light,
+                destructive ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryHover));
+            accept->setLightPressColor(eTheme->getThemeColor(
+                ElaThemeType::Light,
+                destructive ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryPress));
+            accept->setLightTextColor(ElaThemeColor(
+                ElaThemeType::Light, BasicTextInvert));
+            accept->setDarkDefaultColor(eTheme->getThemeColor(
+                ElaThemeType::Dark, darkRole));
+            accept->setDarkHoverColor(eTheme->getThemeColor(
+                ElaThemeType::Dark,
+                destructive ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryHover));
+            accept->setDarkPressColor(eTheme->getThemeColor(
+                ElaThemeType::Dark,
+                destructive ? ElaThemeType::StatusDanger : ElaThemeType::PrimaryPress));
+            accept->setDarkTextColor(ElaThemeColor(
+                ElaThemeType::Dark, BasicTextInvert));
+            connect(accept, &QPushButton::clicked, this, &QDialog::accept);
+            buttons->addWidget(accept);
+            cancel->setFocus(Qt::OtherFocusReason);
+        }
+        else {
+            auto *close = new ElaPushButton(
+                QCoreApplication::translate("ShijimaManager", "Close"), this);
+            close->setAutoDefault(false);
+            close->setDefault(false);
+            close->setMinimumHeight(38);
+            close->setFocusPolicy(Qt::StrongFocus);
+            connect(close, &QPushButton::clicked, this, &QDialog::accept);
+            buttons->addWidget(close);
+            close->setFocus(Qt::OtherFocusReason);
+        }
+        root->addLayout(buttons);
+        connect(this, &ElaDialog::closeButtonClicked, this, &QDialog::reject);
+
+        auto applyPalette = [this, heading, body, bodySurface](
+            ElaThemeType::ThemeMode mode) {
+            QPalette palette = this->palette();
+            palette.setColor(QPalette::Window, ElaThemeColor(mode, DialogBase));
+            palette.setColor(QPalette::WindowText, ElaThemeColor(mode, BasicText));
+            palette.setColor(QPalette::Text, ElaThemeColor(mode, BasicText));
+            palette.setColor(QPalette::Base, ElaThemeColor(mode, DialogBase));
+            body->setPalette(palette);
+            heading->setPalette(palette);
+            bodySurface->setPalette(palette);
+            this->setPalette(palette);
+        };
+        applyPalette(eTheme->getThemeMode());
+        connect(eTheme, &ElaTheme::themeModeChanged, this, applyPalette);
+        fitThemedDialog(this, QSize(360, 148), QSize(520, 300), 0.78);
+    }
+};
+
+class ThemedTextInputDialog final : public ElaDialog {
+public:
+    ThemedTextInputDialog(QWidget *parent, QString const& title,
+        QString const& label, QString const& initial,
+        QString const& acceptText, QString const& cancelText):
+        ElaDialog(parent)
+    {
+        setWindowTitle(title);
+        setWindowButtonFlags(ElaAppBarType::CloseButtonHint);
+        setIsFixedSize(true);
+        setModal(true);
+        setMinimumWidth(360);
+        setMaximumWidth(520);
+
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(22, 18, 22, 16);
+        root->setSpacing(8);
+        auto *heading = new QLabel(title, this);
+        QFont headingFont = heading->font();
+        headingFont.setPointSizeF(qMax(11.0, headingFont.pointSizeF() + 2.0));
+        headingFont.setWeight(QFont::DemiBold);
+        heading->setFont(headingFont);
+        heading->setWordWrap(true);
+        root->addWidget(heading);
+        auto *description = new QLabel(label, this);
+        description->setWordWrap(true);
+        root->addWidget(description);
+        input = new ElaLineEdit(this);
+        input->setText(initial);
+        input->setMinimumHeight(38);
+        input->setClearButtonEnabled(true);
+        root->addWidget(input);
+
+        auto *buttons = new QHBoxLayout;
+        buttons->setContentsMargins(0, 8, 0, 0);
+        buttons->setSpacing(8);
+        buttons->addStretch();
+        auto *cancel = new ElaPushButton(cancelText.isEmpty()
+            ? QCoreApplication::translate("ShijimaManager", "Cancel")
+            : cancelText, this);
+        cancel->setAutoDefault(false);
+        cancel->setDefault(false);
+        cancel->setMinimumHeight(38);
+        connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+        buttons->addWidget(cancel);
+        auto *accept = new ElaPushButton(acceptText.isEmpty()
+            ? QCoreApplication::translate("ShijimaManager", "Save")
+            : acceptText, this);
+        accept->setAutoDefault(false);
+        accept->setDefault(false);
+        accept->setMinimumHeight(38);
+        accept->setLightDefaultColor(ElaThemeColor(
+            ElaThemeType::Light, PrimaryNormal));
+        accept->setLightHoverColor(ElaThemeColor(
+            ElaThemeType::Light, PrimaryHover));
+        accept->setLightPressColor(ElaThemeColor(
+            ElaThemeType::Light, PrimaryPress));
+        accept->setLightTextColor(ElaThemeColor(
+            ElaThemeType::Light, BasicTextInvert));
+        accept->setDarkDefaultColor(ElaThemeColor(
+            ElaThemeType::Dark, PrimaryNormal));
+        accept->setDarkHoverColor(ElaThemeColor(
+            ElaThemeType::Dark, PrimaryHover));
+        accept->setDarkPressColor(ElaThemeColor(
+            ElaThemeType::Dark, PrimaryPress));
+        accept->setDarkTextColor(ElaThemeColor(
+            ElaThemeType::Dark, BasicTextInvert));
+        connect(accept, &QPushButton::clicked, this, &QDialog::accept);
+        buttons->addWidget(accept);
+        root->addLayout(buttons);
+        connect(input, &QLineEdit::returnPressed, this, &QDialog::accept);
+        connect(this, &ElaDialog::closeButtonClicked, this, &QDialog::reject);
+        input->setFocus(Qt::OtherFocusReason);
+        input->selectAll();
+
+        auto applyPalette = [this, heading, description](
+            ElaThemeType::ThemeMode mode) {
+            QPalette palette = this->palette();
+            palette.setColor(QPalette::Window, ElaThemeColor(mode, DialogBase));
+            palette.setColor(QPalette::WindowText, ElaThemeColor(mode, BasicText));
+            palette.setColor(QPalette::Text, ElaThemeColor(mode, BasicText));
+            palette.setColor(QPalette::Base, ElaThemeColor(mode, DialogBase));
+            this->setPalette(palette);
+            heading->setPalette(palette);
+            description->setPalette(palette);
+        };
+        applyPalette(eTheme->getThemeMode());
+        connect(eTheme, &ElaTheme::themeModeChanged, this, applyPalette);
+        fitThemedDialog(this, QSize(360, 156), QSize(520, 280), 0.72);
+    }
+
+    QString value() const { return input->text(); }
+
+private:
+    ElaLineEdit *input = nullptr;
+};
+
+}
+
+bool showThemedQuestion(QWidget *parent, QString const& title,
+    QString const& message, QString const& acceptText,
+    QString const& cancelText, bool destructive)
+{
+    ThemedPromptDialog dialog(parent, title, message, true, acceptText,
+        cancelText, destructive);
+    return dialog.exec() == QDialog::Accepted;
+}
+
+bool showThemedTextInput(QWidget *parent, QString const& title,
+    QString const& label, QString const& initial, QString *result,
+    QString const& acceptText, QString const& cancelText)
+{
+    if (result == nullptr) {
+        return false;
+    }
+    ThemedTextInputDialog dialog(parent, title, label, initial,
+        acceptText, cancelText);
+    if (dialog.exec() != QDialog::Accepted) {
+        return false;
+    }
+    *result = dialog.value();
+    return true;
+}
+
+void showThemedInformation(QWidget *parent, QString const& title,
+    QString const& message)
+{
+    ThemedPromptDialog dialog(parent, title, message, false, {}, {});
+    dialog.exec();
+}
+
+void showThemedWarning(QWidget *parent, QString const& title,
+    QString const& message)
+{
+    ThemedPromptDialog dialog(parent, title, message, false, {}, {});
+    dialog.exec();
+}
+
+void showThemedInformationAsync(QWidget *parent, QString const& title,
+    QString const& message)
+{
+    auto *dialog = new ThemedPromptDialog(parent, title, message, false,
+        {}, {}, false, false);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+}
 
 QString colorToString(QColor const& color) {
     auto rgb = color.toRgb();
@@ -166,14 +498,8 @@ void ShijimaManager::deleteAction() {
         msg += tr("\n... and %n other(s)", nullptr, selected.size() - 5);
     }
 
-    QMessageBox msgBox { this };
-    msgBox.setWindowTitle(tr("Delete shimeji"));
-    msgBox.setText(msg);
-    msgBox.setStandardButtons(QMessageBox::StandardButton::Yes |
-        QMessageBox::StandardButton::No);
-    msgBox.setIcon(QMessageBox::Icon::Question);
-    int ret = msgBox.exec();
-    if (ret == QMessageBox::StandardButton::Yes) {
+    if (ShijimaManagerUiInternal::showThemedQuestion(this,
+            tr("Delete shimeji"), msg, tr("Delete"), tr("Cancel"), true)) {
         QStringList names;
         for (auto item : selected) {
             names.append(item->text());
@@ -283,14 +609,10 @@ void ShijimaManager::askClose() {
     // On desktop platforms this is used both for explicit quit and for tray
     // close behavior when the manager is being hidden instead of destroyed.
     setManagerVisible(true);
-    QMessageBox msgBox { this };
-    msgBox.setWindowTitle(tr("Close NeurolingsCE"));
-    msgBox.setIcon(QMessageBox::Icon::Question);
-    msgBox.setStandardButtons(QMessageBox::StandardButton::Yes |
-        QMessageBox::StandardButton::No);
-    msgBox.setText(tr("Do you want to close NeurolingsCE?"));
-    int ret = msgBox.exec();
-    if (ret == QMessageBox::Button::Yes) {
+    if (ShijimaManagerUiInternal::showThemedQuestion(this,
+            tr("Close NeurolingsCE"),
+            tr("Do you want to close NeurolingsCE?"), tr("Close"),
+            tr("Keep open"))) {
 #if defined(__APPLE__)
         QCoreApplication::quit();
 #else
@@ -371,7 +693,7 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
     if (!m_constructing) {
         // Language changes require a restart because the UI is heavily
         // constructed once and not all widgets retranslate live.
-        QMessageBox::information(this,
+        ShijimaManagerUiInternal::showThemedInformation(this,
             tr("Language Changed"),
             tr("The application will restart to apply the new language."));
 
