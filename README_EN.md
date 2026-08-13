@@ -5,11 +5,16 @@
 > [!NOTE]
 **All versions 0.x.x of this application are beta! Please report any bugs in the Issue section!**
 
+Current release: [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3).
+
 A cross-platform desktop mascot (Shimeji) application, extensively modified from [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt).
 
 Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
-![NeurolingsCE screenshot](.images/Shijima-Qt-Main-Window.png)
+![NeurolingsCE manager window](.images/Shijima-Qt-Main-Window.png)
+
+The screenshot shows the manager window; v0.5.3's embedded About and Codex pages are
+available from the same manager navigation.
 
 ## Features
 
@@ -22,6 +27,9 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 - 🪟 Window mode — run mascots in standalone sandbox windows
 - 🖱️ Mouse interaction — drag, right-click menu
 - 🧰 Dedicated CLI — manage templates and control the runtime with `NeurolingsCE-cli`
+- 🎨 Fluent manager experience — theme-aware pages, dialogs, and responsive layouts
+- ℹ️ Embedded About page — view version, update, and project-support information in manager navigation
+- 🤖 Codex app-server workflow — explicitly connect to private sessions, review plans, approvals, and input without auto-approval
 - 📡 HTTP REST API (`localhost:32456`)
 - 🔐 Safer update checks — use a static update manifest and verify downloaded artifacts
 - 🌐 Multi-language support (English / Simplified Chinese)
@@ -31,8 +39,23 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 
 ## Download
 
+- [v0.5.3 Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)
 - [Latest Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [All Releases](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
+
+### v0.5.3 release assets
+
+| Platform | File | Description |
+|----------|------|-------------|
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI installer |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup bootstrapper |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows portable package |
+| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
+| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
+| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 build |
+| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 build |
+| All platforms | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | Six official mascot packs |
+| All platforms | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/SHA256SUMS.txt) | SHA-256 checksums for release assets |
 
 ## Mascot Store, GitHub Login, And Codex
 
@@ -60,13 +83,18 @@ The Codex notify integration handles new-session title events. When Codex return
 title and summary as JSON, the client extracts only allow-listed fields and renders a
 readable title instead of exposing the raw JSON; it never auto-approves a request.
 
+v0.5.3 also adds an explicit-connect Codex app-server page: after connecting to a
+private session, you can review threads, plans, replies, approvals, and user-input
+requests. JSON-RPC payloads are bounded, pending requests are cancelled on shutdown,
+and approvals always remain user-controlled.
+
 ## Documentation
 
 📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
 
 ## Highlights Since 0.3.3
 
-Current `main` has moved past the `0.5.3` release line and includes additional updater and startup improvements:
+Current `main` corresponds to the latest `v0.5.3` release; the main user-visible changes since `0.3.3` are:
 
 - Added a mascot combinations page for saving the currently running mascot group and restoring the group from the previous close.
 - Double-clicking a template can now spawn the matching mascot directly.
@@ -77,6 +105,10 @@ Current `main` has moved past the `0.5.3` release line and includes additional u
 - Windows now supports start-at-login, silent startup, and restoring the previous or selected mascot combination at login.
 - CI now includes macOS Intel/Apple Silicon builds and validates the supported GUI/CLI build targets; the deprecated standalone test targets have been removed.
 - The default store profile now uses the public Staging registry, with six official mascot packages and readable card details.
+- Manager pages and dialogs now share Fluent/Ela themed surfaces, keyboard focus, and responsive action layouts.
+- Added an embedded About page for identity, version, update, and project-support information; update notifications route there directly.
+- Added an explicit-connect Codex app-server workflow for reviewing plans, replies, approvals, and user-input requests without auto-approval.
+- Completed the Simplified Chinese strings required by the refreshed manager pages, Codex controls, and accessibility labels.
 - GitHub Device Flow authorization now closes its dialog on success and refreshes the signed-in account state.
 - New-session Codex title payloads are adapted from JSON into allow-listed readable title/summary text.
 

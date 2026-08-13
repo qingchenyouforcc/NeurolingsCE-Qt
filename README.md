@@ -6,11 +6,15 @@
 > [!NOTE]
 **该应用0.x.x版本均为测试版！有bug请及时在Issue反馈！**
 
+当前发布版本为 [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)。
+
 跨平台桌面看板娘（Shimeji）应用，基于 [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt) 深度修改而来。
 
 使用 C++17 / Qt6 构建，支持 Windows、Linux 和 macOS。
 
-![NeurolingsCE screenshot](.images/Shijima-Qt-Main-Window.png)
+![NeurolingsCE manager window](.images/Shijima-Qt-Main-Window.png)
+
+截图展示管理器窗口；v0.5.3 的嵌入式“关于”页和 Codex 页面可从同一管理器导航进入。
 
 ## 特性
 
@@ -23,6 +27,9 @@
 - 🪟 窗口模式 — 在独立沙盒窗口中运行看板娘
 - 🖱️ 鼠标交互 — 拖拽、右键菜单
 - 🧰 独立 CLI — 用 `NeurolingsCE-cli` 管理模板和控制运行时
+- 🎨 Fluent 管理器体验 — 主题感知的页面、对话框和响应式布局
+- ℹ️ 嵌入式“关于”页 — 在管理器导航中查看版本、更新和项目支持信息
+- 🤖 Codex app-server 工作流 — 显式连接私有会话，查看计划、审批和用户输入，不自动批准
 - 📡 HTTP REST API（`localhost:32456`）
 - 🔐 安全更新检查 — 使用静态更新清单并校验下载产物
 - 🌐 多语言支持（English / 中文简体）
@@ -32,8 +39,23 @@
 
 ## 下载
 
+- [v0.5.3 发布页](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)
 - [最新版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
 - [所有版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
+
+### v0.5.3 发布资产
+
+| 平台 | 文件 | 说明 |
+|------|------|------|
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI 安装器 |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup 引导安装器 |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows 便携版 |
+| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
+| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
+| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 版本 |
+| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 版本 |
+| 所有平台 | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | 六个官方 mascot 包 |
+| 所有平台 | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/SHA256SUMS.txt) | 所有发布资源的 SHA-256 校验和 |
 
 ## 商店、GitHub 登录与 Codex
 
@@ -56,13 +78,16 @@ https://blog.qingchenyou.asia/NeurolingsCE-Mascots-Staging/index-v1.json
 Codex notify 集成会处理新会话标题事件。若 Codex 将标题和简介作为 JSON 消息返回，客户端
 只提取允许的字段并显示可读标题，不会把原始 JSON 直接显示，也不会自动批准请求。
 
+v0.5.3 还提供显式连接的 Codex app-server 页面：连接私有会话后可查看线程、计划、回复、审批
+和用户输入请求；JSON-RPC 载荷有边界限制，关闭时会取消待处理请求，审批始终由用户决定。
+
 ## 文档
 
 📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
 
 ## 0.3.3 以来的主要更新
 
-当前 `main` 相比 `0.3.3` 已同步到 `0.5.3` 版本线，并继续补充了更新检查与启动体验：
+当前 `main` 对应最新的 `v0.5.3` 发布，下面列出从 `0.3.3` 以来的主要用户可见更新：
 
 - 新增桌宠组合页，可保存当前运行中的多只桌宠，并恢复上次关闭前的组合。
 - 模板列表支持双击生成匹配桌宠，减少选择和召唤步骤。
@@ -73,6 +98,10 @@ Codex notify 集成会处理新会话标题事件。若 Codex 将标题和简介
 - Windows 支持开机自启、静默启动，以及启动时恢复上次或指定桌宠组合。
 - CI 增加 macOS Intel/Apple Silicon 构建，并验证受支持的 GUI/CLI 构建目标；废弃的独立测试目标已移除。
 - 商店默认切换到公开 Staging registry，补充六个官方桌宠包及可读的卡片详情。
+- 管理器页面和对话框统一使用 Fluent/Ela 主题表面、键盘焦点和响应式操作布局。
+- 新增嵌入式“关于”页，集中展示身份、版本、更新和项目支持信息，更新通知会直接进入该页面。
+- 新增需显式连接的 Codex app-server 工作流，可查看计划、回复、审批和用户输入请求，且不会自动批准。
+- 补全刷新管理器页面、Codex 控件及可访问性标签所需的简体中文翻译。
 - 修复 GitHub Device Flow 授权完成后的弹窗生命周期，并刷新登录账号状态。
 - 修复 Codex 新会话标题返回 JSON 时的适配，只显示允许的标题/简介字段。
 
