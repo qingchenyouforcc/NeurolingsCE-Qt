@@ -9,9 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.3] - 2026-08-12
 
+### 🚀 Major Changes / 重大变更
+
+#### Fluent manager experience & embedded About / Fluent 管理器体验与嵌入式关于页
+
+- **Manager page refresh** - Reworked manager pages and dialogs around semantic Ela/Fluent surfaces, responsive layouts, keyboard focus, and accessible actions / **管理器页面刷新** - 使用语义化 Ela/Fluent 表面、响应式布局、键盘焦点和可访问操作重构管理器页面与对话框
+- **Embedded About page** - About is now a persistent navigation page with identity, version, update, and project-support cards; update notifications open it directly / **嵌入式关于页** - 关于页现在是持久化导航页面，包含身份、版本、更新及项目支持卡片；更新通知会直接打开该页面
+- **Theme and layout consistency** - Manager surfaces, dialogs, update prompts, and narrow-window action rows now follow the active theme and reflow without creating tiny content islands / **主题与布局一致性** - 管理器表面、对话框、更新提示及窄窗口操作行会跟随当前主题并自适应重排，避免出现狭窄内容孤岛
+
+#### Explicit Codex app-server workflow / 显式 Codex app-server 工作流
+
+- **Private session controls** - Added an explicit-connect Codex app-server client with session, thread, plan, reply, approval, and user-input controls / **私有会话控制** - 新增需显式连接的 Codex app-server 客户端，支持会话、线程、计划、回复、审批和用户输入控制
+- **Safety boundaries** - JSON-RPC parsing, bounded payloads, request correlation, shutdown cancellation, and no automatic approval keep the companion session isolated / **安全边界** - JSON-RPC 解析、载荷限制、请求关联、关闭时取消及不自动批准机制保持 companion 会话隔离
+
+### ✨ Added / 新增功能
+
+- **Codex app-server protocol** - Added protocol models, JSON-RPC client, plan snapshots, approval decisions, user-input requests, and focused protocol tests / **Codex app-server 协议** - 新增协议模型、JSON-RPC 客户端、计划快照、审批决策、用户输入请求及针对性协议测试
+- **Codex manager page** - Added a manager page for connecting to a private session, reviewing plans and approvals, steering replies, and interrupting active turns / **Codex 管理页面** - 新增管理页面，用于连接私有会话、查看计划与审批、引导回复及中断活动中的回合
+- **Fluent settings color dialog** - Added a compact theme-aware color editing dialog and shared Fluent information, warning, question, and text-input surfaces / **Fluent 设置颜色对话框** - 新增紧凑的主题感知颜色编辑对话框及统一的 Fluent 信息、警告、确认和文本输入表面
+- **Accessibility and localization** - Added accessible names/descriptions, keyboard actions, responsive button rows, and completed Simplified Chinese strings for the refreshed UI / **无障碍与本地化** - 为刷新后的界面补充可访问名称/描述、键盘操作、响应式按钮行并完成简体中文文本
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed About content sizing so the embedded page fills a sensible centered reading column on large windows and shrinks correctly on narrow windows / 修复关于页内容尺寸问题，使嵌入页面在大窗口中填充合理的居中阅读列，并在窄窗口中正确收缩
+- Fixed update notification navigation so the manager is shown and routed to About without opening an independent dialog / 修复更新通知导航，改为显示管理器并进入关于页，不再打开独立对话框
+- Fixed manager message and import/update prompts that could use inconsistent native dialog chrome by routing them through the themed UI helpers / 修复管理器消息及导入/更新提示可能使用不一致原生对话框样式的问题，统一改用主题 UI 辅助器
+- Fixed Codex app-server shutdown handling by cancelling pending requests before the client stops / 修复 Codex app-server 关闭处理，在客户端停止前取消待处理请求
+
 ### 🔧 Changed / 改进与优化
 
-- **Localization** - Completed the Simplified Chinese catalog for manager pages, store/submission flows, update diagnostics, accessibility labels, and Qt standard dialogs / **本地化** - 完善管理器页面、商店/投稿流程、更新诊断、可访问性标签及 Qt 标准对话框的简体中文翻译
+- **Localization** - Completed the Simplified Chinese catalog for manager pages, store/submission flows, update diagnostics, accessibility labels, Codex controls, and Qt standard dialogs / **本地化** - 完善管理器页面、商店/投稿流程、更新诊断、可访问性标签、Codex 控件及 Qt 标准对话框的简体中文翻译
+- **Build and CI** - Kept Debug verification aligned with the GUI, CLI, and Codex protocol targets and made the public staging store profile the safe release default / **构建与 CI** - 让 Debug 验证覆盖 GUI、CLI 和 Codex 协议目标，并将公开 staging 商店配置设为安全的发布默认值
+- **Documentation** - Documented the app-server approval workflow and updated application/UI module guidance for the new manager pages / **文档** - 补充 app-server 审批工作流说明，并更新应用/UI 模块文档以覆盖新的管理器页面
 - **Release metadata** - Synchronized the 0.5.3 version across the source-of-truth configuration and platform manifests / **发布元数据** - 将 0.5.3 版本同步到单一事实配置和各平台清单
 
 ---
@@ -359,7 +388,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 ## Contributors / 贡献者
 
 ### [0.5.3]
-- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Simplified Chinese localization and release metadata / 简体中文本地化与发布元数据
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Fluent manager UI, embedded About, Codex app-server, Simplified Chinese localization, and release metadata / Fluent 管理器界面、嵌入式关于页、Codex app-server、简体中文本地化与发布元数据
 
 ### [0.5.2]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Mascot Store registry and cards, GitHub login lifecycle, Codex title handling, and release maintenance / **桌宠商店 registry 与卡片、GitHub 登录生命周期、Codex 标题处理及发布维护**
