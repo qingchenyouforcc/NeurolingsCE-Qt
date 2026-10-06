@@ -454,6 +454,12 @@ NeurolingsCE/
 
 ---
 
-## Star 趋势
+## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=qingchenyouforcc/NeurolingsCE&type=Date)](https://star-history.com/#qingchenyouforcc/NeurolingsCE&Date)
+<a href="https://www.star-history.com/?repos=qingchenyouforcc%2Fneurolingsce-qt&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=qingchenyouforcc/neurolingsce-qt&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=qingchenyouforcc/neurolingsce-qt&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=qingchenyouforcc/neurolingsce-qt&type=date&legend=top-left" />
+ </picture>
+</a>
