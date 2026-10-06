@@ -1,4 +1,6 @@
-# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE
+![NeurolingsCE-Qt — 跨平台桌面伙伴](.images/NeurolingsCE-Qt-Banner.png)
+
+# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE-Qt
 
 
 **[English](README_EN.md) | 中文**
@@ -9,7 +11,7 @@
 
 **Available on AppImage Catalog** [NeurolingsCE-Qt](https://appimage.github.io/NeurolingsCE-Qt)
 
-当前发布版本为 [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)。
+当前发布版本为 [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/tag/0.5.3)。
 
 跨平台桌面看板娘（Shimeji）应用，基于 [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt) 深度修改而来。
 
@@ -42,23 +44,23 @@
 
 ## 下载
 
-- [v0.5.3 发布页](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)
-- [最新版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
-- [所有版本](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
+- [v0.5.3 发布页](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/tag/0.5.3)
+- [最新版本](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/latest)
+- [所有版本](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases)
 
 ### v0.5.3 发布资产
 
 | 平台 | 文件 | 说明 |
 |------|------|------|
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI 安装器 |
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup 引导安装器 |
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows 便携版 |
-| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
-| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
-| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 版本 |
-| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 版本 |
-| 所有平台 | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | 六个官方 mascot 包 |
-| 所有平台 | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/SHA256SUMS.txt) | 所有发布资源的 SHA-256 校验和 |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI 安装器 |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup 引导安装器 |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows 便携版 |
+| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
+| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
+| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 版本 |
+| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 版本 |
+| 所有平台 | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | 六个官方 mascot 包 |
+| 所有平台 | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/SHA256SUMS.txt) | 所有发布资源的 SHA-256 校验和 |
 
 ## 商店、GitHub 登录与 Codex
 
@@ -86,7 +88,7 @@ v0.5.3 还提供显式连接的 Codex app-server 页面：连接私有会话后�
 
 ## 文档
 
-📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
+📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
 
 ## 0.3.3 以来的主要更新
 
@@ -420,8 +422,8 @@ NeurolingsCE/
 ## 联系方式
 
 - **作者**：[轻尘呦](https://space.bilibili.com/178381315)
-- **项目地址**：https://github.com/qingchenyouforcc/NeurolingsCE
-- **问题反馈**：[GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE/issues)
+- **项目地址**：https://github.com/qingchenyouforcc/NeurolingsCE-Qt
+- **问题反馈**：[GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/issues)
 - **交流 QQ 群**：125081756
 
 **如果你对neuro社区项目开发感兴趣的话**

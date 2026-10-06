@@ -1,11 +1,13 @@
-# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE
+![NeurolingsCE-Qt — cross-platform desktop companions](.images/NeurolingsCE-Qt-Banner.png)
+
+# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE-Qt
 
 **English | [中文](README.md)**
 
 > [!NOTE]
 **All versions 0.x.x of this application are beta! Please report any bugs in the Issue section!**
 
-Current release: [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3).
+Current release: [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/tag/0.5.3).
 
 A cross-platform desktop mascot (Shimeji) application, extensively modified from [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt).
 
@@ -39,23 +41,23 @@ available from the same manager navigation.
 
 ## Download
 
-- [v0.5.3 Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)
-- [Latest Release](https://github.com/qingchenyouforcc/NeurolingsCE/releases/latest)
-- [All Releases](https://github.com/qingchenyouforcc/NeurolingsCE/releases)
+- [v0.5.3 Release](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/tag/0.5.3)
+- [Latest Release](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/latest)
+- [All Releases](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases)
 
 ### v0.5.3 release assets
 
 | Platform | File | Description |
 |----------|------|-------------|
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI installer |
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup bootstrapper |
-| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows portable package |
-| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
-| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
-| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 build |
-| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 build |
-| All platforms | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | Six official mascot packs |
-| All platforms | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE/releases/download/0.5.3/SHA256SUMS.txt) | SHA-256 checksums for release assets |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.msi](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.msi) | Windows MSI installer |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3-setup.exe](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3-setup.exe) | Windows setup bootstrapper |
+| Windows | [NeurolingsCE_windows_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_windows_x86_64_v0.5.3.zip) | Windows portable package |
+| Linux x86_64 | [NeurolingsCE_linux_x86_64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_linux_x86_64_v0.5.3.AppImage) | Linux x86_64 AppImage |
+| Linux arm64 | [NeurolingsCE_linux_arm64_v0.5.3.AppImage](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_linux_arm64_v0.5.3.AppImage) | Linux arm64 AppImage |
+| macOS Apple Silicon | [NeurolingsCE_macos_arm64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_macos_arm64_v0.5.3.zip) | macOS arm64 build |
+| macOS Intel | [NeurolingsCE_macos_x86_64_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_macos_x86_64_v0.5.3.zip) | macOS x86_64 build |
+| All platforms | [NeurolingsCE_mascot_pack_v0.5.3.zip](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/NeurolingsCE_mascot_pack_v0.5.3.zip) | Six official mascot packs |
+| All platforms | [SHA256SUMS.txt](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/releases/download/0.5.3/SHA256SUMS.txt) | SHA-256 checksums for release assets |
 
 ## Mascot Store, GitHub Login, And Codex
 
@@ -90,7 +92,7 @@ and approvals always remain user-controlled.
 
 ## Documentation
 
-📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
+📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
 
 ## Highlights Since 0.3.3
 
@@ -432,8 +434,8 @@ ICO credits:
 ## Contact
 
 - **Author**: [轻尘呦](https://space.bilibili.com/178381315)
-- **Repository**: https://github.com/qingchenyouforcc/NeurolingsCE
-- **Bug Reports**: [GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE/issues)
+- **Repository**: https://github.com/qingchenyouforcc/NeurolingsCE-Qt
+- **Bug Reports**: [GitHub Issues](https://github.com/qingchenyouforcc/NeurolingsCE-Qt/issues)
 - **Chat QQ Group**: 125081756
 
 **Interested in Neuro community project development?**
