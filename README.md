@@ -4,7 +4,7 @@
 **[English](README_EN.md) | 中文**
 
 > [!NOTE]
-**该项目将于9~10月开始迁移至Rust，本仓库将弃用，感兴趣的开发者可加群125081756**
+**该项目将于9~10月开始迁移至Rust，本仓库缓慢更新，感兴趣的开发者可加群125081756**
 
 当前发布版本为 [v0.5.3](https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.5.3)。
 
